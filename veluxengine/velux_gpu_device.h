@@ -3,15 +3,15 @@
 #include "velux_error.h"
 
 #include "velux_gpu_vulkan.h"
-#include "vulkan/vulkan.hpp"
 
 #include <cstdint>
 #include <expected>
 #include <string>
 #include <vector>
-#include <vulkan/vulkan_raii.hpp>
 
 namespace vkr = vk::raii;
+
+constexpr int VLX_MAX_FRAMES_IN_FLIGHT = 2;
 
 struct GLFWwindow;
 
@@ -69,30 +69,30 @@ class VlxGPUDevice
 	auto drawFrame() -> std::expected<void, VlxError>;
 
   private:
-	vkr::Context                context_;
-	vkr::Instance               instance_              = nullptr;
-	vkr::DebugUtilsMessengerEXT debug_                 = nullptr;
-	vkr::SurfaceKHR             surface_               = nullptr;
-	vkr::PhysicalDevice         physical_device_       = nullptr;
-	vkr::Device                 device_                = nullptr;
-	vkr::Queue                  queue_                 = nullptr;
-	uint32_t                    graphics_queue_family_ = UINT32_MAX;
-	uint32_t                    present_queue_family_  = UINT32_MAX;
-	std::string                 device_name_           = "";
-
+	vkr::Context                    context_                 = {};
+	vkr::Instance                   instance_                = nullptr;
+	vkr::DebugUtilsMessengerEXT     debug_                   = nullptr;
+	vkr::SurfaceKHR                 surface_                 = nullptr;
+	vkr::PhysicalDevice             physical_device_         = nullptr;
+	vkr::Device                     device_                  = nullptr;
+	vkr::Queue                      queue_                   = nullptr;
+	uint32_t                        graphics_queue_family_   = UINT32_MAX;
+	uint32_t                        present_queue_family_    = UINT32_MAX;
+	std::string                     device_name_             = "";
 	vkr::SwapchainKHR               swapchain_               = nullptr;
 	std::vector<vk::Image>          swapchain_images_        = {};
 	std::vector<vkr::ImageView>     swapchain_image_views_   = {};
 	vk::SurfaceFormatKHR            swapchain_surfaceformat_ = {};
 	vk::Extent2D                    swapchain_extent_        = {};
-	uint32_t                        image_count_             = UINT32_MAX;
+	std::uint32_t                   image_count_             = UINT32_MAX;
 	vkr::CommandPool                command_pool_            = nullptr;
 	std::vector<vkr::CommandBuffer> command_buffers_         = {};
-	vkr::Semaphore                  present_complete_        = nullptr;
-	vkr::Semaphore                  render_finished_         = nullptr;
-	vkr::Fence                      in_flight_fence_         = nullptr;
-	uint32_t                        current_frame_           = UINT32_MAX;
+	std::vector<vkr::Semaphore>     present_completes_       = {};
+	std::vector<vkr::Semaphore>     render_finisheds_        = {};
+	std::vector<vkr::Fence>         in_flight_fences_        = {};
 	vkr::Pipeline                   graphics_pipeline_       = nullptr;
+	std::uint32_t                   current_frame_           = UINT32_MAX;
+	std::uint32_t                   frame_index_             = 0;
 
 	std::vector<const char *> required_device_exts_ = {vk::KHRSwapchainExtensionName, vk::EXTExtendedDynamicStateExtensionName};
 	float                     queue_priority_       = 1.0f;

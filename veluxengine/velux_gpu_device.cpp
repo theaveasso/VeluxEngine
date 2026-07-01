@@ -4,6 +4,7 @@
 #include "velux_filesystem.h"
 #include "velux_gpu_vulkan.h"
 #include "velux_log.h"
+#include <cstddef>
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -243,11 +244,11 @@ auto VlxGPUDevice::createSwapchain(GLFWwindow *window) -> std::expected<void, Vl
 	    vlx::vkExpected(physical_device_.getSurfacePresentModesKHR(*surface_)));
 	auto present_mode = chooseSwapchainPresentMode(presentmodes_avail);
 
-	auto min_image_count = chooseSwapchainMinImageCount(surface_capabilities);
+	image_count_ = chooseSwapchainMinImageCount(surface_capabilities);
 
 	vk::SwapchainCreateInfoKHR swapchain_info{
 	    .surface          = *surface_,
-	    .minImageCount    = min_image_count,
+	    .minImageCount    = image_count_,
 	    .imageFormat      = swapchain_surfaceformat_.format,
 	    .imageColorSpace  = swapchain_surfaceformat_.colorSpace,
 	    .imageExtent      = swapchain_extent_,
@@ -412,23 +413,36 @@ auto VlxGPUDevice::allocateCommandBuffer() -> std::expected<void, VlxError>
 
 auto VlxGPUDevice::createSyncObjects() -> std::expected<void, VlxError>
 {
+	if (!present_completes_.empty() || !render_finisheds_.empty() || !in_flight_fences_.empty())
+	{
+		VLX_FAIL(VlxErrorCode::Vulkan, "sync objects not empty");
+	}
 	vk::SemaphoreCreateInfo semaphore_info{};
-	VLX_ASSIGN_OR_RETURN(present_complete_, vlx::vkExpected(device_.createSemaphore(semaphore_info)));
-	VLX_ASSIGN_OR_RETURN(render_finished_, vlx::vkExpected(device_.createSemaphore(semaphore_info)));
+	for (size_t i = 0; i < image_count_; ++i)
+	{
+		VLX_ASSIGN_OR_RETURN(auto present_complete, vlx::vkExpected(device_.createSemaphore(semaphore_info)));
+		present_completes_.emplace_back(std::move(present_complete));
+		VLX_ASSIGN_OR_RETURN(auto render_finished, vlx::vkExpected(device_.createSemaphore(semaphore_info)));
+		render_finisheds_.emplace_back(std::move(render_finished));
+	}
 
 	vk::FenceCreateInfo fence_info{
 	    .flags = vk::FenceCreateFlagBits::eSignaled,
 	};
-	VLX_ASSIGN_OR_RETURN(in_flight_fence_, vlx::vkExpected(device_.createFence(fence_info)));
+	for (size_t i = 0; i < VLX_MAX_FRAMES_IN_FLIGHT; ++i)
+	{
+		VLX_ASSIGN_OR_RETURN(auto in_flight_fence, vlx::vkExpected(device_.createFence(fence_info)));
+		in_flight_fences_.emplace_back(std::move(in_flight_fence));
+	}
 	VLX_OK();
 }
 
 auto VlxGPUDevice::drawFrame() -> std::expected<void, VlxError>
 {
-	auto wait_result = device_.waitForFences(*in_flight_fence_, vk::True, UINT64_MAX);
-	device_.resetFences(*in_flight_fence_);
+	auto wait_result = device_.waitForFences(*in_flight_fences_[frame_index_], vk::True, UINT64_MAX);
+	device_.resetFences(*in_flight_fences_[frame_index_]);
 
-	auto aquire_result = swapchain_.acquireNextImage(UINT64_MAX, *present_complete_, nullptr);
+	auto aquire_result = swapchain_.acquireNextImage(UINT64_MAX, *present_completes_[frame_index_], nullptr);
 
 	recordCommandBuffer(aquire_result.value);
 	queue_.waitIdle();
@@ -437,23 +451,24 @@ auto VlxGPUDevice::drawFrame() -> std::expected<void, VlxError>
 
 	const vk::SubmitInfo submit_info{
 	    .waitSemaphoreCount   = 1,
-	    .pWaitSemaphores      = &*present_complete_,
+	    .pWaitSemaphores      = &*present_completes_[frame_index_],
 	    .pWaitDstStageMask    = &wait_destination_stage_mask,
 	    .commandBufferCount   = 1,
 	    .pCommandBuffers      = &*command_buffers_[0],
 	    .signalSemaphoreCount = 1,
-	    .pSignalSemaphores    = &*render_finished_,
+	    .pSignalSemaphores    = &*render_finisheds_[frame_index_],
 	};
-	queue_.submit(submit_info, *in_flight_fence_);
+	queue_.submit(submit_info, *in_flight_fences_[frame_index_]);
 
 	const vk::PresentInfoKHR present_info{
 	    .waitSemaphoreCount = 1,
-	    .pWaitSemaphores    = &*render_finished_,
+	    .pWaitSemaphores    = &*render_finisheds_[frame_index_],
 	    .swapchainCount     = 1,
 	    .pSwapchains        = &*swapchain_,
 	    .pImageIndices      = &aquire_result.value,
 	};
 	auto present_result = queue_.presentKHR(present_info);
+	frame_index_        = (frame_index_ + 1) % VLX_MAX_FRAMES_IN_FLIGHT;
 	VLX_OK();
 }
 

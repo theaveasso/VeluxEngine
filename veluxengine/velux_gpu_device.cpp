@@ -4,9 +4,6 @@
 #include "velux_filesystem.h"
 #include "velux_gpu_vulkan.h"
 #include "velux_log.h"
-#include "vulkan/vulkan.hpp"
-#include <vulkan/vulkan_core.h>
-#include <vulkan/vulkan_raii.hpp>
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -30,7 +27,8 @@ namespace
 static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(
     vk::DebugUtilsMessageSeverityFlagBitsEXT      severity,
     vk::DebugUtilsMessageTypeFlagsEXT             types,
-    vk::DebugUtilsMessengerCallbackDataEXT const *cb_data, void *user_data)
+    vk::DebugUtilsMessengerCallbackDataEXT const *cb_data,
+    void                                         *user_data)
 {
 	if (severity >= vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning)
 	{
@@ -50,16 +48,16 @@ constexpr uint32_t VLX_QUEUE_NONE = UINT32_MAX;
 
 auto collectNames(std::span<const vk::LayerProperties> props) -> std::vector<std::string_view>;
 auto collectNames(std::span<const vk::ExtensionProperties> props) -> std::vector<std::string_view>;
-auto contains(std::span<const std::string_view> names, std::string_view wanted) -> bool;
 auto enableIfAvailable(std::span<const std::string_view> available, const char *name, std::vector<const char *> &out) -> bool;
-auto isDeviceSuitable(vkr::PhysicalDevice const &physcial_device, std::span<const char *> required_device_exts) -> bool;
-auto findQueueFamilies(vkr::Instance const &instance, vkr::PhysicalDevice const &physical_device, uint32_t *graphics, uint32_t *present) -> bool;
+
+[[nodiscard]] auto contains(std::span<const std::string_view> names, std::string_view wanted) -> bool;
+[[nodiscard]] auto isDeviceSuitable(vkr::PhysicalDevice const &physcial_device, std::span<const char *> required_device_exts) -> bool;
+[[nodiscard]] auto findQueueFamilies(vkr::Instance const &instance, vkr::PhysicalDevice const &physical_device, uint32_t *graphics, uint32_t *present) -> bool;
 
 [[nodiscard]] auto chooseSwapchainSurfaceFormat(std::span<vk::SurfaceFormatKHR> avail) -> vk::SurfaceFormatKHR;
 [[nodiscard]] auto chooseSwapchainPresentMode(std::span<vk::PresentModeKHR> avail) -> vk::PresentModeKHR;
 [[nodiscard]] auto chooseSwapchainExtent(vk::SurfaceCapabilitiesKHR const &capabilites, int fbw, int fbh) -> vk::Extent2D;
 [[nodiscard]] auto chooseSwapchainMinImageCount(vk::SurfaceCapabilitiesKHR const &capabilites) -> uint32_t;
-
 [[nodiscard]] auto createShaderModule(vkr::Device const &device, const std::vector<char> &code) -> std::expected<vkr::ShaderModule, VlxError>;
 }        // namespace
 
@@ -93,9 +91,9 @@ auto VlxGPUDevice::createInstance() -> std::expected<void, VlxError>
 	    .apiVersion         = vk::ApiVersion14,
 	};
 
-	VLX_ASSIGN_OR_RETURN(auto layer_props,
-	                     vlx::vkExpected("createInstance: enumerateInstanceLayerProperties",
-	                                     context_.enumerateInstanceLayerProperties()));
+	VLX_ASSIGN_OR_RETURN(
+	    auto layer_props,
+	    vlx::vkExpected(context_.enumerateInstanceLayerProperties()));
 	const auto avail_layers = collectNames(layer_props);
 
 	std::vector<const char *> layers;
@@ -106,9 +104,9 @@ auto VlxGPUDevice::createInstance() -> std::expected<void, VlxError>
 		enableIfAvailable(avail_layers, "VK_LAYER_KHRONOS_validation", layers);
 	}
 
-	VLX_ASSIGN_OR_RETURN(auto ext_props,
-	                     vlx::vkExpected("createInstance: enumerateInstanceExtensionProperties",
-	                                     context_.enumerateInstanceExtensionProperties()));
+	VLX_ASSIGN_OR_RETURN(
+	    auto ext_props,
+	    vlx::vkExpected(context_.enumerateInstanceExtensionProperties()));
 	const auto avail_exts = collectNames(ext_props);
 
 	std::vector<const char *> exts;
@@ -143,20 +141,18 @@ auto VlxGPUDevice::createInstance() -> std::expected<void, VlxError>
 	    .ppEnabledExtensionNames = exts.data(),
 	};
 
-	VLX_ASSIGN_OR_RETURN(instance_, vlx::vkExpected("createInstance",
-	                                                context_.createInstance(create_info)));
+	VLX_ASSIGN_OR_RETURN(instance_, vlx::vkExpected(context_.createInstance(create_info)));
 	VLX_OK();
 }
 
 auto VlxGPUDevice::setupDebugMessenger() -> std::expected<void, VlxError>
 {
-	VLX_ASSIGN_OR_RETURN(auto ext_props,
-	                     vlx::vkExpected("enumerateInstanceExtensionProperties",
-	                                     context_.enumerateInstanceExtensionProperties()));
-	if (!VLX_VULKAN_ENABLE_VALIDATION ||
-	    !contains(collectNames(ext_props), vk::EXTDebugUtilsExtensionName))
+	VLX_ASSIGN_OR_RETURN(
+	    auto ext_props,
+	    vlx::vkExpected(context_.enumerateInstanceExtensionProperties()));
+	if (!VLX_VULKAN_ENABLE_VALIDATION || !contains(collectNames(ext_props), vk::EXTDebugUtilsExtensionName))
 	{
-		return {};
+		VLX_OK();
 	}
 
 	vk::DebugUtilsMessengerCreateInfoEXT debug_info{
@@ -166,22 +162,18 @@ auto VlxGPUDevice::setupDebugMessenger() -> std::expected<void, VlxError>
 	                       vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation,
 	    .pfnUserCallback = &debugCallback,
 	};
-
-	VLX_ASSIGN_OR_RETURN(debug_,
-	                     vlx::vkExpected("createDebugUtilsMessengerEXT",
-	                                     instance_.createDebugUtilsMessengerEXT(debug_info)));
+	VLX_ASSIGN_OR_RETURN(debug_, vlx::vkExpected(instance_.createDebugUtilsMessengerEXT(debug_info)));
 	VLX_OK();
 }
 
 auto VlxGPUDevice::pickPhysicalDevice() -> std::expected<void, VlxError>
 {
-	VLX_ASSIGN_OR_RETURN(auto devices,
-	                     vlx::vkExpected("enumeratePhysicalDevices",
-	                                     instance_.enumeratePhysicalDevices()));
+	VLX_ASSIGN_OR_RETURN(auto devices, vlx::vkExpected(instance_.enumeratePhysicalDevices()));
 	if (devices.empty())
 	{
 		VLX_FAIL(VlxErrorCode::Vulkan, "no physical device");
 	}
+
 	auto const device_itr =
 	    std::ranges::find_if(devices, [&](auto const &device) {
 		    return isDeviceSuitable(device, required_device_exts_) &&
@@ -192,6 +184,7 @@ auto VlxGPUDevice::pickPhysicalDevice() -> std::expected<void, VlxError>
 	{
 		VLX_FAIL(VlxErrorCode::Vulkan, "no suitable physical device");
 	}
+
 	physical_device_ = std::move(*device_itr);
 	device_name_     = physical_device_.getProperties().deviceName.data();
 	VLX_LOGD("Vulkan selected physical device {}", device_name_);
@@ -219,16 +212,13 @@ auto VlxGPUDevice::createLogicalDevice() -> std::expected<void, VlxError>
 	    .pQueuePriorities = &queue_priority_,
 	};
 	vk::DeviceCreateInfo device_info{
-	    .pNext                = &feature_chain.get<vk::PhysicalDeviceFeatures2>(),
-	    .queueCreateInfoCount = 1,
-	    .pQueueCreateInfos    = &device_queue_info,
-	    .enabledExtensionCount =
-	        static_cast<std::uint32_t>(required_device_exts_.size()),
+	    .pNext                   = &feature_chain.get<vk::PhysicalDeviceFeatures2>(),
+	    .queueCreateInfoCount    = 1,
+	    .pQueueCreateInfos       = &device_queue_info,
+	    .enabledExtensionCount   = static_cast<std::uint32_t>(required_device_exts_.size()),
 	    .ppEnabledExtensionNames = required_device_exts_.data(),
 	};
-
-	VLX_ASSIGN_OR_RETURN(device_, vlx::vkExpected("createLogicalDevice: createDevice",
-	                                              physical_device_.createDevice(device_info)));
+	VLX_ASSIGN_OR_RETURN(device_, vlx::vkExpected(physical_device_.createDevice(device_info)));
 	queue_ = device_.getQueue(graphics_queue_family_, 0);
 	VLX_OK();
 }
@@ -237,8 +227,7 @@ auto VlxGPUDevice::createSwapchain(GLFWwindow *window) -> std::expected<void, Vl
 {
 	VLX_ASSIGN_OR_RETURN(
 	    auto surface_capabilities,
-	    vlx::vkExpected("createSwapchain: getSurfaceCapabilitiesKHR",
-	                    physical_device_.getSurfaceCapabilitiesKHR(*surface_)));
+	    vlx::vkExpected(physical_device_.getSurfaceCapabilitiesKHR(*surface_)));
 
 	int fbw{}, fbh{};
 	glfwGetFramebufferSize(window, &fbw, &fbh);
@@ -246,15 +235,12 @@ auto VlxGPUDevice::createSwapchain(GLFWwindow *window) -> std::expected<void, Vl
 
 	VLX_ASSIGN_OR_RETURN(
 	    auto formats_avail,
-	    vlx::vkExpected("createSwapchain: getSurfaceFormatsKHR",
-	                    physical_device_.getSurfaceFormatsKHR(*surface_)));
+	    vlx::vkExpected(physical_device_.getSurfaceFormatsKHR(*surface_)));
 	swapchain_surfaceformat_ = chooseSwapchainSurfaceFormat(formats_avail);
 
 	VLX_ASSIGN_OR_RETURN(
 	    auto presentmodes_avail,
-	    vlx::vkExpected("createSwapchain: getSurfacePresentModesKHR",
-	                    physical_device_.getSurfacePresentModesKHR(*surface_)));
-
+	    vlx::vkExpected(physical_device_.getSurfacePresentModesKHR(*surface_)));
 	auto present_mode = chooseSwapchainPresentMode(presentmodes_avail);
 
 	auto min_image_count = chooseSwapchainMinImageCount(surface_capabilities);
@@ -273,11 +259,7 @@ auto VlxGPUDevice::createSwapchain(GLFWwindow *window) -> std::expected<void, Vl
 	    .presentMode      = present_mode,
 	    .clipped          = vk::True,
 	};
-
-	VLX_ASSIGN_OR_RETURN(swapchain_,
-	                     vlx::vkExpected("createSwapchain: createSwapchainKHR",
-	                                     device_.createSwapchainKHR(swapchain_info)));
-
+	VLX_ASSIGN_OR_RETURN(swapchain_, vlx::vkExpected(device_.createSwapchainKHR(swapchain_info)));
 	swapchain_images_ = std::move(*swapchain_.getImages());
 	VLX_OK();
 }
@@ -301,12 +283,9 @@ auto VlxGPUDevice::createImageViews() -> std::expected<void, VlxError>
 	for (auto &image : swapchain_images_)
 	{
 		view_info.image = image;
-		VLX_ASSIGN_OR_RETURN(auto view,
-		                     vlx::vkExpected("createImageView: createImageView",
-		                                     device_.createImageView(view_info)));
+		VLX_ASSIGN_OR_RETURN(auto view, vlx::vkExpected(device_.createImageView(view_info)));
 		swapchain_image_views_.emplace_back(std::move(view));
 	}
-
 	VLX_OK();
 }
 
@@ -319,8 +298,7 @@ auto VlxGPUDevice::createGraphicsPipeline() -> std::expected<void, VlxError>
 	    .setLayoutCount         = 0,
 	    .pushConstantRangeCount = 0,
 	};
-	VLX_ASSIGN_OR_RETURN(vkr::PipelineLayout pipeline_layout, vlx::vkExpected("createGraphicsPipeline: createPipelineLayout failed",
-	                                                                          device_.createPipelineLayout(layout_info)));
+	VLX_ASSIGN_OR_RETURN(vkr::PipelineLayout pipeline_layout, vlx::vkExpected(device_.createPipelineLayout(layout_info)));
 
 	vk::PipelineShaderStageCreateInfo vert_shader_stage_info{
 	    .stage  = vk::ShaderStageFlagBits::eVertex,
@@ -403,10 +381,10 @@ auto VlxGPUDevice::createGraphicsPipeline() -> std::expected<void, VlxError>
 
 	VLX_ASSIGN_OR_RETURN(
 	    graphics_pipeline_,
-	    vlx::vkExpected("createGraphicsPipeline failed", device_.createGraphicsPipeline(
-	                                                         nullptr,
-	                                                         pipeline_info.get<vk::GraphicsPipelineCreateInfo>(),
-	                                                         nullptr)));
+	    vlx::vkExpected(device_.createGraphicsPipeline(
+	        nullptr,
+	        pipeline_info.get<vk::GraphicsPipelineCreateInfo>(),
+	        nullptr)));
 
 	VLX_OK();
 }
@@ -417,8 +395,7 @@ auto VlxGPUDevice::createCommandPool() -> std::expected<void, VlxError>
 	    .flags            = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
 	    .queueFamilyIndex = graphics_queue_family_,
 	};
-	VLX_ASSIGN_OR_RETURN(command_pool_, vlx::vkExpected("createCommandPool", device_.createCommandPool(pool_info)));
-
+	VLX_ASSIGN_OR_RETURN(command_pool_, vlx::vkExpected(device_.createCommandPool(pool_info)));
 	VLX_OK();
 }
 
@@ -429,22 +406,20 @@ auto VlxGPUDevice::allocateCommandBuffer() -> std::expected<void, VlxError>
 	    .level              = vk::CommandBufferLevel::ePrimary,
 	    .commandBufferCount = 1,
 	};
-	VLX_ASSIGN_OR_RETURN(command_buffers_, vlx::vkExpected("allocateCommandBuffer",
-	                                                       device_.allocateCommandBuffers(allocate_info)));
+	VLX_ASSIGN_OR_RETURN(command_buffers_, vlx::vkExpected(device_.allocateCommandBuffers(allocate_info)));
 	VLX_OK();
 }
 
 auto VlxGPUDevice::createSyncObjects() -> std::expected<void, VlxError>
 {
 	vk::SemaphoreCreateInfo semaphore_info{};
-	VLX_ASSIGN_OR_RETURN(present_complete_, vlx::vkExpected("createSyncObjects: createSemaphore", device_.createSemaphore(semaphore_info)));
-	VLX_ASSIGN_OR_RETURN(render_finished_, vlx::vkExpected("createSyncObjects: createSemaphore", device_.createSemaphore(semaphore_info)));
+	VLX_ASSIGN_OR_RETURN(present_complete_, vlx::vkExpected(device_.createSemaphore(semaphore_info)));
+	VLX_ASSIGN_OR_RETURN(render_finished_, vlx::vkExpected(device_.createSemaphore(semaphore_info)));
 
 	vk::FenceCreateInfo fence_info{
 	    .flags = vk::FenceCreateFlagBits::eSignaled,
 	};
-	VLX_ASSIGN_OR_RETURN(in_flight_fence_, vlx::vkExpected("createSyncObjects: createFence", device_.createFence(fence_info)));
-
+	VLX_ASSIGN_OR_RETURN(in_flight_fence_, vlx::vkExpected(device_.createFence(fence_info)));
 	VLX_OK();
 }
 
@@ -479,7 +454,6 @@ auto VlxGPUDevice::drawFrame() -> std::expected<void, VlxError>
 	    .pImageIndices      = &aquire_result.value,
 	};
 	auto present_result = queue_.presentKHR(present_info);
-
 	VLX_OK();
 }
 
@@ -721,9 +695,9 @@ auto createShaderModule(vkr::Device const &device, const std::vector<char> &code
 	    .codeSize = code.size() * sizeof(char),
 	    .pCode    = reinterpret_cast<const uint32_t *>(code.data()),
 	};
-	VLX_ASSIGN_OR_RETURN(auto module,
-	                     vlx::vkExpected("createShaderModule",
-	                                     device.createShaderModule(module_info)));
+	VLX_ASSIGN_OR_RETURN(
+	    auto module,
+	    vlx::vkExpected(device.createShaderModule(module_info)));
 	return module;
 }        // namespace
 }        // namespace

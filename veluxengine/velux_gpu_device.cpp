@@ -405,7 +405,7 @@ auto VlxGPUDevice::allocateCommandBuffer() -> std::expected<void, VlxError>
 	vk::CommandBufferAllocateInfo allocate_info{
 	    .commandPool        = *command_pool_,
 	    .level              = vk::CommandBufferLevel::ePrimary,
-	    .commandBufferCount = 1,
+	    .commandBufferCount = VLX_MAX_FRAMES_IN_FLIGHT,
 	};
 	VLX_ASSIGN_OR_RETURN(command_buffers_, vlx::vkExpected(device_.allocateCommandBuffers(allocate_info)));
 	VLX_OK();
@@ -444,6 +444,7 @@ auto VlxGPUDevice::drawFrame() -> std::expected<void, VlxError>
 
 	auto aquire_result = swapchain_.acquireNextImage(UINT64_MAX, *present_completes_[frame_index_], nullptr);
 
+	command_buffers_[frame_index_].reset();
 	recordCommandBuffer(aquire_result.value);
 	queue_.waitIdle();
 
@@ -454,7 +455,7 @@ auto VlxGPUDevice::drawFrame() -> std::expected<void, VlxError>
 	    .pWaitSemaphores      = &*present_completes_[frame_index_],
 	    .pWaitDstStageMask    = &wait_destination_stage_mask,
 	    .commandBufferCount   = 1,
-	    .pCommandBuffers      = &*command_buffers_[0],
+	    .pCommandBuffers      = &*command_buffers_[frame_index_],
 	    .signalSemaphoreCount = 1,
 	    .pSignalSemaphores    = &*render_finisheds_[frame_index_],
 	};
@@ -474,7 +475,7 @@ auto VlxGPUDevice::drawFrame() -> std::expected<void, VlxError>
 
 auto VlxGPUDevice::recordCommandBuffer(uint32_t image_index) -> void
 {
-	command_buffers_[0].begin({});
+	command_buffers_[frame_index_].begin({});
 	transitionImageLayout(
 	    image_index,
 	    vk::ImageLayout::eUndefined,
@@ -499,14 +500,14 @@ auto VlxGPUDevice::recordCommandBuffer(uint32_t image_index) -> void
 	    .pColorAttachments    = &attachment_info,
 	};
 
-	command_buffers_[0].beginRendering(rendering_info);
+	command_buffers_[frame_index_].beginRendering(rendering_info);
 
-	command_buffers_[0].bindPipeline(vk::PipelineBindPoint::eGraphics, graphics_pipeline_);
-	command_buffers_[0].setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(swapchain_extent_.width), static_cast<float>(swapchain_extent_.height)));
-	command_buffers_[0].setScissor(0, vk::Rect2D(vk::Offset2D(0.0), swapchain_extent_));
-	command_buffers_[0].draw(3, 1, 0, 0);
+	command_buffers_[frame_index_].bindPipeline(vk::PipelineBindPoint::eGraphics, graphics_pipeline_);
+	command_buffers_[frame_index_].setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(swapchain_extent_.width), static_cast<float>(swapchain_extent_.height)));
+	command_buffers_[frame_index_].setScissor(0, vk::Rect2D(vk::Offset2D(0.0), swapchain_extent_));
+	command_buffers_[frame_index_].draw(3, 1, 0, 0);
 
-	command_buffers_[0].endRendering();
+	command_buffers_[frame_index_].endRendering();
 
 	transitionImageLayout(
 	    image_index,
@@ -516,7 +517,7 @@ auto VlxGPUDevice::recordCommandBuffer(uint32_t image_index) -> void
 	    {},
 	    vk::PipelineStageFlagBits2::eColorAttachmentOutput,
 	    vk::PipelineStageFlagBits2::eBottomOfPipe);
-	command_buffers_[0].end();
+	command_buffers_[frame_index_].end();
 }
 
 auto VlxGPUDevice::transitionImageLayout(
@@ -545,7 +546,7 @@ auto VlxGPUDevice::transitionImageLayout(
 	    .imageMemoryBarrierCount = 1,
 	    .pImageMemoryBarriers    = &barrier,
 	};
-	command_buffers_[0].pipelineBarrier2(dependency_info);
+	command_buffers_[frame_index_].pipelineBarrier2(dependency_info);
 }
 
 auto VlxGPUDevice::createSurface(GLFWwindow *window) -> std::expected<void, VlxError>

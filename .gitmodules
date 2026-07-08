@@ -1,0 +1,4 @@
+[submodule "third_party/odin-vma"]
+	path = third_party/odin-vma
+	url = https://github.com/wrapperup/odin-vma.git
+	branch = master

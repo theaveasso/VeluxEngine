@@ -5,7 +5,7 @@ import "core:mem"
 import vma "third_party:odin-vma"
 import vk "vendor:vulkan"
 
-DeviceAddress :: struct($T: typeid) {
+Device_Address :: struct($T: typeid) {
 	address: vk.DeviceAddress,
 }
 
@@ -13,10 +13,10 @@ Buffer :: struct($T: typeid) {
 	handle:     vk.Buffer,
 	allocation: vma.Allocation,
 	info:       vma.AllocationInfo,
-	ptr:        DeviceAddress(T),
+	ptr:        Device_Address(T),
 }
 
-BufferKind :: enum {
+Buffer_Kind :: enum {
 	Storage,
 	Index,
 	Staging,
@@ -27,7 +27,7 @@ create_buffer :: proc(
 	device: ^Device,
 	$T: typeid,
 	#any_int size: vk.DeviceSize = 1,
-	kind: BufferKind,
+	kind: Buffer_Kind,
 ) -> (
 	buffer: Buffer(T),
 	err: Error,
@@ -80,7 +80,7 @@ get_buffer_device_address :: proc(device: vk.Device, buffer: Buffer($T)) -> vk.D
 	return vk.GetBufferDeviceAddress(device, &device_address_info)
 }
 
-vk_vma_buffer_flags :: proc(kind: BufferKind) -> (vk.BufferUsageFlags, vma.AllocationCreateFlags) {
+vk_vma_buffer_flags :: proc(kind: Buffer_Kind) -> (vk.BufferUsageFlags, vma.AllocationCreateFlags) {
 	switch kind {
 	case .Storage:
 		return {.TRANSFER_DST, .STORAGE_BUFFER, .SHADER_DEVICE_ADDRESS}, {}
@@ -139,7 +139,7 @@ staging_write_buffer :: proc(
 	offset: vk.DeviceSize = 0,
 	loc := #caller_location,
 ) -> (
-	err: Error,
+	err: Error = .None,
 ) {
 	context.logger = device.logger
 
@@ -157,7 +157,7 @@ staging_write_buffer :: proc(
 	region := init_buffer_copy2(cast(vk.DeviceSize)size, offset)
 	cmd_copy_buffer2(cmd, staging.handle, buffer.handle, &region)
 
-	return .None
+	return
 }
 
 @(require_results)
@@ -169,7 +169,7 @@ staging_write_buffer_slice :: proc(
 	offset: vk.DeviceSize = 0,
 	loc := #caller_location,
 ) -> (
-	err: Error,
+	err: Error = .None,
 ) {
 	context.logger = device.logger
 
@@ -187,5 +187,5 @@ staging_write_buffer_slice :: proc(
 	region := init_buffer_copy2(cast(vk.DeviceSize)size, offset)
 	cmd_copy_buffer2(cmd, staging.handle, buffer.handle, &region)
 
-	return .None
+	return
 }

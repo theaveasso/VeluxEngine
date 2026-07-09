@@ -9,6 +9,7 @@ Frame :: struct {
 	present_completed: vk.Semaphore,
 	image:             vk.Image,
 	view:              vk.ImageView,
+	depth_view:        vk.ImageView,
 	extent:            vk.Extent2D,
 	image_index:       u32,
 	frame_index:       u32,
@@ -64,22 +65,35 @@ begin_frame :: proc(device: ^Device) -> (frame: Frame, err: Error) {
 		present_completed = frame_data.present_complete,
 		image             = device.swapchain.images[image_index],
 		view              = device.swapchain.views[image_index],
+		depth_view        = device.depth_image.view,
 		extent            = device.swapchain.extent,
 		image_index       = image_index,
 		frame_index       = device.current_frame,
 	}
 
-	cmd_transition_image(frame, .UNDEFINED, .COLOR_ATTACHMENT_OPTIMAL)
+	cmd_transition_images(
+		frame.cmd,
+		{
+			{frame.image, {.COLOR}, .UNDEFINED, .COLOR_ATTACHMENT_OPTIMAL},
+			{device.depth_image.handle, {.DEPTH}, .UNDEFINED, .DEPTH_ATTACHMENT_OPTIMAL},
+		},
+	)
 
 	return frame, .None
 }
 
 @(require_results)
-end_frame :: proc(device: ^Device, frame: Frame) -> (err: Error) {
+end_frame :: proc(device: ^Device, frame: Frame) -> (err: Error = .None) {
 	context.logger = device.logger
 	frame := frame
 
-	cmd_transition_image(frame, .COLOR_ATTACHMENT_OPTIMAL, .PRESENT_SRC_KHR)
+	cmd_transition_image(
+		frame.cmd,
+		frame.image,
+		{.COLOR},
+		.COLOR_ATTACHMENT_OPTIMAL,
+		.PRESENT_SRC_KHR,
+	)
 
 	vk_check(vk.EndCommandBuffer(frame.cmd), .Vulkan_Call_Failed) or_return
 
@@ -109,5 +123,5 @@ end_frame :: proc(device: ^Device, frame: Frame) -> (err: Error) {
 	}
 
 	device.current_frame = (device.current_frame + 1) % MAX_FRAMES_IN_FLIGHT
-	return .None
+	return
 }

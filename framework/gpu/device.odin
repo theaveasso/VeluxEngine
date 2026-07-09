@@ -21,7 +21,7 @@ Error :: enum {
 	Invalid_Shader,
 	No_Suitable_Physical_Device,
 	No_Graphics_Queue_Supported,
-	CommandBuffer_Allocation_Failed,
+	Command_Buffer_Allocation_Failed,
 	Swapchain_Recreate,
 	Vulkan_Call_Failed,
 	VMA_Call_Failed,
@@ -47,6 +47,7 @@ Device :: struct {
 	graphics_queue:             vk.Queue,
 	graphics_family:            u32,
 	swapchain:                  Swapchain,
+	depth_image:                Image,
 	frames:                     [MAX_FRAMES_IN_FLIGHT]Frame_Data,
 	render_finished_semaphores: []vk.Semaphore,
 	command_pool:               vk.CommandPool,
@@ -71,18 +72,22 @@ Swapchain :: struct {
 }
 
 @(require_results)
-vk_check :: proc(result: vk.Result, err: Error, loc := #caller_location) -> Error {
+vk_check :: proc(
+	result: vk.Result,
+	err: Error = .Vulkan_Call_Failed,
+	loc := #caller_location,
+) -> Error {
 	if result == .SUCCESS do return .None
 	log.errorf("vulkan call failed :%v (%v)", result, loc)
 	return err
 }
 
-wait_idle :: #force_inline proc(device: ^Device) {
+wait_idle :: proc(device: ^Device) {
 	if device.device != nil do vk.DeviceWaitIdle(device.device)
 }
 
 @(require_results)
-init :: proc(device: ^Device, config: Config) -> Error {
+init :: proc(device: ^Device, config: Config) -> (err: Error = .None) {
 	device.logger = core.logger_from_prefix(&device.log_state, "[gpu]: ")
 	context.logger = device.logger
 	device.enable_validation_layer = config.enable_validation
@@ -95,13 +100,14 @@ init :: proc(device: ^Device, config: Config) -> Error {
 	create_device(device) or_return
 	create_vma_allocator(device) or_return
 	create_swapchain(device) or_return
+	create_depth_resources(device) or_return
 	create_per_image_semaphores(device) or_return
 	create_command_pool(device) or_return
 	allocate_command_buffers(device) or_return
 	create_imm_transfer_context(device) or_return
 	create_sync_objects(device) or_return
 
-	return .None
+	return
 }
 
 destroy :: proc(device: ^Device) {
@@ -111,6 +117,7 @@ destroy :: proc(device: ^Device) {
 	destroy_sync_objects(device)
 	vk.DestroyCommandPool(device.device, device.command_pool, nil)
 	destroy_per_image_semaphores(device)
+	destroy_depth_resources(device)
 	destroy_swapchain_resources(device)
 	vma.DestroyAllocator(device.vma_allocator)
 	vk.DestroyDevice(device.device, nil)
@@ -146,8 +153,8 @@ debug_callback :: proc "system" (
 	return false
 }
 
-@(require_results)
-create_instance :: proc(device: ^Device, config: Config) -> Error {
+@(private, require_results)
+create_instance :: proc(device: ^Device, config: Config) -> (err: Error = .None) {
 	vk.load_proc_addresses_global(rawptr(glfw.GetInstanceProcAddress))
 
 	if vk.GetInstanceProcAddr == nil {
@@ -204,16 +211,15 @@ create_instance :: proc(device: ^Device, config: Config) -> Error {
 		create_info.pNext = nil
 	}
 
-	vk_check(vk.CreateInstance(&create_info, nil, &device.instance), .Vulkan_Call_Failed) or_return
-
+	vk_check(vk.CreateInstance(&create_info, nil, &device.instance)) or_return
 	vk.load_proc_addresses_instance(device.instance)
 
-	return .None
+	return
 }
 
-@(require_results)
-setup_debug_utils_messenger :: proc(device: ^Device, config: Config) -> Error {
-	if !config.enable_validation do return .None
+@(private, require_results)
+setup_debug_utils_messenger :: proc(device: ^Device, config: Config) -> (err: Error = .None) {
+	if !config.enable_validation do return
 
 	validation_features: vk.ValidationFeaturesEXT = {
 		sType                         = .VALIDATION_FEATURES_EXT,
@@ -237,27 +243,25 @@ setup_debug_utils_messenger :: proc(device: ^Device, config: Config) -> Error {
 			nil,
 			&device.debug_messenger,
 		),
-		.Vulkan_Call_Failed,
 	) or_return
 
-	return .None
+	return
 }
 
-@(require_results)
-create_surface :: proc(device: ^Device, config: Config) -> Error {
+@(private, require_results)
+create_surface :: proc(device: ^Device, config: Config) -> (err: Error = .None) {
 	device.window = config.window
 	if device.window == nil do return .Invalid_Handle
 
 	vk_check(
 		glfw.CreateWindowSurface(device.instance, device.window, nil, &device.surface),
-		.Vulkan_Call_Failed,
 	) or_return
 
-	return .None
+	return
 }
 
-@(require_results)
-pick_physical_device :: proc(device: ^Device) -> Error {
+@(private, require_results)
+pick_physical_device :: proc(device: ^Device) -> (err: Error = .No_Suitable_Physical_Device) {
 	device_n: u32 = 0
 	vk_check(
 		vk.EnumeratePhysicalDevices(device.instance, &device_n, nil),
@@ -281,20 +285,20 @@ pick_physical_device :: proc(device: ^Device) -> Error {
 	}
 
 	if device.physical_device == nil {
-		for phsyical_device in devices {
-			is_suitable, _is_discrete := is_device_suitable(phsyical_device, device.surface)
+		for physical_device in devices {
+			is_suitable, _is_discrete := is_device_suitable(physical_device, device.surface)
 			if is_suitable {
-				device.physical_device = phsyical_device
+				device.physical_device = physical_device
 				return .None
 			}
 		}
 	}
 
-	return .No_Suitable_Physical_Device
+	return
 }
 
-@(require_results)
-find_queue_families :: proc(device: ^Device) -> Error {
+@(private, require_results)
+find_queue_families :: proc(device: ^Device) -> (err: Error = .None) {
 	queue_family_n: u32
 	vk.GetPhysicalDeviceQueueFamilyProperties(device.physical_device, &queue_family_n, nil)
 
@@ -307,7 +311,7 @@ find_queue_families :: proc(device: ^Device) -> Error {
 	)
 
 	queue_family: u32 = max(u32)
-	for qf, i in &queue_families {
+	for &qf, i in queue_families {
 		if .GRAPHICS not_in qf.queueFlags do continue
 
 		support_present := glfw.GetPhysicalDevicePresentationSupport(
@@ -327,8 +331,8 @@ find_queue_families :: proc(device: ^Device) -> Error {
 	return queue_family != max(u32) ? .None : .No_Graphics_Queue_Supported
 }
 
-@(require_results)
-create_device :: proc(device: ^Device) -> Error {
+@(private, require_results)
+create_device :: proc(device: ^Device) -> (err: Error = .None) {
 	queue_priority: f32 = 1.0
 
 	queue_info: vk.DeviceQueueCreateInfo = {
@@ -356,11 +360,11 @@ create_device :: proc(device: ^Device) -> Error {
 
 	vk.GetDeviceQueue(device.device, device.graphics_family, 0, &device.graphics_queue)
 
-	return .None
+	return
 }
 
-@(require_results)
-create_vma_allocator :: proc(device: ^Device) -> (err: Error) {
+@(private, require_results)
+create_vma_allocator :: proc(device: ^Device) -> (err: Error = .None) {
 	vulkan_functions := vma.create_vulkan_functions()
 
 	allocator_info: vma.AllocatorCreateInfo = {
@@ -377,11 +381,11 @@ create_vma_allocator :: proc(device: ^Device) -> (err: Error) {
 		.Vulkan_Call_Failed,
 	) or_return
 
-	return .None
+	return
 }
 
-@(require_results)
-create_swapchain :: proc(device: ^Device) -> (err: Error) {
+@(private, require_results)
+create_swapchain :: proc(device: ^Device) -> (err: Error = .None) {
 	defer if err != .None do destroy_swapchain_resources(device)
 
 	capabilities: vk.SurfaceCapabilitiesKHR
@@ -482,11 +486,29 @@ create_swapchain :: proc(device: ^Device) -> (err: Error) {
 		) or_return
 	}
 
-	return .None
+	return
 }
 
-@(require_results)
-recreate_swapchain :: proc(device: ^Device) -> (err: Error) {
+@(private, require_results)
+create_depth_resources :: proc(device: ^Device) -> (err: Error = .None) {
+	device.depth_image = create_image(
+		device,
+		init_gpu_image_create_info(
+			DEFAULT_DEPTH_FORMAT,
+			{device.swapchain.extent.width, device.swapchain.extent.height, 1},
+			{.DEPTH_STENCIL_ATTACHMENT},
+		),
+	) or_return
+	return
+}
+
+@(private)
+destroy_depth_resources :: proc(device: ^Device) {
+	destroy_image(device, &device.depth_image)
+}
+
+@(private, require_results)
+recreate_swapchain :: proc(device: ^Device) -> (err: Error = .None) {
 	width, height := glfw.GetFramebufferSize(device.window)
 	for width == 0 || height == 0 {
 		glfw.WaitEvents()
@@ -495,16 +517,18 @@ recreate_swapchain :: proc(device: ^Device) -> (err: Error) {
 
 	vk.DeviceWaitIdle(device.device)
 
+	destroy_depth_resources(device)
 	destroy_per_image_semaphores(device)
 	destroy_swapchain_resources(device)
 
 	create_swapchain(device) or_return
+	create_depth_resources(device) or_return
 	create_per_image_semaphores(device) or_return
-	return .None
+	return
 }
 
-@(require_results)
-create_per_image_semaphores :: proc(device: ^Device) -> (err: Error) {
+@(private, require_results)
+create_per_image_semaphores :: proc(device: ^Device) -> (err: Error = .None) {
 	defer if err != .None do destroy_per_image_semaphores(device)
 
 	semaphore_info: vk.SemaphoreCreateInfo = {
@@ -518,9 +542,10 @@ create_per_image_semaphores :: proc(device: ^Device) -> (err: Error) {
 			.Vulkan_Call_Failed,
 		) or_return
 	}
-	return .None
+	return
 }
 
+@(private)
 destroy_per_image_semaphores :: proc(device: ^Device) {
 	for semaphore in device.render_finished_semaphores {
 		vk.DestroySemaphore(device.device, semaphore, nil)
@@ -529,8 +554,8 @@ destroy_per_image_semaphores :: proc(device: ^Device) {
 	device.render_finished_semaphores = nil
 }
 
-@(require_results)
-create_command_pool :: proc(device: ^Device) -> Error {
+@(private, require_results)
+create_command_pool :: proc(device: ^Device) -> (err: Error = .None) {
 	pool_info: vk.CommandPoolCreateInfo = {
 		sType            = .COMMAND_POOL_CREATE_INFO,
 		flags            = {.RESET_COMMAND_BUFFER},
@@ -542,12 +567,11 @@ create_command_pool :: proc(device: ^Device) -> Error {
 		.Vulkan_Call_Failed,
 	) or_return
 
-	return .None
+	return
 }
 
-@(require_results)
-allocate_command_buffers :: proc(device: ^Device) -> Error {
-
+@(private, require_results)
+allocate_command_buffers :: proc(device: ^Device) -> (err: Error = .None) {
 	allocate_info: vk.CommandBufferAllocateInfo = {
 		sType              = .COMMAND_BUFFER_ALLOCATE_INFO,
 		pNext              = nil,
@@ -558,15 +582,15 @@ allocate_command_buffers :: proc(device: ^Device) -> Error {
 	for &frame in device.frames {
 		vk_check(
 			vk.AllocateCommandBuffers(device.device, &allocate_info, &frame.command_buffer),
-			.CommandBuffer_Allocation_Failed,
+			.Command_Buffer_Allocation_Failed,
 		) or_return
 
 	}
-	return .None
+	return
 }
 
-@(require_results)
-create_sync_objects :: proc(device: ^Device) -> (err: Error) {
+@(private, require_results)
+create_sync_objects :: proc(device: ^Device) -> (err: Error = .None) {
 	defer if err != .None do destroy_sync_objects(device)
 
 	semaphore_info: vk.SemaphoreCreateInfo = {
@@ -589,10 +613,18 @@ create_sync_objects :: proc(device: ^Device) -> (err: Error) {
 		) or_return
 	}
 
-	return .None
+	return
 }
 
-swapchain_format :: #force_inline proc(device: ^Device) -> vk.Format {
+@(private)
+destroy_sync_objects :: proc(device: ^Device) {
+	for &frame in device.frames {
+		vk.DestroySemaphore(device.device, frame.present_complete, nil)
+		vk.DestroyFence(device.device, frame.in_flight_fence, nil)
+	}
+}
+
+swapchain_format :: proc(device: ^Device) -> vk.Format {
 	return device.swapchain.surface_format.format
 }
 
@@ -605,13 +637,6 @@ destroy_swapchain_resources :: proc(device: ^Device) {
 	vk.DestroySwapchainKHR(device.device, device.swapchain.handle, nil)
 	device.swapchain = {}
 
-}
-
-destroy_sync_objects :: proc(device: ^Device) {
-	for &frame in device.frames {
-		vk.DestroySemaphore(device.device, frame.present_complete, nil)
-		vk.DestroyFence(device.device, frame.in_flight_fence, nil)
-	}
 }
 
 get_required_extensions :: proc(enable_validation_layers: bool) -> [dynamic]cstring {
@@ -654,18 +679,18 @@ is_device_suitable :: proc(
 	properties: vk.PhysicalDeviceProperties
 	vk.GetPhysicalDeviceProperties(physical_device, &properties)
 
-	vk_13_features := vk.PhysicalDeviceVulkan13Features {
+	vk_13_features: vk.PhysicalDeviceVulkan13Features = {
 		sType = .PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
 	}
-	vk_12_features := vk.PhysicalDeviceVulkan12Features {
+	vk_12_features: vk.PhysicalDeviceVulkan12Features = {
 		sType = .PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
 		pNext = &vk_13_features,
 	}
-	vk_11_features := vk.PhysicalDeviceVulkan11Features {
+	vk_11_features: vk.PhysicalDeviceVulkan11Features = {
 		sType = .PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
 		pNext = &vk_12_features,
 	}
-	features := vk.PhysicalDeviceFeatures2 {
+	features: vk.PhysicalDeviceFeatures2 = {
 		sType = .PHYSICAL_DEVICE_FEATURES_2,
 		pNext = &vk_11_features,
 	}

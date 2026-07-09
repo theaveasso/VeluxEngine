@@ -2,31 +2,59 @@ package gpu
 
 import vk "vendor:vulkan"
 
-cmd_transition_image :: proc(frame: Frame, old_layout, new_layout: vk.ImageLayout) {
-	barrier_info: vk.ImageMemoryBarrier2 = {
-		sType            = .IMAGE_MEMORY_BARRIER_2,
-		image            = frame.image,
-		srcStageMask     = {.ALL_COMMANDS},
-		srcAccessMask    = {.MEMORY_WRITE},
-		dstStageMask     = {.ALL_COMMANDS},
-		dstAccessMask    = {.MEMORY_WRITE, .MEMORY_READ},
-		oldLayout        = old_layout,
-		newLayout        = new_layout,
-		subresourceRange = init_image_subresource_range({.COLOR}), // TODO: support depth image
+Image_Transition :: struct {
+	image:      vk.Image,
+	aspect:     vk.ImageAspectFlags,
+	old_layout: vk.ImageLayout,
+	new_layout: vk.ImageLayout,
+}
+
+cmd_transition_image :: proc(
+	cmd: vk.CommandBuffer,
+	image: vk.Image,
+	aspect: vk.ImageAspectFlags,
+	old_layout, new_layout: vk.ImageLayout,
+) {
+	cmd_transition_images(cmd, {{image, aspect, old_layout, new_layout}})
+}
+
+cmd_transition_images :: proc(
+	cmd: vk.CommandBuffer,
+	transitions: []Image_Transition,
+	loc := #caller_location,
+) {
+	assert(len(transitions) < MAX_BATCH_TRANSITIONS, "transition batch too large", loc)
+
+	barriers: [MAX_BATCH_TRANSITIONS]vk.ImageMemoryBarrier2
+	for t, i in transitions {
+		barriers[i] = {
+			sType            = .IMAGE_MEMORY_BARRIER_2,
+			pNext            = nil,
+			image            = t.image,
+			srcStageMask     = {.ALL_COMMANDS},
+			srcAccessMask    = {.MEMORY_WRITE},
+			dstStageMask     = {.ALL_COMMANDS},
+			dstAccessMask    = {.MEMORY_WRITE, .MEMORY_READ},
+			oldLayout        = t.old_layout,
+			newLayout        = t.new_layout,
+			subresourceRange = init_image_subresource_range(t.aspect),
+		}
 	}
 
 	dependency_info: vk.DependencyInfo = {
 		sType                   = .DEPENDENCY_INFO,
-		imageMemoryBarrierCount = 1,
-		pImageMemoryBarriers    = &barrier_info,
+		pNext                   = nil,
+		imageMemoryBarrierCount = cast(u32)len(transitions),
+		pImageMemoryBarriers    = raw_data(barriers[:]),
 	}
 
-	vk.CmdPipelineBarrier2(frame.cmd, &dependency_info)
+	vk.CmdPipelineBarrier2(cmd, &dependency_info)
 }
 
 cmd_begin_rendering :: proc(frame: Frame, clear_color: Maybe([4]f32) = nil) {
 	color_attachment: vk.RenderingAttachmentInfo = {
 		sType       = .RENDERING_ATTACHMENT_INFO,
+		pNext       = nil,
 		imageView   = frame.view,
 		imageLayout = .COLOR_ATTACHMENT_OPTIMAL,
 		loadOp      = clear_color != nil ? .CLEAR : .LOAD,
@@ -36,19 +64,32 @@ cmd_begin_rendering :: proc(frame: Frame, clear_color: Maybe([4]f32) = nil) {
 		color = {float32 = c},
 	}
 
+	depth_attachment: vk.RenderingAttachmentInfo = {
+		sType = .RENDERING_ATTACHMENT_INFO,
+		pNext = nil,
+		imageView = frame.depth_view,
+		imageLayout = .DEPTH_ATTACHMENT_OPTIMAL,
+		loadOp = .CLEAR,
+		storeOp = .DONT_CARE,
+		clearValue = {depthStencil = {depth = 1.0}},
+	}
+
 	rendering_info: vk.RenderingInfo = {
 		sType = .RENDERING_INFO,
+		pNext = nil,
 		renderArea = {extent = frame.extent},
 		layerCount = 1,
 		colorAttachmentCount = 1,
 		pColorAttachments = &color_attachment,
+		pDepthAttachment = &depth_attachment,
 	}
 
 	vk.CmdBeginRendering(frame.cmd, &rendering_info)
 
 	viewport: vk.Viewport = {
-		width  = cast(f32)frame.extent.width,
-		height = cast(f32)frame.extent.height,
+		width    = cast(f32)frame.extent.width,
+		height   = cast(f32)frame.extent.height,
+		maxDepth = 1.0,
 	}
 	scissor: vk.Rect2D = {
 		extent = frame.extent,
@@ -66,13 +107,13 @@ cmd_bind_pipeline :: proc {
 	cmd_bind_graphics_pipeline,
 }
 
-cmd_bind_graphics_pipeline :: #force_inline proc(frame: Frame, pipeline: GraphicsPipeline) {
+cmd_bind_graphics_pipeline :: proc(frame: Frame, pipeline: Graphics_Pipeline) {
 	vk.CmdBindPipeline(frame.cmd, .GRAPHICS, pipeline.handle)
 }
 
-cmd_push_constants :: #force_inline proc(
+cmd_push_constants :: proc(
 	frame: Frame,
-	pipeline: GraphicsPipeline,
+	pipeline: Graphics_Pipeline,
 	data: ^$T,
 	loc := #caller_location,
 ) {
@@ -80,7 +121,7 @@ cmd_push_constants :: #force_inline proc(
 	vk.CmdPushConstants(frame.cmd, pipeline.layout, pipeline.stage_flags, 0, size_of(T), data)
 }
 
-cmd_bind_index_buffer :: #force_inline proc(
+cmd_bind_index_buffer :: proc(
 	frame: Frame,
 	buffer: vk.Buffer,
 	offset: vk.DeviceSize = 0,
@@ -89,7 +130,7 @@ cmd_bind_index_buffer :: #force_inline proc(
 	vk.CmdBindIndexBuffer(frame.cmd, buffer, offset, index_type)
 }
 
-cmd_draw_indexed :: #force_inline proc(
+cmd_draw_indexed :: proc(
 	frame: Frame,
 	index_count: u32,
 	instance_count: u32 = 1,
@@ -116,6 +157,7 @@ cmd_copy_buffer2 :: proc(
 ) {
 	copy_info: vk.CopyBufferInfo2 = {
 		sType       = .COPY_BUFFER_INFO_2,
+		pNext       = nil,
 		srcBuffer   = src,
 		dstBuffer   = dst,
 		regionCount = count,

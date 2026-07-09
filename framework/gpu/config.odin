@@ -2,9 +2,13 @@ package gpu
 
 import vk "vendor:vulkan"
 
+DEFAULT_DEPTH_FORMAT :: vk.Format.D32_SFLOAT
+
 DEFAULT_VERTEX_ENTRY: cstring : "vertex_main"
 DEFAULT_FRAGMENT_ENTRY: cstring : "fragment_main"
 DEFAULT_COMPUTE_ENTRY: cstring : "compute_main"
+
+MAX_BATCH_TRANSITIONS :: 8
 
 REQUIRED_VULKAN_FEATURES: vk.PhysicalDeviceFeatures2 = {
 	sType = .PHYSICAL_DEVICE_FEATURES_2,

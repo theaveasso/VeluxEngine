@@ -5,12 +5,17 @@ import vlx "velux:engine"
 import gpu "velux:gpu"
 
 run :: proc(engine: ^vlx.Engine) -> (err: vlx.Error) {
-	vertices: [3]gpu.Vertex = {
-		{{-0.5, -0.5, 0.0}, {1.0, 0.0, 0.0}},
-		{{-0.5, 0.5, 0.0}, {0.0, 1.0, 0.0}},
-		{{0.5, 0.5, 0.0}, {0.0, 0.0, 1.0}},
+	vertices: [6]gpu.Vertex = {
+		// triangle A — NEAR (z = 0.25), red, drawn FIRST
+		{{-0.5, -0.5, 0.25}, {1, 0, 0}},
+		{{-0.5, 0.5, 0.25}, {1, 0, 0}},
+		{{0.5, 0.5, 0.25}, {1, 0, 0}},
+		// triangle B — FAR (z = 0.75), blue, shifted, drawn SECOND
+		{{-0.25, -0.75, 0.75}, {0, 0, 1}},
+		{{-0.25, 0.25, 0.75}, {0, 0, 1}},
+		{{0.75, 0.25, 0.75}, {0, 0, 1}},
 	}
-	indices: [3]u32 = {0, 1, 2}
+	indices: [6]u32 = {0, 1, 2, 3, 4, 5}
 
 	vertex_buffer := gpu.create_buffer(
 		&engine.device,
@@ -29,7 +34,7 @@ run :: proc(engine: ^vlx.Engine) -> (err: vlx.Error) {
 	gpu.imm_transfer_end(&engine.device) or_return
 
 	Triangle_PushConstants :: struct {
-		vertices: gpu.DeviceAddress(gpu.Vertex),
+		vertices: gpu.Device_Address(gpu.Vertex),
 	}
 	push_constants: Triangle_PushConstants = {
 		vertices = vertex_buffer.ptr,
@@ -44,15 +49,20 @@ run :: proc(engine: ^vlx.Engine) -> (err: vlx.Error) {
 
 	pipeline := gpu.create_graphics_pipeline(
 		&engine.device,
-		{
+		gpu.init_gpu_pipeline_create_info(
 			shader = shader,
 			push_constants = Triangle_PushConstants,
 			input_topology = .TRIANGLE_LIST,
 			polygon_mode = .FILL,
 			front_face = .CLOCKWISE,
+			depth = {
+				write_enabled = true,
+				compare_op = .LESS_OR_EQUAL,
+				format = gpu.DEFAULT_DEPTH_FORMAT,
+			},
 			cull_mode = {},
 			color_format = gpu.swapchain_format(&engine.device),
-		},
+		),
 	) or_return
 	defer gpu.destroy_pipeline(&engine.device, &pipeline)
 

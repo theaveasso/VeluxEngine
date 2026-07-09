@@ -10,7 +10,7 @@ Transfer_Context :: struct {
 }
 
 @(private, require_results)
-create_imm_transfer_context :: proc(device: ^Device) -> (err: Error) {
+create_imm_transfer_context :: proc(device: ^Device) -> (err: Error = .None) {
 	defer if err != .None do destroy_imm_transfer_context(device)
 
 	pool_info: vk.CommandPoolCreateInfo = {
@@ -54,7 +54,7 @@ create_imm_transfer_context :: proc(device: ^Device) -> (err: Error) {
 		.Vulkan_Call_Failed,
 	) or_return
 
-	return .None
+	return
 }
 
 @(private)
@@ -89,7 +89,7 @@ imm_transfer_begin :: proc(device: ^Device) -> (cmd: vk.CommandBuffer, err: Erro
 }
 
 @(require_results)
-imm_transfer_end :: proc(device: ^Device) -> (err: Error) {
+imm_transfer_end :: proc(device: ^Device) -> (err: Error = .None) {
 	defer {
 		destroy_imm_staging_buffers(device)
 		clear(&device.imm_transfer_ctx.staging_buffers)
@@ -114,7 +114,7 @@ imm_transfer_end :: proc(device: ^Device) -> (err: Error) {
 		.Vulkan_Call_Failed,
 	) or_return
 
-	return .None
+	return
 }
 
 @(private)

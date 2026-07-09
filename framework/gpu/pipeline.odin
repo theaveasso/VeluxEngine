@@ -8,7 +8,7 @@ import "core:slice"
 
 import vk "vendor:vulkan"
 
-PipelineBlendMode :: enum {
+Pipeline_Blend_Mode :: enum {
 	None,
 	Additive,
 	Alpha,
@@ -21,29 +21,32 @@ Pipeline :: struct {
 	push_constants: typeid,
 }
 
-GraphicPipelineCreateInfo :: struct {
-	shader:         vk.ShaderModule,
-	push_constants: typeid,
-	input_topology: vk.PrimitiveTopology,
-	polygon_mode:   vk.PolygonMode,
-	front_face:     vk.FrontFace,
-	color_format:   vk.Format,
-	cull_mode:      vk.CullModeFlags,
-	blend_mode:     PipelineBlendMode,
-	vertex_entry:   cstring,
-	fragment_entry: cstring,
+Graphics_Pipeline_Create_Info :: struct {
+	shader:              vk.ShaderModule,
+	push_constants:      typeid,
+	input_topology:      vk.PrimitiveTopology,
+	polygon_mode:        vk.PolygonMode,
+	front_face:          vk.FrontFace,
+	depth_write_enabled: b32,
+	depth_compare_op:    vk.CompareOp,
+	depth_format:        vk.Format,
+	color_format:        vk.Format,
+	cull_mode:           vk.CullModeFlags,
+	blend_mode:          Pipeline_Blend_Mode,
+	vertex_entry:        cstring,
+	fragment_entry:      cstring,
 }
 
-GraphicsPipeline :: struct {
+Graphics_Pipeline :: struct {
 	using common: Pipeline,
 }
 
 @(require_results)
 create_graphics_pipeline :: proc(
 	device: ^Device,
-	create_info: GraphicPipelineCreateInfo,
+	create_info: Graphics_Pipeline_Create_Info,
 ) -> (
-	pipeline: GraphicsPipeline,
+	pipeline: Graphics_Pipeline,
 	err: Error,
 ) {
 	context.logger = device.logger
@@ -51,8 +54,8 @@ create_graphics_pipeline :: proc(
 	layout := create_pipeline_layout(device.device, create_info.push_constants) or_return
 	defer if err != .None do vk.DestroyPipelineLayout(device.device, layout, nil)
 
-	pipeline_builder := pipeline_builder_init()
-	defer pipeline_builder_destroy(&pipeline_builder)
+	pipeline_builder := create_pipeline_builder()
+	defer destroy_pipeline_builder(&pipeline_builder)
 
 	vertex_entry :=
 		create_info.vertex_entry != nil ? create_info.vertex_entry : DEFAULT_VERTEX_ENTRY
@@ -73,9 +76,21 @@ create_graphics_pipeline :: proc(
 		create_info.cull_mode,
 		create_info.front_face,
 	)
-	pipeline_builder_set_multisampling_none(&pipeline_builder) // TODO: support multisampling
-	pipeline_builder_set_disable_blending(&pipeline_builder)
+	pipeline_builder_multisampling_none(&pipeline_builder) // TODO: support multisampling
+	pipeline_builder_disable_blending(&pipeline_builder)
 	pipeline_builder_set_attachment_format(&pipeline_builder, create_info.color_format)
+
+	if create_info.depth_format == .UNDEFINED {
+		pipeline_builder_disabled_depth_test(&pipeline_builder)
+	} else {
+		log.info("pipeline_builder_enable_depth_test %v", create_info.depth_compare_op)
+		pipeline_builder_enable_depth_test(
+			&pipeline_builder,
+			create_info.depth_write_enabled,
+			create_info.depth_compare_op,
+		)
+		pipeline_builder_set_depth_format(&pipeline_builder, create_info.depth_format)
+	}
 
 	handle := pipeline_builder_build_pipeline(device.device, &pipeline_builder) or_return
 
@@ -88,10 +103,10 @@ create_graphics_pipeline :: proc(
 		.None
 }
 
-destroy_pipeline :: proc(device: ^Device, pipline: ^Pipeline) {
-	vk.DestroyPipelineLayout(device.device, pipline.layout, nil)
-	vk.DestroyPipeline(device.device, pipline.handle, nil)
-	pipline^ = {}
+destroy_pipeline :: proc(device: ^Device, pipeline: ^Pipeline) {
+	vk.DestroyPipelineLayout(device.device, pipeline.layout, nil)
+	vk.DestroyPipeline(device.device, pipeline.handle, nil)
+	pipeline^ = {}
 }
 
 @(private, require_results)
@@ -141,7 +156,7 @@ load_shader_module :: proc(
 
 	buffer, err := os.read_entire_file(file_name, allocator)
 	if err != nil {
-		log.errorf("read_entire_filed '%v' failed: %v", file_name, err)
+		log.errorf("read_entire_file '%v' failed: %v", file_name, err)
 		return 0, .File_Read_Failed
 	}
 	defer delete(buffer, allocator)

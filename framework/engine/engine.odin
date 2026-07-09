@@ -44,7 +44,7 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 	return nil
 }
 
-running :: #force_inline proc(engine: ^Engine) -> bool {
+running :: proc(engine: ^Engine) -> bool {
 	platform.poll_events()
 	return !platform.window_should_close(&engine.window)
 }

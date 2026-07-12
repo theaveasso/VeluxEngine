@@ -9,20 +9,11 @@ Image_Transition :: struct {
 	new_layout: vk.ImageLayout,
 }
 
-cmd_transition_image :: proc(
-	cmd: vk.CommandBuffer,
-	image: vk.Image,
-	aspect: vk.ImageAspectFlags,
-	old_layout, new_layout: vk.ImageLayout,
-) {
+cmd_transition_image :: proc(cmd: vk.CommandBuffer, image: vk.Image, aspect: vk.ImageAspectFlags, old_layout, new_layout: vk.ImageLayout) {
 	cmd_transition_images(cmd, {{image, aspect, old_layout, new_layout}})
 }
 
-cmd_transition_images :: proc(
-	cmd: vk.CommandBuffer,
-	transitions: []Image_Transition,
-	loc := #caller_location,
-) {
+cmd_transition_images :: proc(cmd: vk.CommandBuffer, transitions: []Image_Transition, loc := #caller_location) {
 	assert(len(transitions) < MAX_BATCH_TRANSITIONS, "transition batch too large", loc)
 
 	barriers: [MAX_BATCH_TRANSITIONS]vk.ImageMemoryBarrier2
@@ -111,22 +102,12 @@ cmd_bind_graphics_pipeline :: proc(frame: Frame, pipeline: Graphics_Pipeline) {
 	vk.CmdBindPipeline(frame.cmd, .GRAPHICS, pipeline.handle)
 }
 
-cmd_push_constants :: proc(
-	frame: Frame,
-	pipeline: Graphics_Pipeline,
-	data: ^$T,
-	loc := #caller_location,
-) {
+cmd_push_constants :: proc(frame: Frame, pipeline: Graphics_Pipeline, data: ^$T, loc := #caller_location) {
 	assert(T == pipeline.push_constants, "push constants type mismatch with pipeline", loc)
 	vk.CmdPushConstants(frame.cmd, pipeline.layout, pipeline.stage_flags, 0, size_of(T), data)
 }
 
-cmd_bind_index_buffer :: proc(
-	frame: Frame,
-	buffer: vk.Buffer,
-	offset: vk.DeviceSize = 0,
-	index_type: vk.IndexType = .UINT32,
-) {
+cmd_bind_index_buffer :: proc(frame: Frame, buffer: vk.Buffer, offset: vk.DeviceSize = 0, index_type: vk.IndexType = .UINT32) {
 	vk.CmdBindIndexBuffer(frame.cmd, buffer, offset, index_type)
 }
 
@@ -138,23 +119,10 @@ cmd_draw_indexed :: proc(
 	vertex_offset: i32 = 0,
 	first_instance: u32 = 0,
 ) {
-	vk.CmdDrawIndexed(
-		frame.cmd,
-		index_count,
-		instance_count,
-		first_index,
-		vertex_offset,
-		first_instance,
-	)
+	vk.CmdDrawIndexed(frame.cmd, index_count, instance_count, first_index, vertex_offset, first_instance)
 }
 
-cmd_copy_buffer2 :: proc(
-	cmd: vk.CommandBuffer,
-	src: vk.Buffer,
-	dst: vk.Buffer,
-	region: ^vk.BufferCopy2,
-	count: u32 = 1,
-) {
+cmd_copy_buffer2 :: proc(cmd: vk.CommandBuffer, src: vk.Buffer, dst: vk.Buffer, region: ^vk.BufferCopy2, count: u32 = 1) {
 	copy_info: vk.CopyBufferInfo2 = {
 		sType       = .COPY_BUFFER_INFO_2,
 		pNext       = nil,

@@ -28,14 +28,7 @@ Image_Create_Info :: struct {
 }
 
 @(require_results)
-create_image :: proc(
-	device: ^Device,
-	create_info: Image_Create_Info,
-	loc := #caller_location,
-) -> (
-	image: Image,
-	err: Error,
-) {
+create_image :: proc(device: ^Device, create_info: Image_Create_Info, loc := #caller_location) -> (image: Image, err: Error) {
 	context.logger = device.logger
 	defer if err != .None do destroy_image(device, &image)
 
@@ -43,6 +36,7 @@ create_image :: proc(
 		sType       = .IMAGE_CREATE_INFO,
 		pNext       = nil,
 		flags       = create_info.flags,
+		usage       = create_info.image_usage_flags,
 		imageType   = create_info.image_type,
 		format      = create_info.format,
 		extent      = create_info.extent,
@@ -58,17 +52,7 @@ create_image :: proc(
 		flags         = create_info.alloc_flags,
 	}
 
-	vk_check(
-		vma.CreateImage(
-			device.vma_allocator,
-			&image_info,
-			&allocation_info,
-			&image.handle,
-			&image.allocation,
-			nil,
-		),
-		.VMA_Call_Failed,
-	) or_return
+	vk_check(vma.CreateImage(device.vma_allocator, &image_info, &allocation_info, &image.handle, &image.allocation, nil)) or_return
 
 	view_type: vk.ImageViewType = .D1
 	if .CUBE_COMPATIBLE in create_info.flags {
@@ -90,10 +74,7 @@ create_image :: proc(
 		),
 	}
 
-	vk_check(
-		vk.CreateImageView(device.device, &view_info, nil, &image.view),
-		.Vulkan_Call_Failed,
-	) or_return
+	vk_check(vk.CreateImageView(device.device, &view_info, nil, &image.view)) or_return
 
 	return image, .None
 }
@@ -107,12 +88,7 @@ destroy_image :: proc(device: ^Device, image: ^Image) {
 @(require_results)
 is_depth_format :: proc(format: vk.Format) -> bool {
 	#partial switch format {
-	case .D16_UNORM,
-	     .D32_SFLOAT,
-	     .D16_UNORM_S8_UINT,
-	     .D24_UNORM_S8_UINT,
-	     .D32_SFLOAT_S8_UINT,
-	     .X8_D24_UNORM_PACK32:
+	case .D16_UNORM, .D32_SFLOAT, .D16_UNORM_S8_UINT, .D24_UNORM_S8_UINT, .D32_SFLOAT_S8_UINT, .X8_D24_UNORM_PACK32:
 		return true
 	}
 	return false

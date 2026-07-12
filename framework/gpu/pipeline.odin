@@ -21,20 +21,24 @@ Pipeline :: struct {
 	push_constants: typeid,
 }
 
+Depth_Config :: struct {
+	write_enabled: b32,
+	compare_op:    vk.CompareOp,
+	format:        vk.Format,
+}
+
 Graphics_Pipeline_Create_Info :: struct {
-	shader:              vk.ShaderModule,
-	push_constants:      typeid,
-	input_topology:      vk.PrimitiveTopology,
-	polygon_mode:        vk.PolygonMode,
-	front_face:          vk.FrontFace,
-	depth_write_enabled: b32,
-	depth_compare_op:    vk.CompareOp,
-	depth_format:        vk.Format,
-	color_format:        vk.Format,
-	cull_mode:           vk.CullModeFlags,
-	blend_mode:          Pipeline_Blend_Mode,
-	vertex_entry:        cstring,
-	fragment_entry:      cstring,
+	shader:         vk.ShaderModule,
+	push_constants: typeid,
+	input_topology: vk.PrimitiveTopology,
+	polygon_mode:   vk.PolygonMode,
+	front_face:     vk.FrontFace,
+	depth_config:   Depth_Config,
+	color_format:   vk.Format,
+	cull_mode:      vk.CullModeFlags,
+	blend_mode:     Pipeline_Blend_Mode,
+	vertex_entry:   cstring,
+	fragment_entry: cstring,
 }
 
 Graphics_Pipeline :: struct {
@@ -57,50 +61,29 @@ create_graphics_pipeline :: proc(
 	pipeline_builder := create_pipeline_builder()
 	defer destroy_pipeline_builder(&pipeline_builder)
 
-	vertex_entry :=
-		create_info.vertex_entry != nil ? create_info.vertex_entry : DEFAULT_VERTEX_ENTRY
-	fragment_entry :=
-		create_info.fragment_entry != nil ? create_info.fragment_entry : DEFAULT_FRAGMENT_ENTRY
+	vertex_entry := create_info.vertex_entry != nil ? create_info.vertex_entry : DEFAULT_VERTEX_ENTRY
+	fragment_entry := create_info.fragment_entry != nil ? create_info.fragment_entry : DEFAULT_FRAGMENT_ENTRY
 
 	pipeline_builder_set_layout(&pipeline_builder, layout)
-	pipeline_builder_set_shaders(
-		&pipeline_builder,
-		create_info.shader,
-		vertex_entry,
-		fragment_entry,
-	)
+	pipeline_builder_set_shaders(&pipeline_builder, create_info.shader, vertex_entry, fragment_entry)
 	pipeline_builder_set_topology(&pipeline_builder, create_info.input_topology)
 	pipeline_builder_set_polygon_mode(&pipeline_builder, create_info.polygon_mode)
-	pipeline_builder_set_cull_mode(
-		&pipeline_builder,
-		create_info.cull_mode,
-		create_info.front_face,
-	)
+	pipeline_builder_set_cull_mode(&pipeline_builder, create_info.cull_mode, create_info.front_face)
 	pipeline_builder_multisampling_none(&pipeline_builder) // TODO: support multisampling
 	pipeline_builder_disable_blending(&pipeline_builder)
 	pipeline_builder_set_attachment_format(&pipeline_builder, create_info.color_format)
 
-	if create_info.depth_format == .UNDEFINED {
+	depth_config := create_info.depth_config
+	if depth_config.format == .UNDEFINED {
 		pipeline_builder_disabled_depth_test(&pipeline_builder)
 	} else {
-		log.info("pipeline_builder_enable_depth_test %v", create_info.depth_compare_op)
-		pipeline_builder_enable_depth_test(
-			&pipeline_builder,
-			create_info.depth_write_enabled,
-			create_info.depth_compare_op,
-		)
-		pipeline_builder_set_depth_format(&pipeline_builder, create_info.depth_format)
+		pipeline_builder_enable_depth_test(&pipeline_builder, depth_config.write_enabled, depth_config.compare_op)
+		pipeline_builder_set_depth_format(&pipeline_builder, depth_config.format)
 	}
 
 	handle := pipeline_builder_build_pipeline(device.device, &pipeline_builder) or_return
 
-	return {
-			layout = layout,
-			handle = handle,
-			stage_flags = {.VERTEX, .FRAGMENT},
-			push_constants = create_info.push_constants,
-		},
-		.None
+	return {layout = layout, handle = handle, stage_flags = {.VERTEX, .FRAGMENT}, push_constants = create_info.push_constants}, .None
 }
 
 destroy_pipeline :: proc(device: ^Device, pipeline: ^Pipeline) {
@@ -134,10 +117,7 @@ create_pipeline_layout :: proc(
 		layout_info.pPushConstantRanges = &range
 	}
 
-	vk_check(
-		vk.CreatePipelineLayout(device, &layout_info, nil, &layout),
-		.Vulkan_Call_Failed,
-	) or_return
+	vk_check(vk.CreatePipelineLayout(device, &layout_info, nil, &layout), .Vulkan_Call_Failed) or_return
 
 	return layout, .None
 }

@@ -17,21 +17,16 @@ run :: proc(engine: ^vlx.Engine) -> (err: vlx.Error) {
 	}
 	indices: [6]u32 = {0, 1, 2, 3, 4, 5}
 
-	vertex_buffer := gpu.create_buffer(
-		&engine.device,
-		gpu.Vertex,
-		len(vertices),
-		.Storage,
-	) or_return
+	vertex_buffer := gpu.create_buffer(&engine.device, gpu.Vertex, len(vertices), .Storage) or_return
 	defer gpu.destroy_buffer(&engine.device, &vertex_buffer)
 
 	index_buffer := gpu.create_buffer(&engine.device, u32, len(indices), .Index) or_return
 	defer gpu.destroy_buffer(&engine.device, &index_buffer)
 
-	cmd := gpu.imm_transfer_begin(&engine.device) or_return
+	cmd := gpu.immediate_transfer_begin(&engine.device) or_return
 	gpu.staging_write_buffer_slice(&engine.device, cmd, &vertex_buffer, vertices[:]) or_return
 	gpu.staging_write_buffer_slice(&engine.device, cmd, &index_buffer, indices[:]) or_return
-	gpu.imm_transfer_end(&engine.device) or_return
+	gpu.immediate_transfer_end(&engine.device) or_return
 
 	Triangle_PushConstants :: struct {
 		vertices: gpu.Device_Address(gpu.Vertex),
@@ -40,11 +35,7 @@ run :: proc(engine: ^vlx.Engine) -> (err: vlx.Error) {
 		vertices = vertex_buffer.ptr,
 	}
 
-	shader := gpu.load_shader_module(
-		&engine.device,
-		"shaders/out/triangle.spv",
-		context.temp_allocator,
-	) or_return
+	shader := gpu.load_shader_module(&engine.device, "shaders/out/triangle.spv", context.temp_allocator) or_return
 	defer gpu.destroy_shader_module(&engine.device, shader)
 
 	pipeline := gpu.create_graphics_pipeline(
@@ -55,11 +46,7 @@ run :: proc(engine: ^vlx.Engine) -> (err: vlx.Error) {
 			input_topology = .TRIANGLE_LIST,
 			polygon_mode = .FILL,
 			front_face = .CLOCKWISE,
-			depth = {
-				write_enabled = true,
-				compare_op = .LESS_OR_EQUAL,
-				format = gpu.DEFAULT_DEPTH_FORMAT,
-			},
+			depth = {write_enabled = true, compare_op = .LESS_OR_EQUAL, format = gpu.DEFAULT_DEPTH_FORMAT},
 			cull_mode = {},
 			color_format = gpu.swapchain_format(&engine.device),
 		),
@@ -91,13 +78,7 @@ main :: proc() {
 	engine: vlx.Engine
 	ok := vlx.init(
 		&engine,
-		{
-			app_name = "02_triangle",
-			width = 1280,
-			height = 720,
-			enable_validation = ODIN_DEBUG,
-			enable_log = ODIN_DEBUG,
-		},
+		{app_name = "02_triangle", width = 1280, height = 720, enable_validation = ODIN_DEBUG, enable_log = ODIN_DEBUG},
 	)
 	if ok != nil {log.errorf("%v", ok); return}
 	defer (vlx.shutdown(&engine))

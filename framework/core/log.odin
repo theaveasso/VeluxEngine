@@ -8,11 +8,7 @@ Prefix_Logger :: struct {
 	prefix:  string,
 }
 
-logger_from_prefix :: proc(
-	state: ^Prefix_Logger,
-	prefix: string,
-	backing := context.logger,
-) -> log.Logger {
+logger_from_prefix :: proc(state: ^Prefix_Logger, prefix: string, backing := context.logger) -> log.Logger {
 	state.backing = backing
 	state.prefix = prefix
 
@@ -24,13 +20,7 @@ logger_from_prefix :: proc(
 	}
 }
 
-prefix_logger_proc :: proc(
-	data: rawptr,
-	level: log.Level,
-	text: string,
-	options: log.Options,
-	loc := #caller_location,
-) {
+prefix_logger_proc :: proc(data: rawptr, level: log.Level, text: string, options: log.Options, loc := #caller_location) {
 	d := cast(^Prefix_Logger)data
 
 	tagged := fmt.tprintf("%s%s", d.prefix, text)

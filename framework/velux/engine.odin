@@ -1,7 +1,7 @@
-package engine
+package velux
 
-import "velux:gpu"
-import "velux:platform"
+import "vlx:gpu"
+import "vlx:platform"
 
 Config :: struct {
 	app_name:          cstring,
@@ -47,6 +47,22 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 running :: proc(engine: ^Engine) -> bool {
 	platform.poll_events()
 	return !platform.window_should_close(&engine.window)
+}
+
+swapchain_format :: proc(engine: ^Engine) -> Format {
+	return gpu.swapchain_format(&engine.device)
+}
+
+window_extent :: proc(engine: ^Engine) -> [2]f32 {
+	return platform.window_extent(&engine.window)
+}
+
+time :: proc() -> f64 {
+	return platform.time()
+}
+
+wait_for_idle :: proc(engine: ^Engine) {
+	gpu.wait_idle(&engine.device)
 }
 
 shutdown :: proc(engine: ^Engine) {

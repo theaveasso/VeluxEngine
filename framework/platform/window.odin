@@ -39,10 +39,19 @@ window_should_close :: proc(window: ^Window) -> bool {
 	return bool(glfw.WindowShouldClose(window.handle))
 }
 
+window_extent :: proc(window: ^Window) -> [2]f32 {
+	w, h := glfw.GetFramebufferSize(window.handle)
+	return {cast(f32)w, cast(f32)h}
+}
+
 poll_events :: proc() {
 	glfw.PollEvents()
 }
 
 shutdown :: proc() {
 	glfw.Terminate()
+}
+
+time :: proc() -> f64 {
+	return glfw.GetTime()
 }

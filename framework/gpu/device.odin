@@ -10,7 +10,7 @@ import vma "third_party:odin-vma"
 import glfw "vendor:glfw"
 import vk "vendor:vulkan"
 
-import core "velux:core"
+import core "vlx:core"
 
 Error :: enum {
 	None,
@@ -72,11 +72,7 @@ Swapchain :: struct {
 }
 
 @(require_results)
-vk_check :: proc(
-	result: vk.Result,
-	err: Error = .Vulkan_Call_Failed,
-	loc := #caller_location,
-) -> Error {
+vk_check :: proc(result: vk.Result, err: Error = .Vulkan_Call_Failed, loc := #caller_location) -> Error {
 	if result == .SUCCESS do return .None
 	log.errorf("vulkan call failed :%v (%v)", result, loc)
 	return err
@@ -104,7 +100,7 @@ init :: proc(device: ^Device, config: Config) -> (err: Error = .None) {
 	create_per_image_semaphores(device) or_return
 	create_command_pool(device) or_return
 	allocate_command_buffers(device) or_return
-	create_imm_transfer_context(device) or_return
+	create_immediate_transfer_context(device) or_return
 	create_sync_objects(device) or_return
 
 	return
@@ -113,7 +109,7 @@ init :: proc(device: ^Device, config: Config) -> (err: Error = .None) {
 destroy :: proc(device: ^Device) {
 	wait_idle(device)
 
-	destroy_imm_transfer_context(device)
+	destroy_immediate_transfer_context(device)
 	destroy_sync_objects(device)
 	vk.DestroyCommandPool(device.device, device.command_pool, nil)
 	destroy_per_image_semaphores(device)
@@ -236,15 +232,7 @@ setup_debug_utils_messenger :: proc(device: ^Device, config: Config) -> (err: Er
 		pUserData       = &device.logger,
 	}
 
-	vk_check(
-		vk.CreateDebugUtilsMessengerEXT(
-			device.instance,
-			&debug_create_info,
-			nil,
-			&device.debug_messenger,
-		),
-	) or_return
-
+	vk_check(vk.CreateDebugUtilsMessengerEXT(device.instance, &debug_create_info, nil, &device.debug_messenger)) or_return
 	return
 }
 
@@ -253,9 +241,7 @@ create_surface :: proc(device: ^Device, config: Config) -> (err: Error = .None) 
 	device.window = config.window
 	if device.window == nil do return .Invalid_Handle
 
-	vk_check(
-		glfw.CreateWindowSurface(device.instance, device.window, nil, &device.surface),
-	) or_return
+	vk_check(glfw.CreateWindowSurface(device.instance, device.window, nil, &device.surface)) or_return
 
 	return
 }
@@ -263,18 +249,12 @@ create_surface :: proc(device: ^Device, config: Config) -> (err: Error = .None) 
 @(private, require_results)
 pick_physical_device :: proc(device: ^Device) -> (err: Error = .No_Suitable_Physical_Device) {
 	device_n: u32 = 0
-	vk_check(
-		vk.EnumeratePhysicalDevices(device.instance, &device_n, nil),
-		.No_Suitable_Physical_Device,
-	) or_return
+	vk_check(vk.EnumeratePhysicalDevices(device.instance, &device_n, nil), .No_Suitable_Physical_Device) or_return
 	if device_n == 0 do return .No_Suitable_Physical_Device
 
 	devices := make([]vk.PhysicalDevice, device_n)
 	defer delete(devices)
-	vk_check(
-		vk.EnumeratePhysicalDevices(device.instance, &device_n, raw_data(devices)),
-		.No_Suitable_Physical_Device,
-	) or_return
+	vk_check(vk.EnumeratePhysicalDevices(device.instance, &device_n, raw_data(devices)), .No_Suitable_Physical_Device) or_return
 
 	for physical_device in devices {
 		is_suitable, is_discrete := is_device_suitable(physical_device, device.surface)
@@ -304,21 +284,13 @@ find_queue_families :: proc(device: ^Device) -> (err: Error = .None) {
 
 	queue_families := make([]vk.QueueFamilyProperties, queue_family_n)
 	defer delete(queue_families)
-	vk.GetPhysicalDeviceQueueFamilyProperties(
-		device.physical_device,
-		&queue_family_n,
-		raw_data(queue_families),
-	)
+	vk.GetPhysicalDeviceQueueFamilyProperties(device.physical_device, &queue_family_n, raw_data(queue_families))
 
 	queue_family: u32 = max(u32)
 	for &qf, i in queue_families {
 		if .GRAPHICS not_in qf.queueFlags do continue
 
-		support_present := glfw.GetPhysicalDevicePresentationSupport(
-			device.instance,
-			device.physical_device,
-			cast(u32)i,
-		)
+		support_present := glfw.GetPhysicalDevicePresentationSupport(device.instance, device.physical_device, cast(u32)i)
 
 		if support_present && .GRAPHICS in qf.queueFlags {
 			queue_family = cast(u32)i
@@ -351,10 +323,7 @@ create_device :: proc(device: ^Device) -> (err: Error = .None) {
 		ppEnabledExtensionNames = raw_data(DEVICE_EXTENSIONS),
 	}
 
-	vk_check(
-		vk.CreateDevice(device.physical_device, &device_info, nil, &device.device),
-		.Vulkan_Call_Failed,
-	) or_return
+	vk_check(vk.CreateDevice(device.physical_device, &device_info, nil, &device.device), .Vulkan_Call_Failed) or_return
 
 	vk.load_proc_addresses_device(device.device)
 
@@ -376,10 +345,7 @@ create_vma_allocator :: proc(device: ^Device) -> (err: Error = .None) {
 		pVulkanFunctions = &vulkan_functions,
 	}
 
-	vk_check(
-		vma.CreateAllocator(&allocator_info, &device.vma_allocator),
-		.Vulkan_Call_Failed,
-	) or_return
+	vk_check(vma.CreateAllocator(&allocator_info, &device.vma_allocator), .Vulkan_Call_Failed) or_return
 
 	return
 }
@@ -389,40 +355,21 @@ create_swapchain :: proc(device: ^Device) -> (err: Error = .None) {
 	defer if err != .None do destroy_swapchain_resources(device)
 
 	capabilities: vk.SurfaceCapabilitiesKHR
-	vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(
-		device.physical_device,
-		device.surface,
-		&capabilities,
-	)
+	vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(device.physical_device, device.surface, &capabilities)
 
 	format_n: u32 = 0
 	vk.GetPhysicalDeviceSurfaceFormatsKHR(device.physical_device, device.surface, &format_n, nil)
 
 	formats := make([]vk.SurfaceFormatKHR, format_n)
 	defer delete(formats)
-	vk.GetPhysicalDeviceSurfaceFormatsKHR(
-		device.physical_device,
-		device.surface,
-		&format_n,
-		raw_data(formats),
-	)
+	vk.GetPhysicalDeviceSurfaceFormatsKHR(device.physical_device, device.surface, &format_n, raw_data(formats))
 
 	present_mode_n: u32 = 0
-	vk.GetPhysicalDeviceSurfacePresentModesKHR(
-		device.physical_device,
-		device.surface,
-		&present_mode_n,
-		nil,
-	)
+	vk.GetPhysicalDeviceSurfacePresentModesKHR(device.physical_device, device.surface, &present_mode_n, nil)
 
 	present_modes := make([]vk.PresentModeKHR, present_mode_n)
 	defer delete(present_modes)
-	vk.GetPhysicalDeviceSurfacePresentModesKHR(
-		device.physical_device,
-		device.surface,
-		&present_mode_n,
-		raw_data(present_modes),
-	)
+	vk.GetPhysicalDeviceSurfacePresentModesKHR(device.physical_device, device.surface, &present_mode_n, raw_data(present_modes))
 
 	surface_format := choose_swapchain_surface_format(&formats)
 	present_mode := choose_swapchain_present_mode(&present_modes)
@@ -451,20 +398,12 @@ create_swapchain :: proc(device: ^Device) -> (err: Error = .None) {
 		clipped               = true,
 	}
 
-	vk_check(
-		vk.CreateSwapchainKHR(device.device, &swapchain_info, nil, &device.swapchain.handle),
-		.Vulkan_Call_Failed,
-	) or_return
+	vk_check(vk.CreateSwapchainKHR(device.device, &swapchain_info, nil, &device.swapchain.handle), .Vulkan_Call_Failed) or_return
 
 	vk.GetSwapchainImagesKHR(device.device, device.swapchain.handle, &image_count, nil)
 
 	device.swapchain.images = make([]vk.Image, image_count)
-	vk.GetSwapchainImagesKHR(
-		device.device,
-		device.swapchain.handle,
-		&image_count,
-		raw_data(device.swapchain.images),
-	)
+	vk.GetSwapchainImagesKHR(device.device, device.swapchain.handle, &image_count, raw_data(device.swapchain.images))
 
 	device.swapchain.surface_format = surface_format
 	device.swapchain.extent = extent
@@ -480,10 +419,7 @@ create_swapchain :: proc(device: ^Device) -> (err: Error = .None) {
 			subresourceRange = init_image_subresource_range({.COLOR}),
 		}
 
-		vk_check(
-			vk.CreateImageView(device.device, &view_info, nil, &device.swapchain.views[i]),
-			.Vulkan_Call_Failed,
-		) or_return
+		vk_check(vk.CreateImageView(device.device, &view_info, nil, &device.swapchain.views[i]), .Vulkan_Call_Failed) or_return
 	}
 
 	return
@@ -493,7 +429,7 @@ create_swapchain :: proc(device: ^Device) -> (err: Error = .None) {
 create_depth_resources :: proc(device: ^Device) -> (err: Error = .None) {
 	device.depth_image = create_image(
 		device,
-		init_gpu_image_create_info(
+		image_create_info(
 			DEFAULT_DEPTH_FORMAT,
 			{device.swapchain.extent.width, device.swapchain.extent.height, 1},
 			{.DEPTH_STENCIL_ATTACHMENT},
@@ -537,10 +473,7 @@ create_per_image_semaphores :: proc(device: ^Device) -> (err: Error = .None) {
 
 	device.render_finished_semaphores = make([]vk.Semaphore, len(device.swapchain.images))
 	for &semaphore in device.render_finished_semaphores {
-		vk_check(
-			vk.CreateSemaphore(device.device, &semaphore_info, nil, &semaphore),
-			.Vulkan_Call_Failed,
-		) or_return
+		vk_check(vk.CreateSemaphore(device.device, &semaphore_info, nil, &semaphore), .Vulkan_Call_Failed) or_return
 	}
 	return
 }
@@ -562,10 +495,7 @@ create_command_pool :: proc(device: ^Device) -> (err: Error = .None) {
 		queueFamilyIndex = device.graphics_family,
 	}
 
-	vk_check(
-		vk.CreateCommandPool(device.device, &pool_info, nil, &device.command_pool),
-		.Vulkan_Call_Failed,
-	) or_return
+	vk_check(vk.CreateCommandPool(device.device, &pool_info, nil, &device.command_pool), .Vulkan_Call_Failed) or_return
 
 	return
 }
@@ -598,19 +528,13 @@ create_sync_objects :: proc(device: ^Device) -> (err: Error = .None) {
 	}
 
 	for &frame in device.frames {
-		vk_check(
-			vk.CreateSemaphore(device.device, &semaphore_info, nil, &frame.present_complete),
-			.Vulkan_Call_Failed,
-		) or_return
+		vk_check(vk.CreateSemaphore(device.device, &semaphore_info, nil, &frame.present_complete), .Vulkan_Call_Failed) or_return
 
 		fence_info: vk.FenceCreateInfo = {
 			sType = .FENCE_CREATE_INFO,
 			flags = {.SIGNALED},
 		}
-		vk_check(
-			vk.CreateFence(device.device, &fence_info, nil, &frame.in_flight_fence),
-			.Vulkan_Call_Failed,
-		) or_return
+		vk_check(vk.CreateFence(device.device, &fence_info, nil, &frame.in_flight_fence), .Vulkan_Call_Failed) or_return
 	}
 
 	return
@@ -670,12 +594,7 @@ get_required_layers :: proc(enable_validation_layers: bool) -> [dynamic]cstring 
 	return layers
 }
 
-is_device_suitable :: proc(
-	physical_device: vk.PhysicalDevice,
-	surface: vk.SurfaceKHR,
-) -> (
-	is_suitable, is_discrete: bool,
-) {
+is_device_suitable :: proc(physical_device: vk.PhysicalDevice, surface: vk.SurfaceKHR) -> (is_suitable, is_discrete: bool) {
 	properties: vk.PhysicalDeviceProperties
 	vk.GetPhysicalDeviceProperties(physical_device, &properties)
 
@@ -707,17 +626,11 @@ is_device_suitable :: proc(
 		format_count: u32
 		vk.GetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_count, nil)
 		present_mode_count: u32
-		vk.GetPhysicalDeviceSurfacePresentModesKHR(
-			physical_device,
-			surface,
-			&present_mode_count,
-			nil,
-		)
+		vk.GetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, nil)
 		swapchain_adequate = format_count > 0 && present_mode_count > 0
 	}
 
-	return swapchain_adequate && supports_extension && supports_features,
-		properties.deviceType == .DISCRETE_GPU
+	return swapchain_adequate && supports_extension && supports_features, properties.deviceType == .DISCRETE_GPU
 }
 
 supports_required_features :: proc(required: $T, test: T) -> bool {
@@ -777,8 +690,7 @@ check_device_extension_support :: proc(device: vk.PhysicalDevice) -> bool {
 	for &expected_ext in DEVICE_EXTENSIONS {
 		found := false
 		for &avail in avail_exts {
-			if strings.compare(string(cstring(&avail.extensionName[0])), string(expected_ext)) ==
-			   0 {
+			if strings.compare(string(cstring(&avail.extensionName[0])), string(expected_ext)) == 0 {
 				found = true
 				break
 			}
@@ -807,26 +719,15 @@ choose_swapchain_present_mode :: proc(present_modes: ^[]vk.PresentModeKHR) -> vk
 	return .FIFO
 }
 
-choose_swapchain_extent :: proc(
-	window: glfw.WindowHandle,
-	capabilities: ^vk.SurfaceCapabilitiesKHR,
-) -> vk.Extent2D {
+choose_swapchain_extent :: proc(window: glfw.WindowHandle, capabilities: ^vk.SurfaceCapabilitiesKHR) -> vk.Extent2D {
 	if (capabilities.currentExtent.width != max(u32)) {
 		return capabilities.currentExtent
 	} else {
 		width, height := glfw.GetFramebufferSize(window)
 
 		actual_extent: vk.Extent2D = {cast(u32)width, cast(u32)height}
-		actual_extent.width = clamp(
-			actual_extent.width,
-			capabilities.minImageExtent.width,
-			capabilities.maxImageExtent.width,
-		)
-		actual_extent.height = clamp(
-			actual_extent.height,
-			capabilities.minImageExtent.height,
-			capabilities.maxImageExtent.height,
-		)
+		actual_extent.width = clamp(actual_extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width)
+		actual_extent.height = clamp(actual_extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height)
 		return actual_extent
 	}
 }

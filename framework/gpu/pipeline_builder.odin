@@ -72,11 +72,7 @@ pipeline_builder_set_polygon_mode :: proc(builder: ^Pipeline_Builder, mode: vk.P
 	builder.rasterizer.lineWidth = 1.0
 }
 
-pipeline_builder_set_cull_mode :: proc(
-	builder: ^Pipeline_Builder,
-	cull_mode: vk.CullModeFlags,
-	front_face: vk.FrontFace,
-) {
+pipeline_builder_set_cull_mode :: proc(builder: ^Pipeline_Builder, cull_mode: vk.CullModeFlags, front_face: vk.FrontFace) {
 	builder.rasterizer.cullMode = cull_mode
 	builder.rasterizer.frontFace = front_face
 }
@@ -107,11 +103,7 @@ pipeline_builder_disabled_depth_test :: proc(builder: ^Pipeline_Builder) {
 	builder.depth_stencil.maxDepthBounds = 1.0
 }
 
-pipeline_builder_enable_depth_test :: proc(
-	builder: ^Pipeline_Builder,
-	depth_write_enable: b32,
-	op: vk.CompareOp,
-) {
+pipeline_builder_enable_depth_test :: proc(builder: ^Pipeline_Builder, depth_write_enable: b32, op: vk.CompareOp) {
 	builder.depth_stencil.depthTestEnable = true
 	builder.depth_stencil.depthWriteEnable = depth_write_enable
 	builder.depth_stencil.depthCompareOp = op
@@ -139,14 +131,7 @@ pipeline_builder_set_layout :: proc(builder: ^Pipeline_Builder, layout: vk.Pipel
 }
 
 @(require_results)
-pipeline_builder_build_pipeline :: proc(
-	device: vk.Device,
-	builder: ^Pipeline_Builder,
-	loc := #caller_location,
-) -> (
-	vk.Pipeline,
-	Error,
-) {
+pipeline_builder_build_pipeline :: proc(device: vk.Device, builder: ^Pipeline_Builder, loc := #caller_location) -> (vk.Pipeline, Error) {
 	viewport_state: vk.PipelineViewportStateCreateInfo = {
 		sType         = .PIPELINE_VIEWPORT_STATE_CREATE_INFO,
 		viewportCount = 1,

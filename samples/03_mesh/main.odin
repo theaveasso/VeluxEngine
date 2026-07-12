@@ -55,7 +55,7 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 	velux.destroy_shader(engine, shader)
 	defer velux.destroy_pipeline(engine, &pipeline)
 
-	camera: velux.Camera = {{0, 0, -3}, {0, 0, 0}, velux.Perspective{linalg.to_radians(cast(f32)45), 0.1, 100.0}}
+	camera: velux.Camera = {{0, 0, -10}, {0, 0, 0}, velux.Perspective{linalg.to_radians(cast(f32)45), 0.1, 100.0}}
 
 	for velux.running(engine) {
 		window_extent := velux.window_extent(engine)
@@ -64,17 +64,20 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 
 		t := cast(f32)velux.time()
 		angle := t * linalg.to_radians(cast(f32)90)
-		model := linalg.matrix4_rotate_f32(angle, {0, 1, 0})
-
-		push_constants.mvp = linalg.matrix_mul(proj, linalg.matrix_mul(view, model))
 
 		frame := velux.begin_frame(engine) or_continue
 		velux.cmd_begin_rendering(frame, [4]f32{0.05, 0.05, 0.1, 1})
 
 		velux.cmd_bind_graphics_pipeline(frame, pipeline)
-		velux.cmd_push_constants(frame, pipeline, &push_constants)
 		velux.cmd_bind_index_buffer(frame, index_buffer.handle)
-		velux.cmd_draw_indexed(frame, len(indices))
+
+		for i in 0 ..< 10 {
+			pos := [3]f32{cast(f32)(i % 5) * 1.5 - 3, cast(f32)(i / 5) * 1.5 - 0.75, 0}
+			model := linalg.matrix4_translate(pos) * linalg.matrix4_rotate(angle, [3]f32{0, 1, 0})
+			push_constants.mvp = linalg.matrix_mul(proj, linalg.matrix_mul(view, model))
+			velux.cmd_push_constants(frame, pipeline, &push_constants)
+			velux.cmd_draw_indexed(frame, len(indices))
+		}
 
 		velux.cmd_end_rendering(frame)
 		velux.end_frame(engine, frame) or_continue

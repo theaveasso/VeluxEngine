@@ -2,4 +2,4 @@ shaders/out
 *.exe
 *.pdb
 *.obj
-shaders/out/
+build

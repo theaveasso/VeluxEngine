@@ -26,9 +26,19 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 	index_buffer := velux.create_buffer(engine, u32, len(indices), .Index) or_return
 	defer velux.destroy_buffer(engine, &index_buffer)
 
+	TEX :: 8
+	pixels: [TEX * TEX]u32
+	for y in 0 ..< TEX do for x in 0 ..< TEX {
+		pixels[y * TEX + x] = (x + y) % 2 == 0 ? 0xFFFFFF : 0xFF181818
+	}
+
+	checker_image := velux.create_texture(engine, .R8G8B8A8_SRGB, {TEX, TEX, 1}, {.TRANSFER_DST, .SAMPLED}) or_return
+	defer velux.destroy_texture(engine, &checker_image)
+
 	cmd := velux.immediate_transfer_begin(engine) or_return
 	velux.write_staging_buffer_slice(engine, cmd, &vertex_buffer, vertices[:]) or_return
 	velux.write_staging_buffer_slice(engine, cmd, &index_buffer, indices[:]) or_return
+	velux.write_staging_image_slice(engine, cmd, &checker_image, pixels[:]) or_return
 	velux.immediate_transfer_end(engine) or_return
 
 	Mesh_Push_Constants :: struct {

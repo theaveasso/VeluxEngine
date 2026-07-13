@@ -4,10 +4,19 @@ import vk "vendor:vulkan"
 
 init_image_subresource_range :: proc(
 	aspect_mask: vk.ImageAspectFlags,
-	mip_levels: u32 = vk.REMAINING_MIP_LEVELS,
-	array_layers: u32 = vk.REMAINING_MIP_LEVELS,
+	level_count: u32 = vk.REMAINING_MIP_LEVELS,
+	layer_count: u32 = vk.REMAINING_ARRAY_LAYERS,
 ) -> vk.ImageSubresourceRange {
-	return {aspectMask = aspect_mask, baseMipLevel = 0, levelCount = mip_levels, baseArrayLayer = 0, layerCount = array_layers}
+	return {aspectMask = aspect_mask, baseMipLevel = 0, levelCount = level_count, baseArrayLayer = 0, layerCount = layer_count}
+}
+
+init_image_subresource_layers :: proc(
+	aspect_mask: vk.ImageAspectFlags,
+	mip_levels: u32 = 0,
+	base_array_layers: u32 = 0,
+	layer_count: u32 = 1,
+) -> vk.ImageSubresourceLayers {
+	return {aspectMask = aspect_mask, mipLevel = mip_levels, baseArrayLayer = base_array_layers, layerCount = layer_count}
 }
 
 init_command_buffer_begin_info :: proc(flags: vk.CommandBufferUsageFlags) -> vk.CommandBufferBeginInfo {
@@ -51,4 +60,23 @@ init_present_info :: proc(wait_semaphore: ^vk.Semaphore, swapchain: ^vk.Swapchai
 
 init_buffer_copy2 :: proc(size: vk.DeviceSize, dst_offset: vk.DeviceSize = 0, src_offset: vk.DeviceSize = 0) -> vk.BufferCopy2 {
 	return {sType = .BUFFER_COPY_2, srcOffset = src_offset, dstOffset = dst_offset, size = size}
+}
+
+init_buffer_image_copy2 :: proc(
+	image_extent: vk.Extent3D,
+	image_subresource: vk.ImageSubresourceLayers,
+	offset: vk.DeviceSize = 0,
+	row: u32 = 0,
+	image_height: u32 = 0,
+	image_offset: vk.Offset3D = {},
+) -> vk.BufferImageCopy2 {
+	return {
+		sType = .BUFFER_IMAGE_COPY_2,
+		pNext = nil,
+		bufferOffset = offset,
+		bufferRowLength = row,
+		imageSubresource = image_subresource,
+		imageOffset = image_offset,
+		imageExtent = image_extent,
+	}
 }

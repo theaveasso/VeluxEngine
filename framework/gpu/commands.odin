@@ -133,3 +133,23 @@ cmd_copy_buffer2 :: proc(cmd: vk.CommandBuffer, src: vk.Buffer, dst: vk.Buffer, 
 	}
 	vk.CmdCopyBuffer2(cmd, &copy_info)
 }
+
+cmd_copy_buffer_to_image2 :: proc(
+	cmd: vk.CommandBuffer,
+	src: vk.Buffer,
+	dst: vk.Image,
+	dst_image_layout: vk.ImageLayout,
+	region: ^vk.BufferImageCopy2,
+	count: u32 = 1,
+) {
+	copy_info: vk.CopyBufferToImageInfo2 = {
+		sType          = .COPY_BUFFER_TO_IMAGE_INFO_2,
+		pNext          = nil,
+		srcBuffer      = src,
+		dstImage       = dst,
+		dstImageLayout = dst_image_layout,
+		regionCount    = count,
+		pRegions       = region,
+	}
+	vk.CmdCopyBufferToImage2(cmd, &copy_info)
+}

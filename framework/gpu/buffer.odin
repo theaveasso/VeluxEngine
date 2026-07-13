@@ -49,15 +49,7 @@ create_buffer :: proc(
 	}
 
 	vk_check(
-		vma.CreateBuffer(
-			device.vma_allocator,
-			&buffer_info,
-			&allocation_info,
-			&buffer.handle,
-			&buffer.allocation,
-			&buffer.info,
-		),
-		.VMA_Call_Failed,
+		vma.CreateBuffer(device.vma_allocator, &buffer_info, &allocation_info, &buffer.handle, &buffer.allocation, &buffer.info),
 	) or_return
 
 	if .SHADER_DEVICE_ADDRESS in vk_usage_flags {
@@ -92,12 +84,7 @@ vk_vma_buffer_flags :: proc(kind: Buffer_Kind) -> (vk.BufferUsageFlags, vma.Allo
 	unreachable()
 }
 
-write_buffer :: proc(
-	buffer: ^Buffer($T),
-	in_data: ^$U,
-	offset: vk.DeviceSize = 0,
-	loc := #caller_location,
-) {
+write_buffer :: proc(buffer: ^Buffer($T), in_data: ^$U, offset: vk.DeviceSize = 0, loc := #caller_location) {
 	size := size_of(U)
 	assert(
 		buffer.info.size >= cast(vk.DeviceSize)(cast(u64)size + cast(u64)offset),
@@ -110,12 +97,7 @@ write_buffer :: proc(
 	mem.copy(data[offset:], in_data, size)
 }
 
-write_buffer_slice :: proc(
-	buffer: ^Buffer($T),
-	in_data: []$U,
-	offset: vk.DeviceSize = 0,
-	loc := #caller_location,
-) {
+write_buffer_slice :: proc(buffer: ^Buffer($T), in_data: []$U, offset: vk.DeviceSize = 0, loc := #caller_location) {
 	size := size_of(U) * len(in_data)
 	assert(
 		buffer.info.size >= cast(vk.DeviceSize)(cast(u64)size + cast(u64)offset),
@@ -131,7 +113,7 @@ write_buffer_slice :: proc(
 }
 
 @(require_results)
-staging_write_buffer :: proc(
+write_staging_buffer :: proc(
 	device: ^Device,
 	cmd: vk.CommandBuffer,
 	buffer: ^Buffer($T),
@@ -161,7 +143,7 @@ staging_write_buffer :: proc(
 }
 
 @(require_results)
-staging_write_buffer_slice :: proc(
+write_staging_buffer_slice :: proc(
 	device: ^Device,
 	cmd: vk.CommandBuffer,
 	buffer: ^Buffer($T),

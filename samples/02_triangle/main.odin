@@ -24,8 +24,8 @@ run :: proc(engine: ^vlx.Engine) -> (err: vlx.Error) {
 	defer gpu.destroy_buffer(&engine.device, &index_buffer)
 
 	cmd := gpu.immediate_transfer_begin(&engine.device) or_return
-	gpu.staging_write_buffer_slice(&engine.device, cmd, &vertex_buffer, vertices[:]) or_return
-	gpu.staging_write_buffer_slice(&engine.device, cmd, &index_buffer, indices[:]) or_return
+	gpu.write_staging_buffer_slice(&engine.device, cmd, &vertex_buffer, vertices[:]) or_return
+	gpu.write_staging_buffer_slice(&engine.device, cmd, &index_buffer, indices[:]) or_return
 	gpu.immediate_transfer_end(&engine.device) or_return
 
 	Triangle_PushConstants :: struct {

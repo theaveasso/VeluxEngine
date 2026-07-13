@@ -1,7 +1,10 @@
 package velux
 
 import "base:runtime"
+
+import vma "third_party:odin-vma"
 import vk "vendor:vulkan"
+
 import gpu "vlx:gpu"
 
 DEFAULT_VERTEX_ENTRY :: gpu.DEFAULT_VERTEX_ENTRY
@@ -12,6 +15,7 @@ DEFAULT_DEPTH_FORMAT :: gpu.DEFAULT_DEPTH_FORMAT
 Frame :: gpu.Frame
 Vertex :: gpu.Vertex
 Buffer :: gpu.Buffer
+Image :: gpu.Image
 Device_Address :: gpu.Device_Address
 Buffer_Kind :: gpu.Buffer_Kind
 Depth_Config :: gpu.Depth_Config
@@ -29,6 +33,7 @@ cmd_bind_index_buffer :: gpu.cmd_bind_index_buffer
 cmd_draw_indexed :: gpu.cmd_draw_indexed
 cmd_end_rendering :: gpu.cmd_end_rendering
 
+@(require_results)
 create_buffer :: #force_inline proc(
 	engine: ^Engine,
 	$T: typeid,
@@ -46,6 +51,47 @@ destroy_buffer :: #force_inline proc(engine: ^Engine, buffer: ^Buffer($T)) {
 	gpu.destroy_buffer(&engine.device, buffer)
 }
 
+@(require_results)
+create_texture :: #force_inline proc(
+	engine: ^Engine,
+	format: vk.Format,
+	extent: vk.Extent3D,
+	image_usage_flags: vk.ImageUsageFlags,
+	mip_levels: u32 = 1,
+	array_layers: u32 = 1,
+	image_type: vk.ImageType = .D2,
+	msaa_samples: vk.SampleCountFlags = {._1},
+	tiling: vk.ImageTiling = .OPTIMAL,
+	flags: vk.ImageCreateFlags = {},
+	alloc_flags: vma.AllocationCreateFlags = {},
+	usage: vma.MemoryUsage = .AUTO,
+) -> (
+	image: Image,
+	err: Error,
+) {
+	image = gpu.create_image(
+		&engine.device,
+		gpu.image_create_info(
+			format,
+			extent,
+			image_usage_flags,
+			mip_levels,
+			array_layers,
+			image_type,
+			msaa_samples,
+			tiling,
+			flags,
+			alloc_flags,
+			usage,
+		),
+	) or_return
+	return
+}
+
+destroy_texture :: #force_inline proc(engine: ^Engine, image: ^Image) {
+	gpu.destroy_image(&engine.device, image)
+}
+
 begin_frame :: #force_inline proc(engine: ^Engine) -> (frame: Frame, err: Error) {
 	frame = gpu.begin_frame(&engine.device) or_return
 	return
@@ -59,19 +105,6 @@ end_frame :: #force_inline proc(engine: ^Engine, frame: Frame) -> (err: Error) {
 immediate_transfer_begin :: #force_inline proc(engine: ^Engine) -> (cmd: Command_Buffer, err: Error) {
 	cmd = gpu.immediate_transfer_begin(&engine.device) or_return
 	return
-}
-
-write_staging_buffer_slice :: #force_inline proc(
-	engine: ^Engine,
-	cmd: Command_Buffer,
-	buffer: ^Buffer($T),
-	in_data: []$U,
-	offset: vk.DeviceSize = 0,
-	loc := #caller_location,
-) -> (
-	err: Error,
-) {
-	return gpu.staging_write_buffer_slice(&engine.device, cmd, buffer, in_data, offset, loc)
 }
 
 immediate_transfer_end :: #force_inline proc(engine: ^Engine) -> (err: Error) {
@@ -133,4 +166,34 @@ create_graphics_pipeline :: #force_inline proc(
 
 destroy_pipeline :: #force_inline proc(engine: ^Engine, pipeline: ^Graphics_Pipeline) {
 	gpu.destroy_pipeline(&engine.device, pipeline)
+}
+
+@(require_results)
+write_staging_buffer_slice :: #force_inline proc(
+	engine: ^Engine,
+	cmd: Command_Buffer,
+	buffer: ^Buffer($T),
+	in_data: []$U,
+	offset: vk.DeviceSize = 0,
+	loc := #caller_location,
+) -> (
+	err: Error,
+) {
+	gpu.write_staging_buffer_slice(&engine.device, cmd, buffer, in_data, offset, loc) or_return
+	return
+}
+
+@(require_results)
+write_staging_image_slice :: #force_inline proc(
+	engine: ^Engine,
+	cmd: Command_Buffer,
+	image: ^Image,
+	in_data: []$T,
+	offset: vk.DeviceSize = 0,
+	loc := #caller_location,
+) -> (
+	err: Error,
+) {
+	gpu.write_staging_image(&engine.device, cmd, image, in_data, offset, loc) or_return
+	return
 }

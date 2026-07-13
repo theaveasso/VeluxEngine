@@ -1,0 +1,72 @@
+{
+	"version": "2.0.0",
+	"inputs": [
+		{
+			"id": "sample",
+			"type": "pickString",
+			"description": "Select sample",
+			"options": ["01_window", "02_triangle", "03_mesh"],
+			"default": "03_mesh"
+		}
+	],
+	"tasks": [
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "${workspaceFolder}/build.bat",
+			"args": ["${input:sample}"],
+			"options": { "cwd": "${workspaceFolder}" },
+			"group": { "kind": "build", "isDefault": true },
+			"presentation": { "reveal": "always", "panel": "shared", "clear": true },
+			"problemMatcher": {
+				"owner": "odin",
+				"fileLocation": ["autoDetect", "${workspaceFolder}"],
+				"pattern": {
+					"regexp": "^(.*)\\((\\d+):(\\d+)\\)\\s+(Error|Warning):\\s+(.*)$",
+					"file": 1,
+					"line": 2,
+					"column": 3,
+					"severity": 4,
+					"message": 5
+				}
+			}
+		},
+		{
+			"label": "run",
+			"type": "process",
+			"command": "${workspaceFolder}/build/${input:sample}.exe",
+			"options": { "cwd": "${workspaceFolder}" },
+			"dependsOn": "build",
+			"presentation": { "reveal": "always", "panel": "shared" },
+			"problemMatcher": []
+		},
+		{
+			"label": "debug (RAD Debugger)",
+			"type": "process",
+			"command": "raddbg",
+			"args": ["${workspaceFolder}/build/${input:sample}.exe"],
+			"options": { "cwd": "${workspaceFolder}" },
+			"dependsOn": "build",
+			"problemMatcher": []
+		},
+		{
+			"label": "debug (RenderDoc capture)",
+			"type": "process",
+			"command": "C:/Program Files/RenderDoc/renderdoccmd.exe",
+			"args": [
+				"capture",
+				"--working-dir", "${workspaceFolder}",
+				"${workspaceFolder}/build/${input:sample}.exe"
+			],
+			"options": { "cwd": "${workspaceFolder}" },
+			"dependsOn": "build",
+			"problemMatcher": []
+		},
+		{
+			"label": "open RenderDoc UI",
+			"type": "process",
+			"command": "C:/Program Files/RenderDoc/qrenderdoc.exe",
+			"problemMatcher": []
+		}
+	]
+}

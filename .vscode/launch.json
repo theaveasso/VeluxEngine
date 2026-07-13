@@ -1,0 +1,24 @@
+{
+	"version": "0.2.0",
+	"inputs": [
+		{
+			"id": "sample",
+			"type": "pickString",
+			"description": "Select sample",
+			"options": ["01_window", "02_triangle", "03_mesh"],
+			"default": "03_mesh"
+		}
+	],
+	"configurations": [
+		{
+			"name": "Debug sample (cppvsdbg)",
+			"type": "cppvsdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/build/${input:sample}.exe",
+			"args": [],
+			"cwd": "${workspaceFolder}",
+			"console": "integratedTerminal",
+			"preLaunchTask": "build"
+		}
+	]
+}

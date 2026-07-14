@@ -100,6 +100,8 @@ cmd_bind_pipeline :: proc {
 
 cmd_bind_graphics_pipeline :: proc(frame: Frame, pipeline: Graphics_Pipeline) {
 	vk.CmdBindPipeline(frame.cmd, .GRAPHICS, pipeline.handle)
+	bindless_set := frame.bindless_set
+	vk.CmdBindDescriptorSets(frame.cmd, .GRAPHICS, pipeline.layout, 0, 1, &bindless_set, 0, nil)
 }
 
 cmd_push_constants :: proc(frame: Frame, pipeline: Graphics_Pipeline, data: ^$T, loc := #caller_location) {

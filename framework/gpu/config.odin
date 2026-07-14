@@ -9,6 +9,7 @@ DEFAULT_FRAGMENT_ENTRY: cstring : "fragment_main"
 DEFAULT_COMPUTE_ENTRY: cstring : "compute_main"
 
 MAX_BATCH_TRANSITIONS :: 8
+MAX_TEXTURES :: 1024
 
 REQUIRED_VULKAN_FEATURES: vk.PhysicalDeviceFeatures2 = {
 	sType = .PHYSICAL_DEVICE_FEATURES_2,
@@ -22,10 +23,15 @@ REQUIRED_VULKAN_1_1_FEATURES: vk.PhysicalDeviceVulkan11Features = {
 }
 
 REQUIRED_VULKAN_1_2_FEATURES: vk.PhysicalDeviceVulkan12Features = {
-	sType               = .PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
-	pNext               = &REQUIRED_VULKAN_1_3_FEATURES,
-	bufferDeviceAddress = true,
-	scalarBlockLayout   = true,
+	sType                                        = .PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+	pNext                                        = &REQUIRED_VULKAN_1_3_FEATURES,
+	bufferDeviceAddress                          = true,
+	descriptorIndexing                           = true,
+	runtimeDescriptorArray                       = true,
+	descriptorBindingPartiallyBound              = true,
+	descriptorBindingSampledImageUpdateAfterBind = true,
+	shaderSampledImageArrayNonUniformIndexing    = true,
+	scalarBlockLayout                            = true,
 }
 
 REQUIRED_VULKAN_1_3_FEATURES: vk.PhysicalDeviceVulkan13Features = {

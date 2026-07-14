@@ -52,6 +52,7 @@ Device :: struct {
 	render_finished_semaphores: []vk.Semaphore,
 	command_pool:               vk.CommandPool,
 	imm_transfer_ctx:           Transfer_Context,
+	bindless:                   Bindless,
 	enable_validation_layer:    bool,
 	current_frame:              u32,
 }
@@ -102,6 +103,7 @@ init :: proc(device: ^Device, config: Config) -> (err: Error = .None) {
 	allocate_command_buffers(device) or_return
 	create_immediate_transfer_context(device) or_return
 	create_sync_objects(device) or_return
+	create_bindless(device) or_return
 
 	return
 }
@@ -109,6 +111,7 @@ init :: proc(device: ^Device, config: Config) -> (err: Error = .None) {
 destroy :: proc(device: ^Device) {
 	wait_idle(device)
 
+	destroy_bindless(device)
 	destroy_immediate_transfer_context(device)
 	destroy_sync_objects(device)
 	vk.DestroyCommandPool(device.device, device.command_pool, nil)

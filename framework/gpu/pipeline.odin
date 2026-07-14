@@ -55,7 +55,7 @@ create_graphics_pipeline :: proc(
 ) {
 	context.logger = device.logger
 
-	layout := create_pipeline_layout(device.device, create_info.push_constants) or_return
+	layout := create_pipeline_layout(device, create_info.push_constants) or_return
 	defer if err != .None do vk.DestroyPipelineLayout(device.device, layout, nil)
 
 	pipeline_builder := create_pipeline_builder()
@@ -94,7 +94,7 @@ destroy_pipeline :: proc(device: ^Device, pipeline: ^Pipeline) {
 
 @(private, require_results)
 create_pipeline_layout :: proc(
-	device: vk.Device,
+	device: ^Device,
 	push_constants: typeid,
 	stage_flags: vk.ShaderStageFlags = {.VERTEX, .FRAGMENT},
 ) -> (
@@ -117,8 +117,10 @@ create_pipeline_layout :: proc(
 		layout_info.pPushConstantRanges = &range
 	}
 
-	vk_check(vk.CreatePipelineLayout(device, &layout_info, nil, &layout), .Vulkan_Call_Failed) or_return
+	layout_info.setLayoutCount = 1
+	layout_info.pSetLayouts = &device.bindless.layout
 
+	vk_check(vk.CreatePipelineLayout(device.device, &layout_info, nil, &layout), .Vulkan_Call_Failed) or_return
 	return layout, .None
 }
 

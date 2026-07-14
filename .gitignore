@@ -3,3 +3,6 @@ shaders/out
 *.pdb
 *.obj
 build
+
+# RenderDoc captures
+*.cap

@@ -9,14 +9,14 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 	defer velux.wait_for_idle(engine)
 
 	vertices: [8]velux.Vertex = {
-		{{-0.5, -0.5, 0.5}, {0, 0, 1}},
-		{{0.5, -0.5, 0.5}, {1, 0, 1}},
-		{{0.5, 0.5, 0.5}, {1, 1, 1}},
-		{{-0.5, 0.5, 0.5}, {0, 1, 1}},
-		{{-0.5, -0.5, -0.5}, {0, 0, 0}},
-		{{0.5, -0.5, -0.5}, {1, 0, 0}},
-		{{0.5, 0.5, -0.5}, {1, 1, 0}},
-		{{-0.5, 0.5, -0.5}, {0, 1, 0}},
+		{{-0.5, -0.5, 0.5}, {0, 0, 1}, {0, 0}},
+		{{0.5, -0.5, 0.5}, {1, 0, 1}, {1, 0}},
+		{{0.5, 0.5, 0.5}, {1, 1, 1}, {1, 1}},
+		{{-0.5, 0.5, 0.5}, {0, 1, 1}, {0, 1}},
+		{{-0.5, -0.5, -0.5}, {0, 0, 0}, {0, 0}},
+		{{0.5, -0.5, -0.5}, {1, 0, 0}, {1, 0}},
+		{{0.5, 0.5, -0.5}, {1, 1, 0}, {1, 1}},
+		{{-0.5, 0.5, -0.5}, {0, 1, 0}, {0, 1}},
 	}
 	indices: [36]u32 = {0, 1, 2, 2, 3, 0, 1, 5, 6, 6, 2, 1, 5, 4, 7, 7, 6, 5, 4, 0, 3, 3, 7, 4, 3, 2, 6, 6, 7, 3, 4, 5, 1, 1, 0, 4}
 
@@ -42,12 +42,14 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 	velux.immediate_transfer_end(engine) or_return
 
 	Mesh_Push_Constants :: struct {
-		mvp:      matrix[4, 4]f32,
-		vertices: velux.Device_Address(velux.Vertex),
+		mvp:           matrix[4, 4]f32,
+		vertices:      velux.Device_Address(velux.Vertex),
+		texture_index: u32,
 	}
 
 	push_constants: Mesh_Push_Constants = {
-		vertices = vertex_buffer.ptr,
+		vertices      = vertex_buffer.ptr,
+		texture_index = checker_image.bindless_index,
 	}
 
 	shader := velux.create_shader(engine, "shaders/out/mesh.spv", context.temp_allocator) or_return
@@ -65,15 +67,15 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 	velux.destroy_shader(engine, shader)
 	defer velux.destroy_pipeline(engine, &pipeline)
 
-	camera: velux.Camera = {{0, 0, -10}, {0, 0, 0}, velux.Perspective{linalg.to_radians(cast(f32)45), 0.1, 100.0}}
+	camera: velux.Camera = {{0, 0, -10}, {0, 0, 0}, velux.Perspective{linalg.to_radians(f32(45)), 0.1, 100.0}}
 
 	for velux.running(engine) {
 		window_extent := velux.window_extent(engine)
 		proj := velux.camera_projection(camera, window_extent[0] / window_extent[1])
 		view := velux.camera_view(camera)
 
-		t := cast(f32)velux.time()
-		angle := t * linalg.to_radians(cast(f32)90)
+		t := f32(velux.time())
+		angle := t * linalg.to_radians(f32(90))
 
 		frame := velux.begin_frame(engine) or_continue
 		velux.cmd_begin_rendering(frame, [4]f32{0.05, 0.05, 0.1, 1})
@@ -82,9 +84,9 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 		velux.cmd_bind_index_buffer(frame, index_buffer.handle)
 
 		for i in 0 ..< 10 {
-			pos := [3]f32{cast(f32)(i % 5) * 1.5 - 3, cast(f32)(i / 5) * 1.5 - 0.75, 0}
+			pos := [3]f32{f32((i % 5)) * 1.5 - 3, f32((i / 5)) * 1.5 - 0.75, 0}
 			model := linalg.matrix4_translate(pos) * linalg.matrix4_rotate(angle, [3]f32{0, 1, 0})
-			push_constants.mvp = linalg.matrix_mul(proj, linalg.matrix_mul(view, model))
+			push_constants.mvp = proj * linalg.matrix_mul(view, model)
 			velux.cmd_push_constants(frame, pipeline, &push_constants)
 			velux.cmd_draw_indexed(frame, len(indices))
 		}

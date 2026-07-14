@@ -11,6 +11,7 @@ Frame :: struct {
 	view:              vk.ImageView,
 	depth_view:        vk.ImageView,
 	extent:            vk.Extent2D,
+	bindless_set:      vk.DescriptorSet,
 	image_index:       u32,
 	frame_index:       u32,
 }
@@ -64,6 +65,7 @@ begin_frame :: proc(device: ^Device) -> (frame: Frame, err: Error) {
 			device.swapchain.views[image_index],
 			device.depth_image.view,
 			device.swapchain.extent,
+			device.bindless.set,
 			image_index,
 			device.current_frame,
 		},

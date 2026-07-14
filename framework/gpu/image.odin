@@ -4,13 +4,14 @@ import vma "third_party:odin-vma"
 import vk "vendor:vulkan"
 
 Image :: struct {
-	handle:       vk.Image,
-	view:         vk.ImageView,
-	allocation:   vma.Allocation,
-	format:       vk.Format,
-	extent:       vk.Extent3D,
-	mip_levels:   u32,
-	array_layers: u32,
+	handle:         vk.Image,
+	view:           vk.ImageView,
+	allocation:     vma.Allocation,
+	bindless_index: u32,
+	format:         vk.Format,
+	extent:         vk.Extent3D,
+	mip_levels:     u32,
+	array_layers:   u32,
 }
 
 Image_Create_Info :: struct {
@@ -75,6 +76,10 @@ create_image :: proc(device: ^Device, create_info: Image_Create_Info, loc := #ca
 	}
 
 	vk_check(vk.CreateImageView(device.device, &view_info, nil, &image.view)) or_return
+
+	if .SAMPLED in create_info.image_usage_flags {
+		image.bindless_index = register_bindless(device, image.view)
+	}
 
 	image.extent = create_info.extent
 	image.format = create_info.format
@@ -148,7 +153,7 @@ write_staging_image :: proc(
 	aspect := vk_aspect_of_format(image.format)
 	cmd_transition_image(cmd, image.handle, aspect, .UNDEFINED, .TRANSFER_DST_OPTIMAL)
 
-	region := init_buffer_image_copy2(image.extent, init_image_subresource_layers(aspect, image.mip_levels, image.array_layers))
+	region := init_buffer_image_copy2(image.extent, init_image_subresource_layers(aspect, 0, 0, image.array_layers))
 	cmd_copy_buffer_to_image2(cmd, staging.handle, image.handle, .TRANSFER_DST_OPTIMAL, &region)
 	cmd_transition_image(cmd, image.handle, aspect, .TRANSFER_DST_OPTIMAL, .SHADER_READ_ONLY_OPTIMAL)
 	return

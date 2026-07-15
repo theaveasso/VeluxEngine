@@ -67,10 +67,16 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 	velux.destroy_shader(engine, shader)
 	defer velux.destroy_pipeline(engine, &pipeline)
 
-	camera: velux.Camera = {{0, 0, -10}, {0, 0, 0}, velux.Perspective{linalg.to_radians(f32(45)), 0.1, 100.0}}
+	camera: velux.Camera = {
+		position = {0, 0, -10},
+		target = {0, 0, 0},
+		projection = velux.Perspective{linalg.to_radians(f32(45)), 0.1, 100.0},
+		controller = velux.Orbit_Camera{yaw = 0, pitch = 0, radius = 10},
+	}
 
 	for velux.running(engine) {
 		window_extent := velux.window_extent(engine)
+		velux.camera_update(&camera, velux.mouse_delta(), velux.scroll_delta().y, velux.is_mouse_down(.LEFT), engine.dt)
 		proj := velux.camera_projection(camera, window_extent[0] / window_extent[1])
 		view := velux.camera_view(camera)
 

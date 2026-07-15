@@ -6,6 +6,7 @@ import vma "third_party:odin-vma"
 import vk "vendor:vulkan"
 
 import gpu "vlx:gpu"
+import platform "vlx:platform"
 
 DEFAULT_VERTEX_ENTRY :: gpu.DEFAULT_VERTEX_ENTRY
 DEFAULT_FRAGMENT_ENTRY :: gpu.DEFAULT_FRAGMENT_ENTRY
@@ -21,10 +22,13 @@ Buffer_Kind :: gpu.Buffer_Kind
 Depth_Config :: gpu.Depth_Config
 Pipeline_Blend_Mode :: gpu.Pipeline_Blend_Mode
 Graphics_Pipeline :: gpu.Graphics_Pipeline
+
+Mouse_Button :: platform.Mouse_Button
+Key :: platform.Key
+
 Command_Buffer :: vk.CommandBuffer
 Shader_Module :: vk.ShaderModule
 Format :: vk.Format
-
 
 cmd_begin_rendering :: gpu.cmd_begin_rendering
 cmd_bind_graphics_pipeline :: gpu.cmd_bind_graphics_pipeline
@@ -32,6 +36,13 @@ cmd_push_constants :: gpu.cmd_push_constants
 cmd_bind_index_buffer :: gpu.cmd_bind_index_buffer
 cmd_draw_indexed :: gpu.cmd_draw_indexed
 cmd_end_rendering :: gpu.cmd_end_rendering
+
+time :: platform.time
+
+mouse_delta :: platform.mouse_delta
+scroll_delta :: platform.scroll_delta
+is_mouse_down :: platform.is_mouse_down
+is_key_down :: platform.is_key_down
 
 @(require_results)
 create_buffer :: #force_inline proc(

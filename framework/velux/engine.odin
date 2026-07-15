@@ -3,6 +3,8 @@ package velux
 import "vlx:gpu"
 import "vlx:platform"
 
+MAX_DELTA :: 0.1
+
 Config :: struct {
 	app_name:          cstring,
 	width:             i32,
@@ -12,8 +14,10 @@ Config :: struct {
 }
 
 Engine :: struct {
-	window: platform.Window,
-	device: gpu.Device,
+	window:    platform.Window,
+	device:    gpu.Device,
+	dt:        f32,
+	last_time: f64,
 }
 
 Error :: union #shared_nil {
@@ -30,6 +34,7 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 
 	platform.init() or_return
 	platform.create_window(&engine.window, config.width, config.height, config.app_name) or_return
+	platform.input_init(&engine.window)
 
 	gpu.init(
 		&engine.device,
@@ -41,11 +46,19 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 		},
 	) or_return
 
+	engine.last_time = platform.time()
 	return nil
 }
 
 running :: proc(engine: ^Engine) -> bool {
 	platform.poll_events()
+	platform.input_new_frame()
+
+	now := platform.time()
+	raw := f32(now - engine.last_time)
+	engine.dt = min(raw, MAX_DELTA)
+	engine.last_time = now
+
 	return !platform.window_should_close(&engine.window)
 }
 
@@ -55,10 +68,6 @@ swapchain_format :: proc(engine: ^Engine) -> Format {
 
 window_extent :: proc(engine: ^Engine) -> [2]f32 {
 	return platform.window_extent(&engine.window)
-}
-
-time :: proc() -> f64 {
-	return platform.time()
 }
 
 wait_for_idle :: proc(engine: ^Engine) {

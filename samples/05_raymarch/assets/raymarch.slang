@@ -52,6 +52,7 @@ float solid(int3 c)
 {
     return voxel_at(c) != 0 ? 1.0 : 0.0;
 }
+
 float corner_ao(float s1, float s2, float cn)
 {
     if (s1 > 0.5 && s2 > 0.5)
@@ -60,6 +61,7 @@ float corner_ao(float s1, float s2, float cn)
     }
     return 3.0 - (s1 + s2 + cn);
 }
+
 float face_ao(int3 c, float3 N, float3 hit_p)
 {
     int3 n = int3(N);
@@ -93,6 +95,38 @@ float face_ao(int3 c, float3 N, float3 hit_p)
 
     float ao = lerp(lerp(a00, a10, u), lerp(a01, a11, u), v);
     return ao / 3.0;
+}
+
+bool in_shadow(float3 origin, float3 dir)
+{
+    int3 c = int3(floor(origin));
+    int3 step = int3(sign(dir));
+    float3 t_delta = abs(1.0 / dir);
+    float3 t_max = (float3(c) + max(float3(step), 0.0) - origin) / dir;
+
+    for (int i = 0; i < 256; i++)
+    {
+        if (voxel_at(c) != 0)
+        {
+            return true;
+        }
+        if (t_max.x < t_max.y && t_max.x < t_max.z)
+        {
+            c.x += step.x;
+            t_max.x += t_delta.x;
+        }
+        else if (t_max.y < t_max.z)
+        {
+            c.y += step.y;
+            t_max.y += t_delta.y;
+        }
+        else
+        {
+            c.z += step.z;
+            t_max.z += t_delta.z;
+        }
+    }
+    return false;
 }
 
 [shader("vertex")]
@@ -152,10 +186,13 @@ PS_Output fragment_main(V2P input)
             float ao = face_ao(c, N, hit_p);
             float ao_b = lerp(0.35, 1.0, ao);
 
+            float3 sp = hit_p + N * 0.02;
+            float ndl = max(dot(N, L), 0.0);
+            float shadow = (ndl > 0.0 && in_shadow(sp, L)) ? 0.0 : 1.0;
+
             float3 ambient = lerp(ground_warm, sky_warm, N.y * 0.5 + 0.5);
-            float3 sun = sun_color * max(dot(N, L), 0);
-            float3 color = BLOCK_PALETTE[voxel] * (ambient + sun);
-            color = color * ao_b;
+            float3 sun = sun_color * ndl * shadow;
+            float3 color = BLOCK_PALETTE[voxel] * (ambient * ao_b + sun);
 
             output.frag_color = float4(color, 1);
             return output;

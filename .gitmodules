@@ -6,7 +6,3 @@
 	path = third_party/odin-libktx
 	url = https://github.com/DanielGavin/odin-libktx.git
 	branch = master
-[submodule "third_party/odin-gltf2"]
-	path = third_party/odin-gltf2
-	url = https://github.com/Pawel82S/glTF2.git
-	branch = master

@@ -13,8 +13,13 @@ DEFAULT_FRAGMENT_ENTRY :: gpu.DEFAULT_FRAGMENT_ENTRY
 
 DEFAULT_DEPTH_FORMAT :: gpu.DEFAULT_DEPTH_FORMAT
 
+Vertex :: struct {
+	position: [3]f32,
+	normal:   [3]f32,
+	uv:       [2]f32,
+}
+
 Frame :: gpu.Frame
-Vertex :: gpu.Vertex
 Buffer :: gpu.Buffer
 Image :: gpu.Image
 Device_Address :: gpu.Device_Address

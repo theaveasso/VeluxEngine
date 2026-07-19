@@ -5,8 +5,8 @@
 			"id": "sample",
 			"type": "pickString",
 			"description": "Select sample",
-			"options": ["01_window", "02_triangle", "03_mesh"],
-			"default": "03_mesh"
+			"options": ["01_window", "02_triangle", "03_mesh", "04_voxel"],
+			"default": "04_voxel"
 		}
 	],
 	"tasks": [
@@ -34,8 +34,8 @@
 		{
 			"label": "run",
 			"type": "process",
-			"command": "${workspaceFolder}/build/${input:sample}.exe",
-			"options": { "cwd": "${workspaceFolder}" },
+			"command": "${workspaceFolder}/samples/${input:sample}/${input:sample}.exe",
+			"options": { "cwd": "${workspaceFolder}/samples/${input:sample}" },
 			"dependsOn": "build",
 			"presentation": { "reveal": "always", "panel": "shared" },
 			"problemMatcher": []
@@ -44,8 +44,8 @@
 			"label": "debug (RAD Debugger)",
 			"type": "process",
 			"command": "raddbg",
-			"args": ["${workspaceFolder}/build/${input:sample}.exe"],
-			"options": { "cwd": "${workspaceFolder}" },
+			"args": ["${workspaceFolder}/samples/${input:sample}/${input:sample}.exe"],
+			"options": { "cwd": "${workspaceFolder}/samples/${input:sample}" },
 			"dependsOn": "build",
 			"problemMatcher": []
 		},
@@ -55,10 +55,10 @@
 			"command": "C:/Program Files/RenderDoc/renderdoccmd.exe",
 			"args": [
 				"capture",
-				"--working-dir", "${workspaceFolder}",
-				"${workspaceFolder}/build/${input:sample}.exe"
+				"--working-dir", "${workspaceFolder}/samples/${input:sample}",
+				"${workspaceFolder}/samples/${input:sample}/${input:sample}.exe"
 			],
-			"options": { "cwd": "${workspaceFolder}" },
+			"options": { "cwd": "${workspaceFolder}/samples/${input:sample}" },
 			"dependsOn": "build",
 			"problemMatcher": []
 		},

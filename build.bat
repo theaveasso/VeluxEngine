@@ -2,23 +2,22 @@
 setlocal enabledelayedexpansion
 
 set "SAMPLE=%~1"
-if "%SAMPLE%"=="" set "SAMPLE=03_mesh"
+if "%SAMPLE%"=="" set "SAMPLE=04_voxel"
 
 set "ODIN=odin"
 
-if not exist build mkdir build
-
-call "%~dp0compile_shader.bat" -in shaders\mesh.slang     -out shaders\out\mesh.spv     || goto :err
-call "%~dp0compile_shader.bat" -in shaders\triangle.slang -out shaders\out\triangle.spv || goto :err
+call "%~dp0compile_shader.bat" -in shaders\mesh.slang                  -out shaders\out\mesh.spv                   || goto :err
+call "%~dp0compile_shader.bat" -in shaders\triangle.slang              -out shaders\out\triangle.spv               || goto :err
+call "%~dp0compile_shader.bat" -in samples\04_voxel\assets\voxel.slang -out samples\04_voxel\assets\voxel.spv      || goto :err
 
 "%ODIN%" build samples\%SAMPLE% -debug -o:none ^
   -collection:vlx=framework ^
   -collection:third_party=third_party ^
-  -out:build\%SAMPLE%.exe || goto :err
+  -out:samples\%SAMPLE%\%SAMPLE%.exe || goto :err
 
 echo.
-echo Built build\%SAMPLE%.exe (debug symbols: build\%SAMPLE%.pdb)
-echo Run from the project root so shaders/out/*.spv resolves:  build\%SAMPLE%.exe
+echo Built samples\%SAMPLE%\%SAMPLE%.exe (debug symbols alongside it)
+echo Run it from its own folder so relative assets resolve:  samples\%SAMPLE%\%SAMPLE%.exe
 exit /b 0
 
 :err

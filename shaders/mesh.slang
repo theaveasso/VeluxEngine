@@ -47,7 +47,6 @@ Sampler2D textures[];
 PS_Output fragment_main(V2P input)
 {
     PS_Output output;
-    // output.frag_color = float4(input.color, 1.0);
     output.frag_color = textures[pc.texture_index].Sample(input.uv);
     return output;
 }

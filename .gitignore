@@ -4,5 +4,6 @@ shaders/out
 *.obj
 build
 
-# RenderDoc captures
 *.cap
+
+*.spv

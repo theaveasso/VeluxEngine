@@ -39,6 +39,7 @@ cmd_begin_rendering :: gpu.cmd_begin_rendering
 cmd_bind_graphics_pipeline :: gpu.cmd_bind_graphics_pipeline
 cmd_push_constants :: gpu.cmd_push_constants
 cmd_bind_index_buffer :: gpu.cmd_bind_index_buffer
+cmd_draw :: gpu.cmd_draw
 cmd_draw_indexed :: gpu.cmd_draw_indexed
 cmd_end_rendering :: gpu.cmd_end_rendering
 

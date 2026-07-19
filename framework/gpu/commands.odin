@@ -113,6 +113,10 @@ cmd_bind_index_buffer :: proc(frame: Frame, buffer: vk.Buffer, offset: vk.Device
 	vk.CmdBindIndexBuffer(frame.cmd, buffer, offset, index_type)
 }
 
+cmd_draw :: proc(frame: Frame, vertex_count: u32, instance_count: u32 = 1, first_vertex: u32 = 0, first_instance: u32 = 0) {
+	vk.CmdDraw(frame.cmd, vertex_count, instance_count, first_vertex, first_instance)
+}
+
 cmd_draw_indexed :: proc(
 	frame: Frame,
 	index_count: u32,

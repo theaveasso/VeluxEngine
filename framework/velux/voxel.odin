@@ -6,6 +6,8 @@ Voxel :: Block_Type
 VOXEL_SIZE :: 0.1
 WORLD_DIMENSION :: [3]int{255, 128, 255}
 
+BLAST_RADIUS :: 5
+
 BLOCK_PALLETTE :: [Block_Type][3]f32 {
 	.Air   = {0.0, 0.0, 0.0},
 	.Grass = {0.45, 0.62, 0.28},
@@ -32,6 +34,12 @@ Voxel_Grid :: struct {
 
 voxel_index :: proc(x, y, z: int) -> int {
 	return x + y * WORLD_DIMENSION[0] + z * WORLD_DIMENSION[0] * WORLD_DIMENSION[1]
+}
+
+grid_to_u32 :: proc(grid: ^Voxel_Grid, allocator := context.allocator) -> []u32 {
+	out := make([]u32, len(grid.voxels), allocator)
+	for v, i in grid.voxels do out[i] = u32(v)
+	return out
 }
 
 voxel_at :: proc(grid: ^Voxel_Grid, x, y, z: int) -> Voxel {
@@ -84,7 +92,6 @@ hash3 :: proc(x, y, z: int) -> f32 {
 	h = h ~ (h >> 16)
 	return f32(h & 0xFFFF) / f32(0xFFFF)
 }
-
 place_leaf_blob :: proc(grid: ^Voxel_Grid, cx, cy, cz: int, radius: f32) {
 	r := int(radius) + 1
 	for z in -r ..= r {
@@ -158,4 +165,29 @@ place_branch :: proc(grid: ^Voxel_Grid, sx, sy, sz: int, seed: int) {
 	}
 
 	place_leaf_blob(grid, int(fx), int(fy) + 1, int(fz), 3.0)
+}
+
+carve_sphere :: proc(grid: ^Voxel_Grid, center_x, center_y, center_z: int) {
+	r := int(BLAST_RADIUS) + 1
+	for oz in -r ..= r {
+		for oy in -r ..= r {
+			for ox in -r ..= r {
+				dist := math.sqrt(f32(ox * ox + oy * oy + oz * oz))
+				if dist <= BLAST_RADIUS do voxel_set(grid, ox + center_x, oy + center_y, oz + center_z, .Air)
+			}
+		}
+	}
+}
+
+voxel_raycast :: proc(grid: ^Voxel_Grid, origin, dir: [3]f32, max_dist: f32) -> (cell: [3]int, normal: [3]int, hit: bool) {
+	STEP :: 0.1
+	p := origin
+	prev_cell := [3]int{int(p.x), int(p.y), int(p.z)}
+	for _ in 0 ..< int(max_dist / STEP) {
+		cell = [3]int{int(p.x), int(p.y), int(p.z)}
+		if voxel_at(grid, cell.x, cell.y, cell.z) != .Air do return cell, prev_cell - cell, true
+		prev_cell = cell
+		p = p + dir * STEP
+	}
+	return {}, {}, false
 }

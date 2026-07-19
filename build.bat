@@ -9,6 +9,7 @@ set "ODIN=odin"
 call "%~dp0compile_shader.bat" -in shaders\mesh.slang                  -out shaders\out\mesh.spv                   || goto :err
 call "%~dp0compile_shader.bat" -in shaders\triangle.slang              -out shaders\out\triangle.spv               || goto :err
 call "%~dp0compile_shader.bat" -in samples\04_voxel\assets\voxel.slang -out samples\04_voxel\assets\voxel.spv      || goto :err
+call "%~dp0compile_shader.bat" -in samples\05_raymarch\assets\raymarch.slang -out samples\05_raymarch\assets\raymarch.spv || goto :err
 
 "%ODIN%" build samples\%SAMPLE% -debug -o:none ^
   -collection:vlx=framework ^

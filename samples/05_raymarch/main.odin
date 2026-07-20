@@ -46,7 +46,7 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 	pipeline := velux.create_graphics_pipeline(
 		engine,
 		shader,
-		Push_Constants,
+		size_of(Push_Constants),
 		.TRIANGLE_LIST,
 		.FILL,
 		.COUNTER_CLOCKWISE,

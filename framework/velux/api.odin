@@ -148,7 +148,7 @@ destroy_shader :: #force_inline proc(engine: ^Engine, shader: Shader_Module) {
 create_graphics_pipeline :: #force_inline proc(
 	engine: ^Engine,
 	shader: vk.ShaderModule,
-	push_constants: typeid,
+	push_constant_size: u32,
 	input_topology: vk.PrimitiveTopology,
 	polygon_mode: vk.PolygonMode,
 	front_face: vk.FrontFace,
@@ -164,9 +164,9 @@ create_graphics_pipeline :: #force_inline proc(
 ) {
 	pipeline = gpu.create_graphics_pipeline(
 		&engine.device,
+		shader,
 		gpu.pipeline_create_info(
-			shader,
-			push_constants,
+			push_constant_size,
 			input_topology,
 			polygon_mode,
 			front_face,

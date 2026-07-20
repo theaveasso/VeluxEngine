@@ -105,8 +105,8 @@ cmd_bind_graphics_pipeline :: proc(frame: Frame, pipeline: Graphics_Pipeline) {
 }
 
 cmd_push_constants :: proc(frame: Frame, pipeline: Graphics_Pipeline, data: ^$T, loc := #caller_location) {
-	assert(T == pipeline.push_constants, "push constants type mismatch with pipeline", loc)
-	vk.CmdPushConstants(frame.cmd, pipeline.layout, pipeline.stage_flags, 0, size_of(T), data)
+	assert(size_of(T) == int(pipeline.info.push_constant_size), "push constants size mismatch with pipeline", loc)
+	vk.CmdPushConstants(frame.cmd, pipeline.layout, pipeline.stage_flags, 0, pipeline.info.push_constant_size, data)
 }
 
 cmd_bind_index_buffer :: proc(frame: Frame, buffer: vk.Buffer, offset: vk.DeviceSize = 0, index_type: vk.IndexType = .UINT32) {

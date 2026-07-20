@@ -4,8 +4,7 @@ import vma "third_party:odin-vma"
 import vk "vendor:vulkan"
 
 pipeline_create_info :: proc(
-	shader: vk.ShaderModule,
-	push_constants: typeid,
+	push_constant_size: u32,
 	input_topology: vk.PrimitiveTopology,
 	polygon_mode: vk.PolygonMode,
 	front_face: vk.FrontFace,
@@ -17,8 +16,7 @@ pipeline_create_info :: proc(
 	fragment_entry: cstring = DEFAULT_FRAGMENT_ENTRY,
 ) -> Graphics_Pipeline_Create_Info {
 	return {
-		shader = shader,
-		push_constants = push_constants,
+		push_constant_size = push_constant_size,
 		input_topology = input_topology,
 		polygon_mode = polygon_mode,
 		front_face = front_face,

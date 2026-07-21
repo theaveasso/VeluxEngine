@@ -29,14 +29,23 @@ Orbit_Camera :: struct {
 	radius:             f32,
 	invert_x, invert_y: bool,
 }
+Free_Fly_Camera :: struct {
+	yaw, pitch:         f32,
+	speed:              f32,
+	invert_x, invert_y: bool,
+}
 
-Free_Fly_Camera :: struct {}
-
+Camera_Input :: struct {
+	move:    [3]f32,
+	look:    [2]f32,
+	zoom:    f32,
+	boost:   bool,
+	looking: bool,
+}
 Camera_Controller :: union {
 	Orbit_Camera,
 	Free_Fly_Camera,
 }
-
 Camera :: struct {
 	position:   [3]f32,
 	target:     [3]f32,
@@ -44,17 +53,17 @@ Camera :: struct {
 	controller: Camera_Controller,
 }
 
-camera_update :: proc(camera: ^Camera, drag: [2]f32, zoom: f32, dragging: bool, dt: f32) {
+camera_update :: proc(camera: ^Camera, input: Camera_Input, dt: f32) {
 	switch &control in camera.controller {
 	case Orbit_Camera:
 		ix: f32 = control.invert_x ? -1 : 1
 		iy: f32 = control.invert_y ? -1 : 1
-		if dragging {
-			control.yaw += drag.x * ORBIT_SENSITIVITY * ix
-			control.pitch += drag.y * ORBIT_SENSITIVITY * iy
+		if input.looking {
+			control.yaw += input.look.x * ORBIT_SENSITIVITY * ix
+			control.pitch += input.look.y * ORBIT_SENSITIVITY * iy
 		}
 		control.pitch = clamp(control.pitch, -PITCH_LIMIT, PITCH_LIMIT)
-		control.radius = clamp(control.radius - zoom * ZOOM_SPEED, RADIUS_MIN, RADIUS_MAX)
+		control.radius = clamp(control.radius - input.zoom * ZOOM_SPEED, RADIUS_MIN, RADIUS_MAX)
 
 		cp := math.cos(control.pitch)
 		sp := math.sin(control.pitch)
@@ -63,6 +72,20 @@ camera_update :: proc(camera: ^Camera, drag: [2]f32, zoom: f32, dragging: bool, 
 		camera.position = camera.target + {control.radius * cp * sy, control.radius * sp, control.radius * cp * cy}
 	case Free_Fly_Camera:
 	}
+}
+camera_input_from_platform :: proc() -> (input: Camera_Input) {
+	if is_key_down(.D) do input.move.x += 1
+	if is_key_down(.A) do input.move.x -= 1
+	if is_key_down(.SPACE) do input.move.y += 1
+	if is_key_down(.LEFT_CONTROL) do input.move.y -= 1
+	if is_key_down(.W) do input.move.z += 1
+	if is_key_down(.S) do input.move.z -= 1
+	input.look = mouse_delta()
+	input.zoom = scroll_delta().y
+	input.boost = is_key_down(.LEFT_SHIFT)
+	input.looking = is_cursor_captured() || is_mouse_down(.LEFT) || is_mouse_down(.RIGHT)
+
+	return
 }
 
 camera_view :: proc(camera: Camera) -> matrix[4, 4]f32 {

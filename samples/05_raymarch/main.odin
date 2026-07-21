@@ -66,7 +66,7 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 
 	for velux.running(engine) {
 		window_extent := velux.window_extent(engine)
-		velux.camera_update(&camera, velux.mouse_delta(), velux.scroll_delta().y, velux.is_mouse_down(.LEFT), engine.dt)
+		velux.camera_update(&camera, velux.camera_input_from_platform(), engine.dt)
 		proj := velux.camera_projection(camera, window_extent[0] / window_extent[1])
 		view := velux.camera_view(camera)
 

@@ -40,6 +40,7 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 		voxels  = voxel_buffer.ptr,
 	}
 
+	_ = velux.compile_slang("assets/raymarch.slang", "assets/raymarch.spv", context.allocator) or_return
 	shader := velux.create_shader(engine, "assets/raymarch.spv", context.temp_allocator) or_return
 	defer velux.destroy_shader(engine, shader)
 

@@ -21,6 +21,7 @@ Engine :: struct {
 }
 
 Error :: union #shared_nil {
+	Shader_Compile_Error,
 	platform.Error,
 	gpu.Error,
 }

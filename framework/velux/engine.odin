@@ -1,5 +1,7 @@
 package velux
 
+import "core:time"
+
 import "vlx:gpu"
 import "vlx:platform"
 
@@ -14,14 +16,16 @@ Config :: struct {
 }
 
 Engine :: struct {
-	window:    platform.Window,
-	device:    gpu.Device,
-	dt:        f32,
-	last_time: f64,
+	window:             platform.Window,
+	device:             gpu.Device,
+	watch_shaders:      [dynamic]Shader_Watch,
+	last_shader_check:  time.Time,
+	dt:                 f32,
+	last_time:          f64,
 }
 
 Error :: union #shared_nil {
-	Shader_Compile_Error,
+	Hot_Reload_Shader_Error,
 	platform.Error,
 	gpu.Error,
 }
@@ -52,8 +56,13 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 }
 
 running :: proc(engine: ^Engine) -> bool {
+	free_all(context.temp_allocator)
+
 	platform.poll_events()
 	platform.input_new_frame()
+	when ODIN_DEBUG {
+		poll_shader_watches(engine)
+	}
 
 	now := platform.time()
 	raw := f32(now - engine.last_time)
@@ -77,6 +86,7 @@ wait_for_idle :: proc(engine: ^Engine) {
 
 shutdown :: proc(engine: ^Engine) {
 	gpu.destroy(&engine.device)
+	destroy_watch_shaders(engine)
 	platform.destroy_window(&engine.window)
 	platform.shutdown()
 }

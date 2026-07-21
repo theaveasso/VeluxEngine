@@ -40,7 +40,12 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 		voxels  = voxel_buffer.ptr,
 	}
 
-	_ = velux.compile_slang("assets/raymarch.slang", "assets/raymarch.spv", context.allocator) or_return
+	compile_log, compile_err := velux.compile_slang("assets/raymarch.slang", "assets/raymarch.spv", context.temp_allocator)
+	if compile_err != .None {
+		if compile_log != "" do log.error(compile_log)
+		return compile_err
+	}
+	if compile_log != "" do log.warn(compile_log)
 	shader := velux.create_shader(engine, "assets/raymarch.spv", context.temp_allocator) or_return
 	defer velux.destroy_shader(engine, shader)
 
@@ -56,6 +61,8 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 		velux.swapchain_format(engine),
 	) or_return
 	defer velux.destroy_pipeline(engine, &pipeline)
+
+	velux.create_watch_shader(engine, &pipeline, "assets/raymarch.slang", "assets/raymarch.spv") or_return
 
 	for velux.running(engine) {
 		window_extent := velux.window_extent(engine)

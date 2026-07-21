@@ -27,6 +27,7 @@ Buffer_Kind :: gpu.Buffer_Kind
 Depth_Config :: gpu.Depth_Config
 Pipeline_Blend_Mode :: gpu.Pipeline_Blend_Mode
 Graphics_Pipeline :: gpu.Graphics_Pipeline
+Graphics_Pipeline_Create_Info :: gpu.Graphics_Pipeline_Create_Info
 
 Mouse_Button :: platform.Mouse_Button
 Key :: platform.Key
@@ -178,6 +179,18 @@ create_graphics_pipeline :: #force_inline proc(
 			fragment_entry,
 		),
 	) or_return
+	return
+}
+
+rebuild_graphics_pipeline :: #force_inline proc(
+	engine: ^Engine,
+	shader: Shader_Module,
+	info: Graphics_Pipeline_Create_Info,
+) -> (
+	pipeline: Graphics_Pipeline,
+	err: Error,
+) {
+	pipeline = gpu.create_graphics_pipeline(&engine.device, shader, info) or_return
 	return
 }
 

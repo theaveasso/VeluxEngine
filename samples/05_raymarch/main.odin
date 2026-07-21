@@ -11,7 +11,8 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 		position = {0, 0, -5},
 		target = {0, 0, 0},
 		projection = velux.Perspective{linalg.to_radians(f32(45)), 0.1, 100.0},
-		controller = velux.Orbit_Camera{yaw = 0, pitch = 0, radius = 25},
+		// controller = velux.Orbit_Camera{radius = 25},
+		controller = velux.Free_Fly_Camera{speed = 10},
 	}
 
 	glade: velux.Voxel_Grid
@@ -66,6 +67,17 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 
 	for velux.running(engine) {
 		window_extent := velux.window_extent(engine)
+
+		if velux.is_key_pressed(.F1) {
+			switch _ in camera.controller {
+			case velux.Orbit_Camera:
+				velux.camera_set_controller(&camera, velux.Free_Fly_Camera{})
+			case velux.Free_Fly_Camera:
+				velux.camera_set_controller(&camera, velux.Orbit_Camera{})
+			}
+		}
+		if velux.is_key_pressed(.TAB) do velux.set_cursor_captured(!velux.is_cursor_captured())
+
 		velux.camera_update(&camera, velux.camera_input_from_platform(), engine.dt)
 		proj := velux.camera_projection(camera, window_extent[0] / window_extent[1])
 		view := velux.camera_view(camera)

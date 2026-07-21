@@ -7,7 +7,16 @@ ORBIT_SENSITIVITY :: 0.005
 ZOOM_SPEED :: 1.0
 RADIUS_MIN :: 2.0
 RADIUS_MAX :: 50.0
+RADIUS_DEFAULT :: 25.0
 PITCH_LIMIT :: 1.55
+
+FLY_SENSITIVITY :: 0.0015
+FLY_SPEED_DEFAULT :: 10.0
+FLY_SPEED_MIN :: 1.0
+FLY_SPEED_MAX :: 200.0
+FLY_SPEED_STEP :: 2.0
+FLY_BOOST_MULTIPLIER :: 4.0
+WORLD_UP :: [3]f32{0, 1, 0}
 
 Perspective :: struct {
 	fov_y:     f32,
@@ -71,8 +80,65 @@ camera_update :: proc(camera: ^Camera, input: Camera_Input, dt: f32) {
 		sy := math.sin(control.yaw)
 		camera.position = camera.target + {control.radius * cp * sy, control.radius * sp, control.radius * cp * cy}
 	case Free_Fly_Camera:
+		ix: f32 = control.invert_x ? 1 : -1
+		iy: f32 = control.invert_y ? 1 : -1
+		if input.looking {
+			control.yaw += input.look.x * FLY_SENSITIVITY * ix
+			control.pitch += input.look.y * FLY_SENSITIVITY * iy
+		}
+		control.pitch = clamp(control.pitch, -PITCH_LIMIT, PITCH_LIMIT)
+		control.speed = clamp(control.speed + input.zoom * FLY_SPEED_STEP, FLY_SPEED_MIN, FLY_SPEED_MAX)
+
+		cp := math.cos(control.pitch)
+		sp := math.sin(control.pitch)
+		cy := math.cos(control.yaw)
+		sy := math.sin(control.yaw)
+
+		forward := [3]f32{cp * sy, sp, cp * cy}
+		right := linalg.normalize(linalg.cross(forward, WORLD_UP))
+
+		velocity := right * input.move.x + WORLD_UP * input.move.y + forward * input.move.z
+		if linalg.dot(velocity, velocity) > 0 {
+			speed := control.speed * (input.boost ? FLY_BOOST_MULTIPLIER : 1)
+			camera.position += linalg.normalize(velocity) * speed * dt
+		}
+		camera.target = camera.position + forward
 	}
 }
+camera_set_controller :: proc(camera: ^Camera, controller: Camera_Controller) {
+	switch incoming in controller {
+	case Orbit_Camera:
+		control := incoming
+		if control.radius == 0 do control.radius = RADIUS_DEFAULT
+		control.radius = clamp(control.radius, RADIUS_MIN, RADIUS_MAX)
+
+		#partial switch old in camera.controller {
+		case Free_Fly_Camera:
+			control.yaw = old.yaw + math.PI
+			control.pitch = clamp(-old.pitch, -PITCH_LIMIT, PITCH_LIMIT)
+
+			cp := math.cos(old.pitch)
+			sp := math.sin(old.pitch)
+			cy := math.cos(old.yaw)
+			sy := math.sin(old.yaw)
+			camera.target = camera.position + [3]f32{cp * sy, sp, cp * cy} * control.radius
+		}
+		camera.controller = control
+
+	case Free_Fly_Camera:
+		control := incoming
+		if control.speed == 0 do control.speed = FLY_SPEED_DEFAULT
+		control.speed = clamp(control.speed, FLY_SPEED_MIN, FLY_SPEED_MAX)
+
+		#partial switch old in camera.controller {
+		case Orbit_Camera:
+			control.yaw = old.yaw + math.PI
+			control.pitch = clamp(-old.pitch, -PITCH_LIMIT, PITCH_LIMIT)
+		}
+		camera.controller = control
+	}
+}
+
 camera_input_from_platform :: proc() -> (input: Camera_Input) {
 	if is_key_down(.D) do input.move.x += 1
 	if is_key_down(.A) do input.move.x -= 1

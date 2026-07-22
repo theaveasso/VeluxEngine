@@ -138,6 +138,38 @@ float3 srgb_to_linear(float3 s)
     return select(s <= 0.04045, low, high);
 }
 
+float3 sky_color(float3 direction)
+{
+    float h = saturate(direction.y);
+
+    float3 horizon = srgb_to_linear(float3(0.80, 0.88, 1.00));
+    float3 sky = srgb_to_linear(float3(0.08, 0.16, 0.38));
+    float3 zenith = srgb_to_linear(float3(0.015, 0.035, 0.12));
+
+    float3 color;
+
+    if (h < 0.5)
+    {
+        float t = h / 0.5;
+        color = lerp(horizon, sky, t);
+    }
+    else
+    {
+        float t = (h - 0.5) / 0.5;
+        color = lerp(sky, zenith, t);
+    }
+
+    float s = max(
+        dot(direction, normalize(pc.sun_direction.xyz)),
+        0.0);
+
+    float3 sun_color = srgb_to_linear(float3(1.0, 0.45, 0.15));
+
+    color += sun_color * pow(s, 8.0) * 0.15;
+    color += sun_color * pow(s, 512.0) * 4.0;
+    return color;
+}
+
 float3 tonemap_reinhard(float3 color)
 {
     return color / (color + 1.0);
@@ -281,6 +313,9 @@ PS_Output fragment_main(V2P input)
             float3 albedo = srgb_to_linear(BLOCK_PALETTE[voxel]);
             float3 color = albedo * (ambient * ao_b + sun);
 
+            float3 sky = sky_color(g_dir);
+            float fog = 1.0 - exp(-t_hit * 0.001);
+            color = lerp(color, sky, fog);
             color *= exp2(exposure);
 
             output.frag_color = float4(tonemap(color, int(tonemap_mode)), 1);
@@ -309,6 +344,8 @@ PS_Output fragment_main(V2P input)
         }
     }
 
-    output.frag_color = float4(0.05, 0.05, 0.1, 1.0);
+    float3 sky = sky_color(g_dir);
+    sky *= exp2(exposure);
+    output.frag_color = float4(tonemap(sky, int(tonemap_mode)), 1.0);
     return output;
 }

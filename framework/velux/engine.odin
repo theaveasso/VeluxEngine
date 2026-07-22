@@ -4,6 +4,7 @@ import "core:time"
 
 import "vlx:gpu"
 import "vlx:platform"
+import "vlx:ui"
 
 MAX_DELTA :: 0.1
 
@@ -16,18 +17,20 @@ Config :: struct {
 }
 
 Engine :: struct {
-	window:             platform.Window,
-	device:             gpu.Device,
-	watch_shaders:      [dynamic]Shader_Watch,
-	last_shader_check:  time.Time,
-	dt:                 f32,
-	last_time:          f64,
+	window:            platform.Window,
+	device:            gpu.Device,
+	ui:                ui.Context,
+	watch_shaders:     [dynamic]Shader_Watch,
+	last_shader_check: time.Time,
+	dt:                f32,
+	last_time:         f64,
 }
 
 Error :: union #shared_nil {
 	Hot_Reload_Shader_Error,
-	platform.Error,
 	gpu.Error,
+	platform.Error,
+	ui.Error,
 }
 
 @(require_results)
@@ -50,6 +53,8 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 			window = engine.window.handle,
 		},
 	) or_return
+
+	ui.init(&engine.ui, &engine.device, &engine.window) or_return
 
 	engine.last_time = platform.time()
 	return nil
@@ -85,6 +90,8 @@ wait_for_idle :: proc(engine: ^Engine) {
 }
 
 shutdown :: proc(engine: ^Engine) {
+	wait_for_idle(engine)
+	ui.destroy(&engine.ui)
 	gpu.destroy(&engine.device)
 	destroy_watch_shaders(engine)
 	platform.destroy_window(&engine.window)

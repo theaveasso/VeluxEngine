@@ -105,6 +105,7 @@ camera_update :: proc(camera: ^Camera, input: Camera_Input, dt: f32) {
 		camera.target = camera.position + forward
 	}
 }
+
 camera_set_controller :: proc(camera: ^Camera, controller: Camera_Controller) {
 	switch incoming in controller {
 	case Orbit_Camera:
@@ -139,18 +140,21 @@ camera_set_controller :: proc(camera: ^Camera, controller: Camera_Controller) {
 	}
 }
 
-camera_input_from_platform :: proc() -> (input: Camera_Input) {
-	if is_key_down(.D) do input.move.x += 1
-	if is_key_down(.A) do input.move.x -= 1
-	if is_key_down(.SPACE) do input.move.y += 1
-	if is_key_down(.LEFT_CONTROL) do input.move.y -= 1
-	if is_key_down(.W) do input.move.z += 1
-	if is_key_down(.S) do input.move.z -= 1
-	input.look = mouse_delta()
-	input.zoom = scroll_delta().y
-	input.boost = is_key_down(.LEFT_SHIFT)
-	input.looking = is_cursor_captured() || is_mouse_down(.LEFT) || is_mouse_down(.RIGHT)
-
+camera_input_from_platform :: proc(engine: ^Engine) -> (input: Camera_Input) {
+	if !ui_wants_keyboard(engine) {
+		if is_key_down(.D) do input.move.x += 1
+		if is_key_down(.A) do input.move.x -= 1
+		if is_key_down(.SPACE) do input.move.y += 1
+		if is_key_down(.LEFT_CONTROL) do input.move.y -= 1
+		if is_key_down(.W) do input.move.z += 1
+		if is_key_down(.S) do input.move.z -= 1
+		input.boost = is_key_down(.LEFT_SHIFT)
+	}
+	if !ui_wants_mouse(engine) {
+		input.look = mouse_delta()
+		input.zoom = scroll_delta().y
+		input.looking = is_cursor_captured() || is_mouse_down(.LEFT) || is_mouse_down(.RIGHT)
+	}
 	return
 }
 

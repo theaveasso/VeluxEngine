@@ -68,6 +68,9 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 	for velux.running(engine) {
 		window_extent := velux.window_extent(engine)
 
+		velux.ui_new_frame(engine)
+		velux.ui_demo(engine)
+
 		if velux.is_key_pressed(.F1) {
 			switch _ in camera.controller {
 			case velux.Orbit_Camera:
@@ -78,20 +81,25 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 		}
 		if velux.is_key_pressed(.TAB) do velux.set_cursor_captured(!velux.is_cursor_captured())
 
-		velux.camera_update(&camera, velux.camera_input_from_platform(), engine.dt)
+		velux.camera_update(&camera, velux.camera_input_from_platform(engine), engine.dt)
 		proj := velux.camera_projection(camera, window_extent[0] / window_extent[1])
 		view := velux.camera_view(camera)
 
 		pc.inv_view_proj = linalg.inverse(proj * view)
 		pc.cam_pos = {camera.position[0], camera.position[1], camera.position[2], velux.VOXEL_SIZE}
 
-		frame := velux.begin_frame(engine) or_continue
+		frame, frame_err := velux.begin_frame(engine)
+		if frame_err != nil {
+			velux.ui_end_frame(engine)
+			continue
+		}
 		velux.cmd_begin_rendering(frame, [4]f32{0.05, 0.05, 0.1, 1})
 
 		velux.cmd_bind_graphics_pipeline(frame, pipeline)
 		velux.cmd_push_constants(frame, pipeline, &pc)
 		velux.cmd_draw(frame, 3)
 
+		velux.ui_draw(engine, frame)
 		velux.cmd_end_rendering(frame)
 		velux.end_frame(engine, frame) or_continue
 	}

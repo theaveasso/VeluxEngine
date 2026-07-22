@@ -19,7 +19,6 @@ Config :: struct {
 Engine :: struct {
 	window:            platform.Window,
 	device:            gpu.Device,
-	ui:                ui.Context,
 	watch_shaders:     [dynamic]Shader_Watch,
 	last_shader_check: time.Time,
 	dt:                f32,
@@ -54,7 +53,7 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 		},
 	) or_return
 
-	ui.init(&engine.ui, &engine.device, &engine.window) or_return
+	ui.init(&engine.device, &engine.window) or_return
 
 	engine.last_time = platform.time()
 	return nil
@@ -91,7 +90,7 @@ wait_for_idle :: proc(engine: ^Engine) {
 
 shutdown :: proc(engine: ^Engine) {
 	wait_for_idle(engine)
-	ui.destroy(&engine.ui)
+	ui.destroy()
 	gpu.destroy(&engine.device)
 	destroy_watch_shaders(engine)
 	platform.destroy_window(&engine.window)

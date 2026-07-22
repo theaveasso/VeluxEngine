@@ -15,6 +15,8 @@ struct Push_Constants
     float4x4 inv_view_proj;
     float4 cam_pos;
     int4 dims;
+    int32_t max_steps;
+    int32_t padding;
     uint *voxels;
 }
 
@@ -162,7 +164,7 @@ PS_Output fragment_main(V2P input)
 
     PS_Output output;
 
-    for (int i = 0; i < 1024; i++)
+    for (int i = 0; i < pc.max_steps; i++)
     {
         int voxel = voxel_at(c);
         if (voxel != 0)

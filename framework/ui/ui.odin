@@ -10,6 +10,9 @@ import "vlx:platform"
 
 import "vlx:gpu"
 
+@(private)
+g_initialized: bool
+
 Context :: struct {
 	initialized: bool,
 }
@@ -19,7 +22,7 @@ Error :: enum {
 }
 
 @(require_results)
-init :: proc(ui: ^Context, device: ^gpu.Device, window: ^platform.Window) -> (err: Error) {
+init :: proc(device: ^gpu.Device, window: ^platform.Window) -> (err: Error) {
 
 	imgui.CreateContext()
 	if !imgui_glfw.InitForVulkan(window.handle, true) do return .ImGui_Call_Failed
@@ -47,42 +50,47 @@ init :: proc(ui: ^Context, device: ^gpu.Device, window: ^platform.Window) -> (er
 	}
 	if !imgui_vk.Init(&info) do return .ImGui_Call_Failed
 
-	ui.initialized = true
+	g_initialized = true
 	return
 }
 
-destroy :: proc(ui: ^Context) {
-	if ui.initialized {
+destroy :: proc() {
+	if g_initialized {
 		imgui_vk.Shutdown()
 		imgui_glfw.Shutdown()
 		imgui.DestroyContext()
-		ui.initialized = false
+		g_initialized = false
 	}
 }
 
 new_frame :: proc() {
+	if !g_initialized do return
 	imgui_vk.NewFrame()
 	imgui_glfw.NewFrame()
 	imgui.NewFrame()
 }
 
 end_frame :: proc() {
+	if !g_initialized do return
 	imgui.EndFrame()
 }
 
-draw :: proc(cmd: vk.CommandBuffer) {
+draw :: proc(frame: gpu.Frame) {
+	if !g_initialized do return
 	imgui.Render()
-	imgui_vk.RenderDrawData(imgui.GetDrawData(), cmd)
+	imgui_vk.RenderDrawData(imgui.GetDrawData(), frame.cmd)
 }
 
 @(require_results)
-wants_mouse :: proc(ui: ^Context) -> bool {
-	return ui.initialized ? imgui.GetIO().WantCaptureMouse : false
+wants_mouse :: proc() -> bool {
+	if !g_initialized do return false
+	return imgui.GetIO().WantCaptureMouse
 }
 
 @(require_results)
-wants_keyboard :: proc(ui: ^Context) -> bool {
-	return ui.initialized ? imgui.GetIO().WantCaptureKeyboard : false
+wants_keyboard :: proc() -> bool {
+	if !g_initialized do return false
+	return imgui.GetIO().WantCaptureKeyboard
 }
 
 @(private)

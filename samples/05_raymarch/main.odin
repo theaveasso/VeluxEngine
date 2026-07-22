@@ -33,12 +33,15 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 		inv_view_proj: matrix[4, 4]f32,
 		cam_pos:       [4]f32,
 		dims:          [4]i32,
+		max_steps:     i32,
+		padding:       i32,
 		voxels:        velux.Device_Address(u32),
 	}
 	pc := Push_Constants {
-		cam_pos = {0, 0, 0, velux.VOXEL_SIZE},
-		dims    = {i32(velux.WORLD_DIMENSION[0]), i32(velux.WORLD_DIMENSION[1]), i32(velux.WORLD_DIMENSION[2]), 0},
-		voxels  = voxel_buffer.ptr,
+		cam_pos   = {0, 0, 0, velux.VOXEL_SIZE},
+		dims      = {i32(velux.WORLD_DIMENSION[0]), i32(velux.WORLD_DIMENSION[1]), i32(velux.WORLD_DIMENSION[2]), 0},
+		max_steps = 1,
+		voxels    = voxel_buffer.ptr,
 	}
 
 	compile_log, compile_err := velux.compile_slang("assets/raymarch.slang", "assets/raymarch.spv", context.temp_allocator)
@@ -68,8 +71,12 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 	for velux.running(engine) {
 		window_extent := velux.window_extent(engine)
 
-		velux.ui_new_frame(engine)
-		velux.ui_demo(engine)
+		velux.ui_new_frame()
+
+		if velux.ui_begin_panel("Renderer") {
+			velux.ui_slider("View Distance", &pc.max_steps, 1, 1024)
+		}
+		velux.ui_end_panel()
 
 		if velux.is_key_pressed(.F1) {
 			switch _ in camera.controller {
@@ -81,7 +88,7 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 		}
 		if velux.is_key_pressed(.TAB) do velux.set_cursor_captured(!velux.is_cursor_captured())
 
-		velux.camera_update(&camera, velux.camera_input_from_platform(engine), engine.dt)
+		velux.camera_update(&camera, velux.camera_input_from_platform(), engine.dt)
 		proj := velux.camera_projection(camera, window_extent[0] / window_extent[1])
 		view := velux.camera_view(camera)
 
@@ -90,7 +97,7 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 
 		frame, frame_err := velux.begin_frame(engine)
 		if frame_err != nil {
-			velux.ui_end_frame(engine)
+			velux.ui_end_frame()
 			continue
 		}
 		velux.cmd_begin_rendering(frame, [4]f32{0.05, 0.05, 0.1, 1})
@@ -99,7 +106,7 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 		velux.cmd_push_constants(frame, pipeline, &pc)
 		velux.cmd_draw(frame, 3)
 
-		velux.ui_draw(engine, frame)
+		velux.ui_draw(frame)
 		velux.cmd_end_rendering(frame)
 		velux.end_frame(engine, frame) or_continue
 	}

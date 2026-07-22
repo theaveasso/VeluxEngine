@@ -2,23 +2,15 @@ package velux
 
 import "vlx:ui"
 
-ui_wants_mouse :: #force_inline proc(engine: ^Engine) -> bool {
-	return ui.wants_mouse(&engine.ui)
-}
-ui_wants_keyboard :: #force_inline proc(engine: ^Engine) -> bool {
-	return ui.wants_keyboard(&engine.ui)
-}
+ui_new_frame :: ui.new_frame
+ui_end_frame :: ui.end_frame
+ui_draw :: ui.draw
 
-ui_new_frame :: proc(engine: ^Engine) {
-	if engine.ui.initialized do ui.new_frame()
-}
-ui_end_frame :: proc(engine: ^Engine) {
-	if engine.ui.initialized do ui.end_frame()
-}
-ui_draw :: proc(engine: ^Engine, frame: Frame) {
-	if engine.ui.initialized do ui.draw(frame.cmd)
-}
+ui_wants_mouse :: ui.wants_mouse
+ui_wants_keyboard :: ui.wants_keyboard
 
-ui_demo :: proc(engine: ^Engine) {
-	if engine.ui.initialized do ui.demo()
-}
+ui_demo :: ui.demo
+ui_begin_panel :: ui.begin_panel
+ui_end_panel :: ui.end_panel
+ui_slider :: ui.slider
+ui_checkbox :: ui.check_box

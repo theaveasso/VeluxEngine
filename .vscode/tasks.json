@@ -5,8 +5,8 @@
 			"id": "sample",
 			"type": "pickString",
 			"description": "Select sample",
-			"options": ["01_window", "02_triangle", "03_mesh", "04_voxel", "05_raymarch"],
-			"default": "05_raymarch"
+			"options": ["01_window", "02_triangle", "03_mesh", "04_voxel", "05_voxel_raycast"],
+			"default": "05_voxel_raycast"
 		},
 		{
 			"id": "testName",

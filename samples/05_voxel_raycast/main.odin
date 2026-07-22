@@ -32,25 +32,26 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 	Push_Constants :: struct {
 		inv_view_proj: matrix[4, 4]f32,
 		cam_pos:       [4]f32,
-		dims:          [4]i32,
-		max_steps:     i32,
-		padding:       i32,
+		dims:          [4]i32, // .w view_distant
+		sun_direction: [4]f32, // .w exposure
 		voxels:        velux.Device_Address(u32),
+		tonemap_mode:  i32, // 0: R, 1: ACES, 2:AgX
 	}
 	pc := Push_Constants {
-		cam_pos   = {0, 0, 0, velux.VOXEL_SIZE},
-		dims      = {i32(velux.WORLD_DIMENSION[0]), i32(velux.WORLD_DIMENSION[1]), i32(velux.WORLD_DIMENSION[2]), 0},
-		max_steps = 1,
-		voxels    = voxel_buffer.ptr,
+		cam_pos       = {0, 0, 0, velux.VOXEL_SIZE},
+		dims          = {i32(velux.WORLD_DIMENSION[0]), i32(velux.WORLD_DIMENSION[1]), i32(velux.WORLD_DIMENSION[2]), 1024},
+		sun_direction = [4]f32{0.5, 0.55, 0.35, 1.5},
+		voxels        = voxel_buffer.ptr,
+		tonemap_mode  = 2,
 	}
 
-	compile_log, compile_err := velux.compile_slang("assets/raymarch.slang", "assets/raymarch.spv", context.temp_allocator)
+	compile_log, compile_err := velux.compile_slang("assets/voxel_raycast.slang", "assets/voxel_raycast.spv", context.temp_allocator)
 	if compile_err != .None {
 		if compile_log != "" do log.error(compile_log)
 		return compile_err
 	}
 	if compile_log != "" do log.warn(compile_log)
-	shader := velux.create_shader(engine, "assets/raymarch.spv", context.temp_allocator) or_return
+	shader := velux.create_shader(engine, "assets/voxel_raycast.spv", context.temp_allocator) or_return
 	defer velux.destroy_shader(engine, shader)
 
 	pipeline := velux.create_graphics_pipeline(
@@ -66,7 +67,7 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 	) or_return
 	defer velux.destroy_pipeline(engine, &pipeline)
 
-	velux.create_watch_shader(engine, &pipeline, "assets/raymarch.slang", "assets/raymarch.spv") or_return
+	velux.create_watch_shader(engine, &pipeline, "assets/voxel_raycast.slang", "assets/voxel_raycast.spv") or_return
 
 	for velux.running(engine) {
 		window_extent := velux.window_extent(engine)
@@ -74,7 +75,10 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 		velux.ui_new_frame()
 
 		if velux.ui_begin_panel("Renderer") {
-			velux.ui_slider("View Distance", &pc.max_steps, 1, 1024)
+			velux.ui_slider("View Distance", &pc.dims.w, 1, 1024)
+			velux.ui_slider("Sun Direction", cast(^[3]f32)&pc.sun_direction, -1, 1)
+			velux.ui_slider("Exposure", &pc.sun_direction[3], -10, 10)
+			velux.ui_slider("Tonemap (0=R, 1=ACES 2=AgX)", &pc.tonemap_mode, 0, 2)
 		}
 		velux.ui_end_panel()
 
@@ -119,7 +123,7 @@ main :: proc() {
 	defer log.destroy_console_logger(context.logger)
 
 	engine: velux.Engine = {}
-	if err := velux.init(&engine, {"05 raymarch", 1280, 720, ODIN_DEBUG, ODIN_DEBUG}); err != nil {
+	if err := velux.init(&engine, {"05 voxel raycast", 1280, 720, ODIN_DEBUG, ODIN_DEBUG}); err != nil {
 		log.errorf("%v", err)
 		return
 	}

@@ -17,12 +17,16 @@ end_panel :: proc() {
 slider :: proc {
 	slider_f32,
 	slider_int,
+	slider_float3,
 }
 slider_f32 :: proc(label: string, v: ^f32, v_min, v_max: f32, allocator := context.temp_allocator) -> bool {
 	return g_initialized ? imgui.SliderFloat(strings.clone_to_cstring(label, allocator), v, v_min, v_max) : false
 }
 slider_int :: proc(label: string, v: ^i32, v_min, v_max: i32, allocator := context.temp_allocator) -> bool {
 	return g_initialized ? imgui.SliderInt(strings.clone_to_cstring(label, allocator), v, v_min, v_max) : false
+}
+slider_float3 :: proc(lable: string, v: ^[3]f32, v_min: f32, v_max: f32, allocator := context.temp_allocator) -> bool {
+	return g_initialized ? imgui.SliderFloat3(strings.clone_to_cstring(lable, allocator), v, v_min, v_max) : false
 }
 
 check_box :: proc(label: string, v: ^bool, allocator := context.temp_allocator) -> bool {

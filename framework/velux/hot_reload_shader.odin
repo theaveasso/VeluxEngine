@@ -7,6 +7,8 @@ import "core:path/filepath"
 import "core:strings"
 import "core:time"
 
+import "vlx:shaders"
+
 Hot_Reload_Shader_Error :: enum {
 	None,
 	File_Not_Found,
@@ -121,7 +123,20 @@ compile_slang :: proc(slang_path, spv_path: string, allocator: runtime.Allocator
 		if os.exists(candidate) do slangc = candidate
 	}
 
-	cmd := []string{slangc, slang_path, "-target", "spirv", "-fvk-use-entrypoint-name", "-o", spv_path}
+	slang_dir := filepath.dir(slang_path)
+	cmd := []string {
+		slangc,
+		slang_path,
+		"-I",
+		slang_dir,
+		"-I",
+		shaders.ENGINE_SHADER_DIR,
+		"-target",
+		"spirv",
+		"-fvk-use-entrypoint-name",
+		"-o",
+		spv_path,
+	}
 	state, stdout, stderr, exec_err := os.process_exec({command = cmd}, allocator)
 	defer delete(stdout, allocator)
 	defer delete(stderr, allocator)

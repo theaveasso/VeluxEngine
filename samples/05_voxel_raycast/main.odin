@@ -11,7 +11,6 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 		position = {0, 0, -5},
 		target = {0, 0, 0},
 		projection = velux.Perspective{linalg.to_radians(f32(45)), 0.1, 100.0},
-		// controller = velux.Orbit_Camera{radius = 25},
 		controller = velux.Free_Fly_Camera{speed = 10},
 	}
 
@@ -36,6 +35,7 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 		sun_direction: [4]f32, // .w exposure
 		voxels:        velux.Device_Address(u32),
 		tonemap_mode:  i32, // 0: R, 1: ACES, 2:AgX
+		debug_mode:    i32,
 	}
 	pc := Push_Constants {
 		cam_pos       = {0, 0, 0, velux.VOXEL_SIZE},
@@ -43,6 +43,7 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 		sun_direction = [4]f32{0.5, 0.55, 0.35, 1.5},
 		voxels        = voxel_buffer.ptr,
 		tonemap_mode  = 2,
+		debug_mode    = 0,
 	}
 
 	compile_log, compile_err := velux.compile_slang("assets/voxel_raycast.slang", "assets/voxel_raycast.spv", context.temp_allocator)
@@ -79,6 +80,7 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 			velux.ui_slider("Sun Direction", cast(^[3]f32)&pc.sun_direction, -1, 1)
 			velux.ui_slider("Exposure", &pc.sun_direction[3], -10, 10)
 			velux.ui_slider("Tonemap (0=R, 1=ACES 2=AgX)", &pc.tonemap_mode, 0, 2)
+			velux.ui_slider("Debug (Gray Test)", &pc.debug_mode, 0, 1)
 		}
 		velux.ui_end_panel()
 

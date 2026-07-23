@@ -1,3 +1,7 @@
+import color;
+import sky;
+import tonemap;
+
 struct V2P
 {
     float4 pos : SV_Position;
@@ -18,6 +22,7 @@ struct Push_Constants
     float4 sun_direction;
     uint *voxels;
     int32_t tonemap_mode;
+    int32_t debug_mode;
 }
 
 [vk_push_constant]
@@ -131,119 +136,6 @@ bool in_shadow(float3 origin, float3 dir)
     return false;
 }
 
-float3 srgb_to_linear(float3 s)
-{
-    float3 low = s / 12.92;
-    float3 high = pow((s + 0.055) / 1.055, 2.4);
-    return select(s <= 0.04045, low, high);
-}
-
-float3 sky_color(float3 direction)
-{
-    float h = saturate(direction.y);
-
-    float3 horizon = srgb_to_linear(float3(0.80, 0.88, 1.00));
-    float3 sky = srgb_to_linear(float3(0.08, 0.16, 0.38));
-    float3 zenith = srgb_to_linear(float3(0.015, 0.035, 0.12));
-
-    float3 color;
-
-    if (h < 0.5)
-    {
-        float t = h / 0.5;
-        color = lerp(horizon, sky, t);
-    }
-    else
-    {
-        float t = (h - 0.5) / 0.5;
-        color = lerp(sky, zenith, t);
-    }
-
-    float s = max(
-        dot(direction, normalize(pc.sun_direction.xyz)),
-        0.0);
-
-    float3 sun_color = srgb_to_linear(float3(1.0, 0.45, 0.15));
-
-    color += sun_color * pow(s, 8.0) * 0.15;
-    color += sun_color * pow(s, 512.0) * 4.0;
-    return color;
-}
-
-float3 tonemap_reinhard(float3 color)
-{
-    return color / (color + 1.0);
-}
-
-float3 tonemap_aces(float3 color)
-{
-    const float a = 2.51;
-    const float b = 0.03;
-    const float c = 2.43;
-    const float d = 0.59;
-    const float e = 0.14;
-    return saturate((color * (a * color + b)) / (color * (c * color + d) + e));
-}
-
-float3 agx_default_contrast_approximation(float3 x)
-{
-    float3 x2 = x * x;
-    float3 x4 = x2 * x2;
-    float3 x6 = x4 * x2;
-
-    return 15.5 * x6 - 40.14 * x4 * x + 31.96 * x4 - 6.868 * x2 * x + 0.4298 * x2 + 0.1191 * x - 0.00232;
-}
-
-float3 mul_matrix3x3(float3x3 m, float3 v)
-{
-    return float3(
-        m[0][0] * v.x + m[0][1] * v.y + m[0][2] * v.z,
-        m[1][0] * v.x + m[1][1] * v.y + m[1][2] * v.z,
-        m[2][0] * v.x + m[2][1] * v.y + m[2][2] * v.z);
-}
-
-float3 tonemap_agx(float3 color)
-{
-    float3x3 input_matrix = float3x3(
-        0.842479062253094, 0.042328258469531, 0.042375654905705,
-        0.078433614410084, 0.878468636469772, 0.078433614410084,
-        0.079142846350375, 0.079166127460543, 0.879142846350375);
-
-    float3x3 output_matrix = float3x3(
-        1.19687900512017, -0.052896851757456, -0.052971635514443,
-        -0.098020881140136, 1.15190312990417, -0.098043450117124,
-        -0.099029744079720, -0.098961176844950, 1.15107545118753);
-
-    color = mul_matrix3x3(input_matrix, color);
-
-    color = clamp(
-        log2(max(color, float3(1e-6))),
-        -12.47393,
-        4.026069);
-
-    color = (color + 12.47393) / (4.026069 + 12.47393);
-
-    color = agx_default_contrast_approximation(color);
-
-    color = mul_matrix3x3(output_matrix, color);
-    color = pow(clamp(color, 0.0, 1.0), float3(2.2));
-
-    return color;
-}
-
-float3 tonemap(float3 color, int mode)
-{
-    switch (mode)
-    {
-    case 0:
-        return tonemap_reinhard(color);
-    case 1:
-        return tonemap_aces(color);
-    default:
-        return tonemap_agx(color);
-    }
-}
-
 [shader("vertex")]
 V2P vertex_main(uint id: SV_VertexID)
 {
@@ -258,6 +150,15 @@ V2P vertex_main(uint id: SV_VertexID)
 [shader("fragment")]
 PS_Output fragment_main(V2P input)
 {
+    if (pc.debug_mode == 1)
+    {
+        PS_Output output;
+        int2 position = int2(input.pos.xy);
+        float value = select(input.ndc.x < 0.0, float((position.x + position.y) & 1), 0.5);
+
+        output.frag_color = float4(float3(value), 1.0);
+        return output;
+    }
     float exposure = pc.sun_direction.w;
     float tonemap_mode = pc.tonemap_mode;
 
@@ -313,7 +214,7 @@ PS_Output fragment_main(V2P input)
             float3 albedo = srgb_to_linear(BLOCK_PALETTE[voxel]);
             float3 color = albedo * (ambient * ao_b + sun);
 
-            float3 sky = sky_color(g_dir);
+            float3 sky = sky_color(g_dir, pc.sun_direction.xyz);
             float fog = 1.0 - exp(-t_hit * 0.001);
             color = lerp(color, sky, fog);
             color *= exp2(exposure);
@@ -344,7 +245,7 @@ PS_Output fragment_main(V2P input)
         }
     }
 
-    float3 sky = sky_color(g_dir);
+    float3 sky = sky_color(g_dir, pc.sun_direction.xyz);
     sky *= exp2(exposure);
     output.frag_color = float4(tonemap(sky, int(tonemap_mode)), 1.0);
     return output;

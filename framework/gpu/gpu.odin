@@ -2,6 +2,7 @@ package gpu
 
 import "base:runtime"
 import "core:dynlib"
+import "core:fmt"
 import "core:log"
 import "core:reflect"
 import "core:strings"
@@ -707,7 +708,7 @@ check_device_extension_support :: proc(device: vk.PhysicalDevice) -> bool {
 	return true
 }
 
-choose_swapchain_surface_format :: proc(formats: ^[]vk.SurfaceFormatKHR) -> vk.SurfaceFormatKHR {
+choose_swapchain_surface_format :: proc(formats: ^[]vk.SurfaceFormatKHR, loc := #caller_location) -> vk.SurfaceFormatKHR {
 	surface_format := formats[0]
 	for format in formats {
 		if format.format == .B8G8R8A8_SRGB && format.colorSpace == .SRGB_NONLINEAR {
@@ -715,6 +716,11 @@ choose_swapchain_surface_format :: proc(formats: ^[]vk.SurfaceFormatKHR) -> vk.S
 			break
 		}
 	}
+	fmt.assertf(
+		surface_format.format == .B8G8R8A8_SRGB || surface_format.colorSpace == .SRGB_NONLINEAR,
+		"swapchain is NOT sRGB (got %v)",
+		loc,
+	)
 	return surface_format
 }
 

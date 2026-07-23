@@ -1,6 +1,7 @@
 import color;
 import sky;
 import tonemap;
+import hash;
 
 struct V2P
 {
@@ -23,6 +24,8 @@ struct Push_Constants
     uint *voxels;
     int32_t tonemap_mode;
     int32_t debug_mode;
+    float jitter_hue;
+    float jitter_value;
 }
 
 [vk_push_constant]
@@ -211,11 +214,17 @@ PS_Output fragment_main(V2P input)
 
             float3 ambient = lerp(srgb_to_linear(ground_warm), srgb_to_linear(sky_warm), N.y * 0.5 + 0.5);
             float3 sun = srgb_to_linear(sun_color) * ndl * shadow;
-            float3 albedo = srgb_to_linear(BLOCK_PALETTE[voxel]);
-            float3 color = albedo * (ambient * ao_b + sun);
 
+            float2 rnd = hash_cell(c);
+            float3 hsv = rgb_to_hsv(BLOCK_PALETTE[voxel]);
+            float hue_offset = (rnd.x * 2.0 - 1.0) * (pc.jitter_hue / 360);
+            hsv.x = frac(hsv.x + hue_offset);
+            float value_offset = rnd.y * 2.0 - 1.0;
+            hsv.z = saturate(hsv.z * (1.0 + value_offset * pc.jitter_value));
+            float3 albedo = srgb_to_linear(hsv_to_rgb(hsv));
+            float3 color = albedo * (ambient * ao_b + sun);
             float3 sky = sky_color(g_dir, pc.sun_direction.xyz);
-            float fog = 1.0 - exp(-t_hit * 0.001);
+            float fog = 1.0 - exp(-t_hit * 0.0002);
             color = lerp(color, sky, fog);
             color *= exp2(exposure);
 

@@ -36,6 +36,8 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 		voxels:        velux.Device_Address(u32),
 		tonemap_mode:  i32, // 0: R, 1: ACES, 2:AgX
 		debug_mode:    i32,
+		jitter_hue:    f32,
+		jitter_value:  f32,
 	}
 	pc := Push_Constants {
 		cam_pos       = {0, 0, 0, velux.VOXEL_SIZE},
@@ -44,6 +46,8 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 		voxels        = voxel_buffer.ptr,
 		tonemap_mode  = 2,
 		debug_mode    = 0,
+		jitter_hue    = 6.0,
+		jitter_value  = 0.08,
 	}
 
 	compile_log, compile_err := velux.compile_slang("assets/voxel_raycast.slang", "assets/voxel_raycast.spv", context.temp_allocator)
@@ -76,11 +80,13 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 		velux.ui_new_frame()
 
 		if velux.ui_begin_panel("Renderer") {
+			velux.ui_slider("Debug (Gray Test)", &pc.debug_mode, 0, 1)
 			velux.ui_slider("View Distance", &pc.dims.w, 1, 1024)
 			velux.ui_slider("Sun Direction", cast(^[3]f32)&pc.sun_direction, -1, 1)
 			velux.ui_slider("Exposure", &pc.sun_direction[3], -10, 10)
 			velux.ui_slider("Tonemap (0=R, 1=ACES 2=AgX)", &pc.tonemap_mode, 0, 2)
-			velux.ui_slider("Debug (Gray Test)", &pc.debug_mode, 0, 1)
+			velux.ui_slider("Jitter Hue (deg)", &pc.jitter_hue, 0, 30)
+			velux.ui_slider("Jitter Value", &pc.jitter_value, 0, 0.3)
 		}
 		velux.ui_end_panel()
 

@@ -114,9 +114,11 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 		}
 		velux.cmd_begin_rendering(frame, [4]f32{0.05, 0.05, 0.1, 1})
 
+		velux.prof_zone_begin(engine, frame, "raycast")
 		velux.cmd_bind_graphics_pipeline(frame, pipeline)
 		velux.cmd_push_constants(frame, pipeline, &pc)
 		velux.cmd_draw(frame, 3)
+		velux.prof_zone_end(engine, frame)
 
 		velux.ui_draw(frame)
 		velux.cmd_end_rendering(frame)
@@ -131,7 +133,8 @@ main :: proc() {
 	defer log.destroy_console_logger(context.logger)
 
 	engine: velux.Engine = {}
-	if err := velux.init(&engine, {"05 voxel raycast", 1280, 720, ODIN_DEBUG, ODIN_DEBUG}); err != nil {
+
+	if err := velux.init(&engine, {app_name = "05 voxel raycast", width = 1280, height = 720}); err != nil {
 		log.errorf("%v", err)
 		return
 	}

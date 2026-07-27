@@ -30,9 +30,10 @@ Error :: enum {
 
 Config :: struct {
 	app_name:          cstring,
+	window:            glfw.WindowHandle,
 	enable_validation: bool,
 	enable_log:        bool,
-	window:            glfw.WindowHandle,
+	enable_profiler:   bool,
 }
 
 Device :: struct {
@@ -56,6 +57,9 @@ Device :: struct {
 	bindless:                   Bindless,
 	enable_validation_layer:    bool,
 	current_frame:              u32,
+	enable_profiler:            bool,
+	profiler:                   Profiler,
+	timestamp_period:           f32,
 }
 
 Frame_Data :: struct {
@@ -89,6 +93,7 @@ init :: proc(device: ^Device, config: Config) -> (err: Error = .None) {
 	device.logger = core.logger_from_prefix(&device.log_state, "[gpu]: ")
 	context.logger = device.logger
 	device.enable_validation_layer = config.enable_validation
+	device.enable_profiler = config.enable_profiler
 
 	create_instance(device, config) or_return
 	setup_debug_utils_messenger(device, config) or_return
@@ -104,8 +109,8 @@ init :: proc(device: ^Device, config: Config) -> (err: Error = .None) {
 	allocate_command_buffers(device) or_return
 	create_immediate_transfer_context(device) or_return
 	create_sync_objects(device) or_return
+	create_profiler(device) or_return
 	create_bindless(device) or_return
-
 	return
 }
 
@@ -113,8 +118,9 @@ destroy :: proc(device: ^Device) {
 	wait_idle(device)
 
 	destroy_bindless(device)
-	destroy_immediate_transfer_context(device)
+	destroy_profiler(device)
 	destroy_sync_objects(device)
+	destroy_immediate_transfer_context(device)
 	vk.DestroyCommandPool(device.device, device.command_pool, nil)
 	destroy_per_image_semaphores(device)
 	destroy_depth_resources(device)
@@ -264,6 +270,9 @@ pick_physical_device :: proc(device: ^Device) -> (err: Error = .No_Suitable_Phys
 		is_suitable, is_discrete := is_device_suitable(physical_device, device.surface)
 		if is_suitable && is_discrete {
 			device.physical_device = physical_device
+			props: vk.PhysicalDeviceProperties
+			vk.GetPhysicalDeviceProperties(device.physical_device, &props)
+			device.timestamp_period = props.limits.timestampPeriod
 			return .None
 		}
 	}
@@ -273,6 +282,9 @@ pick_physical_device :: proc(device: ^Device) -> (err: Error = .No_Suitable_Phys
 			is_suitable, _is_discrete := is_device_suitable(physical_device, device.surface)
 			if is_suitable {
 				device.physical_device = physical_device
+				props: vk.PhysicalDeviceProperties
+				vk.GetPhysicalDeviceProperties(device.physical_device, &props)
+				device.timestamp_period = props.limits.timestampPeriod
 				return .None
 			}
 		}
@@ -292,7 +304,7 @@ find_queue_families :: proc(device: ^Device) -> (err: Error = .None) {
 
 	queue_family: u32 = max(u32)
 	for &qf, i in queue_families {
-		if .GRAPHICS not_in qf.queueFlags do continue
+		if .GRAPHICS not_in qf.queueFlags || qf.timestampValidBits == 0 do continue
 
 		support_present := glfw.GetPhysicalDevicePresentationSupport(device.instance, device.physical_device, cast(u32)i)
 

@@ -13,6 +13,7 @@ Config :: struct {
 	width:             i32,
 	height:            i32,
 	enable_validation: bool,
+	enable_profiler:   bool,
 	enable_log:        bool,
 }
 
@@ -39,6 +40,10 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 	if config.width == 0 do config.width = 1280
 	if config.height == 0 do config.height = 720
 
+	if config.enable_validation || ODIN_DEBUG do config.enable_validation = true
+	if config.enable_log || ODIN_DEBUG do config.enable_log = true
+	if config.enable_profiler || ODIN_DEBUG do config.enable_profiler = true
+
 	platform.init() or_return
 	platform.create_window(&engine.window, config.width, config.height, config.app_name) or_return
 	platform.input_init(&engine.window)
@@ -47,9 +52,10 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 		&engine.device,
 		{
 			app_name = config.app_name,
+			window = engine.window.handle,
 			enable_validation = config.enable_validation,
 			enable_log = config.enable_log,
-			window = engine.window.handle,
+			enable_profiler = config.enable_profiler,
 		},
 	) or_return
 

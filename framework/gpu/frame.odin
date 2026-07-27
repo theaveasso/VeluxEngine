@@ -48,6 +48,9 @@ begin_frame :: proc(device: ^Device) -> (frame: Frame, err: Error) {
 	begin_info: vk.CommandBufferBeginInfo = init_command_buffer_begin_info({.ONE_TIME_SUBMIT})
 	vk_check(vk.BeginCommandBuffer(frame_data.command_buffer, &begin_info)) or_return
 
+	readback_profiler(device, device.current_frame) or_return
+	reset_profiler(device, frame_data.command_buffer, device.current_frame)
+
 	cmd_transition_images(
 		frame_data.command_buffer,
 		{

@@ -230,3 +230,11 @@ write_staging_image_slice :: #force_inline proc(
 	gpu.write_staging_image(&engine.device, cmd, image, in_data, offset, loc) or_return
 	return
 }
+
+prof_zone_begin :: #force_inline proc(engine: ^Engine, frame: Frame, name: string, loc := #caller_location) -> (zone_index: u32) {
+	return gpu.zone_begin(&engine.device, frame, name, loc)
+}
+
+prof_zone_end :: #force_inline proc(engine: ^Engine, frame: Frame, loc := #caller_location) {
+	gpu.zone_end(&engine.device, frame, loc)
+}

@@ -18,6 +18,7 @@ Key :: enum i32 {
 	SPACE        = glfw.KEY_SPACE,
 	TAB          = glfw.KEY_TAB,
 	F1           = glfw.KEY_F1,
+	F2           = glfw.KEY_F2,
 }
 
 Input_State :: struct {

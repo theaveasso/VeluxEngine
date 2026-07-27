@@ -2,8 +2,6 @@ package gpu
 
 import vk "vendor:vulkan"
 
-import "core:log"
-
 MAX_ZONES :: 32
 
 Zone_Result :: struct {
@@ -104,8 +102,6 @@ readback_profiler :: proc(device: ^Device, slot: u32) -> (err: Error = .None) {
 			name = device.profiler.zone_names[slot][zone],
 			ms   = elapsed_ns / 1_000_000,
 		}
-
-		log.infof("zone %s: %.3f ms", device.profiler.zone_names[slot][zone], elapsed_ns / 1_000_000)
 	}
 	device.profiler.result_count = zone_count
 	return

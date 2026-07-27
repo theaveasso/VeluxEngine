@@ -78,7 +78,6 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 		window_extent := velux.window_extent(engine)
 
 		velux.ui_new_frame()
-
 		if velux.ui_begin_panel("Renderer") {
 			velux.ui_slider("Debug (Gray Test)", &pc.debug_mode, 0, 1)
 			velux.ui_slider("View Distance", &pc.dims.w, 1, 1024)
@@ -120,7 +119,7 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 		velux.cmd_draw(frame, 3)
 		velux.prof_zone_end(engine, frame)
 
-		velux.ui_draw(frame)
+		velux.ui_draw(engine, frame)
 		velux.cmd_end_rendering(frame)
 		velux.end_frame(engine, frame) or_continue
 	}

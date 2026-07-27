@@ -21,6 +21,7 @@ Engine :: struct {
 	window:            platform.Window,
 	device:            gpu.Device,
 	watch_shaders:     [dynamic]Shader_Watch,
+	hud:               Hud,
 	last_shader_check: time.Time,
 	dt:                f32,
 	last_time:         f64,
@@ -79,6 +80,8 @@ running :: proc(engine: ^Engine) -> bool {
 	engine.dt = min(raw, MAX_DELTA)
 	engine.last_time = now
 
+	if is_key_pressed(.F2) do engine.hud.show = !engine.hud.show
+	hud_update(engine)
 	return !platform.window_should_close(&engine.window)
 }
 

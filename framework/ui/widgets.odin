@@ -32,3 +32,22 @@ slider_float3 :: proc(lable: string, v: ^[3]f32, v_min: f32, v_max: f32, allocat
 check_box :: proc(label: string, v: ^bool, allocator := context.temp_allocator) -> bool {
 	return g_initialized ? imgui.Checkbox(strings.clone_to_cstring(label, allocator), v) : false
 }
+
+text :: proc(t: string, allocator := context.temp_allocator) {
+	if !g_initialized do return
+	imgui.TextUnformatted(strings.clone_to_cstring(t, allocator))
+}
+
+plot_lines :: proc(label: string, v: []f32, s_min: f32 = 0, s_max: f32 = 33, height: f32 = 40, allocator := context.temp_allocator) {
+	if !g_initialized do return
+	if len(v) == 0 do return
+
+	imgui.PlotLines(
+		strings.clone_to_cstring(label, allocator),
+		&v[0],
+		i32(len(v)),
+		scale_min = s_min,
+		scale_max = s_max,
+		graph_size = {0, height},
+	)
+}

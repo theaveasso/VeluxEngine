@@ -17,16 +17,16 @@ run :: proc(engine: ^vlx.Engine) -> (err: vlx.Error) {
 	}
 	indices: [6]u32 = {0, 1, 2, 3, 4, 5}
 
-	vertex_buffer := gpu.create_buffer(&engine.device, gpu.Vertex, len(vertices), .Storage) or_return
-	defer gpu.destroy_buffer(&engine.device, &vertex_buffer)
+	vertex_buffer := gpu.create_buffer(&engine.gpu, gpu.Vertex, len(vertices), .Storage) or_return
+	defer gpu.destroy_buffer(&engine.gpu, &vertex_buffer)
 
-	index_buffer := gpu.create_buffer(&engine.device, u32, len(indices), .Index) or_return
-	defer gpu.destroy_buffer(&engine.device, &index_buffer)
+	index_buffer := gpu.create_buffer(&engine.gpu, u32, len(indices), .Index) or_return
+	defer gpu.destroy_buffer(&engine.gpu, &index_buffer)
 
-	cmd := gpu.immediate_transfer_begin(&engine.device) or_return
-	gpu.write_staging_buffer_slice(&engine.device, cmd, &vertex_buffer, vertices[:]) or_return
-	gpu.write_staging_buffer_slice(&engine.device, cmd, &index_buffer, indices[:]) or_return
-	gpu.immediate_transfer_end(&engine.device) or_return
+	cmd := gpu.immediate_transfer_begin(&engine.gpu) or_return
+	gpu.write_staging_buffer_slice(&engine.gpu, cmd, &vertex_buffer, vertices[:]) or_return
+	gpu.write_staging_buffer_slice(&engine.gpu, cmd, &index_buffer, indices[:]) or_return
+	gpu.immediate_transfer_end(&engine.gpu) or_return
 
 	Triangle_PushConstants :: struct {
 		vertices: gpu.Device_Address(gpu.Vertex),
@@ -35,11 +35,11 @@ run :: proc(engine: ^vlx.Engine) -> (err: vlx.Error) {
 		vertices = vertex_buffer.ptr,
 	}
 
-	shader := gpu.load_shader_module(&engine.device, "shaders/out/triangle.spv", context.temp_allocator) or_return
-	defer gpu.destroy_shader_module(&engine.device, shader)
+	shader := gpu.load_shader_module(&engine.gpu, "shaders/out/triangle.spv", context.temp_allocator) or_return
+	defer gpu.destroy_shader_module(&engine.gpu, shader)
 
 	pipeline := gpu.create_graphics_pipeline(
-		&engine.device,
+		&engine.gpu,
 		gpu.init_gpu_pipeline_create_info(
 			shader = shader,
 			push_constants = Triangle_PushConstants,
@@ -48,13 +48,13 @@ run :: proc(engine: ^vlx.Engine) -> (err: vlx.Error) {
 			front_face = .CLOCKWISE,
 			depth = {write_enabled = true, compare_op = .LESS_OR_EQUAL, format = gpu.DEFAULT_DEPTH_FORMAT},
 			cull_mode = {},
-			color_format = gpu.swapchain_format(&engine.device),
+			color_format = gpu.swapchain_format(&engine.gpu),
 		),
 	) or_return
-	defer gpu.destroy_pipeline(&engine.device, &pipeline)
+	defer gpu.destroy_pipeline(&engine.gpu, &pipeline)
 
 	for vlx.running(engine) {
-		frame := gpu.begin_frame(&engine.device) or_continue
+		frame := gpu.begin_frame(&engine.gpu) or_continue
 		gpu.cmd_begin_rendering(frame, [4]f32{0.05, 0.05, 0.1, 1})
 
 		gpu.cmd_bind_graphics_pipeline(frame, pipeline)
@@ -63,10 +63,10 @@ run :: proc(engine: ^vlx.Engine) -> (err: vlx.Error) {
 		gpu.cmd_draw_indexed(frame, len(indices))
 
 		gpu.cmd_end_rendering(frame)
-		gpu.end_frame(&engine.device, frame) or_continue
+		gpu.end_frame(&engine.gpu, frame) or_continue
 	}
 
-	gpu.wait_idle(&engine.device)
+	gpu.wait_idle(&engine.gpu)
 
 	return nil
 }

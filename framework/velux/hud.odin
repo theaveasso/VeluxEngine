@@ -26,7 +26,7 @@ hud_update :: proc(engine: ^Engine) {
 	target_fps := 1. / engine.dt
 	engine.hud.fps_smooth += (target_fps - engine.hud.fps_smooth) * 0.1
 
-	profiler := &engine.device.profiler
+	profiler := &engine.gpu.profiler
 	for zone in 0 ..< profiler.result_count {
 		engine.hud.zone_ms[zone] += (profiler.results[zone].ms - engine.hud.zone_ms[zone]) * 0.1
 	}
@@ -40,8 +40,8 @@ hud_draw :: proc(engine: ^Engine) {
 		ui_plot_lines("frame ms", engine.hud.frame_ms[:])
 
 		total_ms: f32
-		for zone in 0 ..< engine.device.profiler.result_count {
-			result := engine.device.profiler.results[zone]
+		for zone in 0 ..< engine.gpu.profiler.result_count {
+			result := engine.gpu.profiler.results[zone]
 			smoothed_ms := engine.hud.zone_ms[zone]
 			ui_text(fmt.tprintf("%s		%.3f ms", result.name, smoothed_ms))
 			total_ms += smoothed_ms
@@ -57,10 +57,10 @@ hud_draw :: proc(engine: ^Engine) {
 @(private)
 hud_vram_usage :: proc(engine: ^Engine) -> (used_mb: f32, total_mb: f32) {
 	memory_props: vk.PhysicalDeviceMemoryProperties
-	vk.GetPhysicalDeviceMemoryProperties(engine.device.physical_device, &memory_props)
+	vk.GetPhysicalDeviceMemoryProperties(engine.gpu.physical_device, &memory_props)
 
 	budgets: [vk.MAX_MEMORY_HEAPS]vma.Budget
-	vma.GetHeapBudgets(engine.device.vma_allocator, &budgets[0])
+	vma.GetHeapBudgets(engine.gpu.vma_allocator, &budgets[0])
 
 	used_bytes, total_bytes: u64
 	for heap in 0 ..< memory_props.memoryHeapCount {

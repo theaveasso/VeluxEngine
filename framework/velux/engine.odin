@@ -1,10 +1,12 @@
 package velux
 
+import "core:log"
 import "core:time"
-import "vlx:shaders"
 
+import "vlx:audio"
 import "vlx:gpu"
 import "vlx:platform"
+import "vlx:shaders"
 import "vlx:ui"
 
 MAX_DELTA :: 0.1
@@ -20,7 +22,8 @@ Config :: struct {
 
 Engine :: struct {
 	window:            platform.Window,
-	device:            gpu.Device,
+	gpu:               gpu.Device,
+	audio:             audio.Device,
 	watch_shaders:     [dynamic]Shader_Watch,
 	hud:               Hud,
 	last_shader_check: time.Time,
@@ -29,6 +32,7 @@ Engine :: struct {
 }
 
 Error :: union #shared_nil {
+	audio.Error,
 	gpu.Error,
 	platform.Error,
 	shaders.Error,
@@ -74,7 +78,7 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 	platform.input_init(&engine.window)
 
 	gpu.init(
-		&engine.device,
+		&engine.gpu,
 		{
 			app_name = config.app_name,
 			window = engine.window.handle,
@@ -84,7 +88,11 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 		},
 	) or_return
 
-	ui.init(&engine.device, &engine.window) or_return
+	ui.init(&engine.gpu, &engine.window) or_return
+
+	if audio_err := audio.init(&engine.audio); audio_err != nil {
+		log.warnf("audio unavailable, continuing withou sound: %v", audio_err)
+	}
 
 	engine.last_time = platform.time()
 	return nil
@@ -110,7 +118,7 @@ running :: proc(engine: ^Engine) -> bool {
 }
 
 swapchain_format :: proc(engine: ^Engine) -> Format {
-	return gpu.swapchain_format(&engine.device)
+	return gpu.swapchain_format(&engine.gpu)
 }
 
 window_extent :: proc(engine: ^Engine) -> [2]f32 {
@@ -118,13 +126,14 @@ window_extent :: proc(engine: ^Engine) -> [2]f32 {
 }
 
 wait_for_idle :: proc(engine: ^Engine) {
-	gpu.wait_idle(&engine.device)
+	gpu.wait_idle(&engine.gpu)
 }
 
 shutdown :: proc(engine: ^Engine) {
 	wait_for_idle(engine)
 	ui.destroy()
-	gpu.destroy(&engine.device)
+	gpu.destroy(&engine.gpu)
+	audio.destroy(&engine.audio)
 	destroy_watch_shaders(engine)
 	platform.destroy_window(&engine.window)
 	platform.shutdown()

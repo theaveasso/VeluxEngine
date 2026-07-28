@@ -1,6 +1,7 @@
 package velux
 
 import "base:runtime"
+import "vlx:audio"
 import "vlx:shaders"
 
 import vma "third_party:odin-vma"
@@ -37,6 +38,8 @@ Command_Buffer :: vk.CommandBuffer
 Shader_Module :: vk.ShaderModule
 Format :: vk.Format
 
+Sound_Handle :: audio.Sound_Handle
+
 cmd_begin_rendering :: gpu.cmd_begin_rendering
 cmd_bind_graphics_pipeline :: gpu.cmd_bind_graphics_pipeline
 cmd_push_constants :: gpu.cmd_push_constants
@@ -55,27 +58,16 @@ is_key_pressed :: platform.is_key_pressed
 set_cursor_captured :: platform.set_cursor_captured
 is_cursor_captured :: platform.is_cursor_captured
 
+// begin	vlx:gpu			---
 @(require_results)
-create_buffer :: #force_inline proc(
-	engine: ^Engine,
-	$T: typeid,
-	#any_int size: vk.DeviceSize = 1,
-	buffer_kind: Buffer_Kind = .Storage,
-) -> (
-	buffer: Buffer(T),
-	err: Error,
-) {
-	buffer = gpu.create_buffer(&engine.device, T, size, buffer_kind) or_return
-	return
+create_buffer :: #force_inline proc($T: typeid, #any_int size: vk.DeviceSize = 1, kind: Buffer_Kind = .Storage) -> (Buffer(T), Error) {
+	return gpu.create_buffer(&g_engine.gpu, T, size, kind)
 }
 
-destroy_buffer :: #force_inline proc(engine: ^Engine, buffer: ^Buffer($T)) {
-	gpu.destroy_buffer(&engine.device, buffer)
-}
+destroy_buffer :: #force_inline proc(buffer: ^Buffer($T)) {gpu.destroy_buffer(&g_engine.gpu, buffer)}
 
 @(require_results)
 create_texture :: #force_inline proc(
-	engine: ^Engine,
 	format: vk.Format,
 	extent: vk.Extent3D,
 	image_usage_flags: vk.ImageUsageFlags,
@@ -88,70 +80,43 @@ create_texture :: #force_inline proc(
 	alloc_flags: vma.AllocationCreateFlags = {},
 	usage: vma.MemoryUsage = .AUTO,
 ) -> (
-	image: Image,
-	err: Error,
+	Image,
+	Error,
 ) {
-	image = gpu.create_image(
-		&engine.device,
-		gpu.image_create_info(
-			format,
-			extent,
-			image_usage_flags,
-			mip_levels,
-			array_layers,
-			image_type,
-			msaa_samples,
-			tiling,
-			flags,
-			alloc_flags,
-			usage,
-		),
-	) or_return
-	return
+	info := gpu.image_create_info(
+		format,
+		extent,
+		image_usage_flags,
+		mip_levels,
+		array_layers,
+		image_type,
+		msaa_samples,
+		tiling,
+		flags,
+		alloc_flags,
+		usage,
+	)
+	return gpu.create_image(&g_engine.gpu, info)
 }
 
-destroy_texture :: #force_inline proc(engine: ^Engine, image: ^Image) {
-	gpu.destroy_image(&engine.device, image)
+destroy_texture :: #force_inline proc(image: ^Image) {gpu.destroy_image(&g_engine.gpu, image)}
+
+begin_frame :: #force_inline proc() -> (Frame, Error) {return gpu.begin_frame(&g_engine.gpu)}
+
+end_frame :: #force_inline proc(frame: Frame) -> Error {return gpu.end_frame(&g_engine.gpu, frame)}
+
+immediate_transfer_begin :: #force_inline proc() -> (Command_Buffer, Error) {return gpu.immediate_transfer_begin(&g_engine.gpu)}
+
+immediate_transfer_end :: #force_inline proc() -> Error {return gpu.immediate_transfer_end(&g_engine.gpu)}
+
+create_shader :: #force_inline proc(file_name: string, allocator: runtime.Allocator) -> (Shader_Module, Error) {
+	return gpu.load_shader_module(&g_engine.gpu, file_name, allocator)
 }
 
-begin_frame :: #force_inline proc(engine: ^Engine) -> (frame: Frame, err: Error) {
-	frame = gpu.begin_frame(&engine.device) or_return
-	return
-}
+destroy_shader :: #force_inline proc(shader: Shader_Module) {gpu.destroy_shader_module(&g_engine.gpu, shader)}
 
-end_frame :: #force_inline proc(engine: ^Engine, frame: Frame) -> (err: Error) {
-	gpu.end_frame(&engine.device, frame) or_return
-	return
-}
-
-immediate_transfer_begin :: #force_inline proc(engine: ^Engine) -> (cmd: Command_Buffer, err: Error) {
-	cmd = gpu.immediate_transfer_begin(&engine.device) or_return
-	return
-}
-
-immediate_transfer_end :: #force_inline proc(engine: ^Engine) -> (err: Error) {
-	gpu.immediate_transfer_end(&engine.device) or_return
-	return
-}
-
-create_shader :: #force_inline proc(
-	engine: ^Engine,
-	file_name: string,
-	allocator: runtime.Allocator,
-) -> (
-	shader: Shader_Module,
-	err: Error,
-) {
-	shader = gpu.load_shader_module(&engine.device, file_name, allocator) or_return
-	return
-}
-
-destroy_shader :: #force_inline proc(engine: ^Engine, shader: Shader_Module) {
-	gpu.destroy_shader_module(&engine.device, shader)
-}
-
+@(require_results)
 create_graphics_pipeline :: #force_inline proc(
-	engine: ^Engine,
 	shader: vk.ShaderModule,
 	push_constant_size: u32,
 	input_topology: vk.PrimitiveTopology,
@@ -164,82 +129,73 @@ create_graphics_pipeline :: #force_inline proc(
 	vertex_entry: cstring = gpu.DEFAULT_VERTEX_ENTRY,
 	fragment_entry: cstring = gpu.DEFAULT_FRAGMENT_ENTRY,
 ) -> (
-	pipeline: Graphics_Pipeline,
-	err: Error,
+	Graphics_Pipeline,
+	Error,
 ) {
-	pipeline = gpu.create_graphics_pipeline(
-		&engine.device,
-		shader,
-		gpu.pipeline_create_info(
-			push_constant_size,
-			input_topology,
-			polygon_mode,
-			front_face,
-			depth_config,
-			cull_mode,
-			color_format,
-			blend_mode,
-			vertex_entry,
-			fragment_entry,
-		),
-	) or_return
-	return
-}
-
-rebuild_graphics_pipeline :: #force_inline proc(
-	engine: ^Engine,
-	shader: Shader_Module,
-	info: Graphics_Pipeline_Create_Info,
-) -> (
-	pipeline: Graphics_Pipeline,
-	err: Error,
-) {
-	pipeline = gpu.create_graphics_pipeline(&engine.device, shader, info) or_return
-	return
-}
-
-destroy_pipeline :: #force_inline proc(engine: ^Engine, pipeline: ^Graphics_Pipeline) {
-	gpu.destroy_pipeline(&engine.device, pipeline)
+	info := gpu.pipeline_create_info(
+		push_constant_size,
+		input_topology,
+		polygon_mode,
+		front_face,
+		depth_config,
+		cull_mode,
+		color_format,
+		blend_mode,
+		vertex_entry,
+		fragment_entry,
+	)
+	return gpu.create_graphics_pipeline(&g_engine.gpu, shader, info)
 }
 
 @(require_results)
+rebuild_graphics_pipeline :: #force_inline proc(shader: Shader_Module, info: Graphics_Pipeline_Create_Info) -> (Graphics_Pipeline, Error) {
+	return gpu.create_graphics_pipeline(&g_engine.gpu, shader, info)
+}
+
+destroy_pipeline :: #force_inline proc(pipeline: ^Graphics_Pipeline) {gpu.destroy_pipeline(&g_engine.gpu, pipeline)}
+
+@(require_results)
 write_staging_buffer_slice :: #force_inline proc(
-	engine: ^Engine,
 	cmd: Command_Buffer,
 	buffer: ^Buffer($T),
 	in_data: []$U,
 	offset: vk.DeviceSize = 0,
 	loc := #caller_location,
-) -> (
-	err: Error,
-) {
-	gpu.write_staging_buffer_slice(&engine.device, cmd, buffer, in_data, offset, loc) or_return
-	return
+) -> Error {
+	return gpu.write_staging_buffer_slice(&g_engine.gpu, cmd, buffer, in_data, offset, loc)
 }
 
 @(require_results)
 write_staging_image_slice :: #force_inline proc(
-	engine: ^Engine,
 	cmd: Command_Buffer,
 	image: ^Image,
 	in_data: []$T,
 	offset: vk.DeviceSize = 0,
 	loc := #caller_location,
-) -> (
-	err: Error,
-) {
-	gpu.write_staging_image(&engine.device, cmd, image, in_data, offset, loc) or_return
-	return
+) -> Error {
+	return gpu.write_staging_image(&g_engine.gpu, cmd, image, in_data, offset, loc)
 }
 
-prof_zone_begin :: #force_inline proc(engine: ^Engine, frame: Frame, name: string, loc := #caller_location) -> (zone_index: u32) {
-	return gpu.zone_begin(&engine.device, frame, name, loc)
+prof_zone_begin :: #force_inline proc(frame: Frame, name: string, loc := #caller_location) -> u32 {
+	return gpu.zone_begin(&g_engine.gpu, frame, name, loc)
 }
 
-prof_zone_end :: #force_inline proc(engine: ^Engine, frame: Frame, loc := #caller_location) {
-	gpu.zone_end(&engine.device, frame, loc)
-}
+prof_zone_end :: #force_inline proc(frame: Frame, loc := #caller_location) {gpu.zone_end(&g_engine.gpu, frame, loc)}
+// end		vlx:gpu			---
 
-// begin vlx:shaders 	---
+// begin	vlx:shaders		---
 compile_slang :: shaders.compile_slang
-// end vlx:shaders 		---
+// end		vlx:shaders		---
+
+// begin	vlx:audio		---
+@(require_results)
+load_sound :: #force_inline proc(file_name: string, spatial: bool) -> (Sound_Handle, Error) {
+	return audio.load(&g_engine.audio, file_name, spatial)
+}
+
+play_sound :: #force_inline proc(handle: Sound_Handle) {audio.play(&g_engine.audio, handle)}
+
+stop_sound :: #force_inline proc(handle: Sound_Handle) {audio.stop(&g_engine.audio, handle)}
+
+play_oneshot :: #force_inline proc(file_name: string) {audio.play_oneshot(&g_engine.audio, file_name)}
+// end		vlx:audio		---

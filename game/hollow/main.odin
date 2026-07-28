@@ -20,13 +20,7 @@ main :: proc() {
 	}
 }
 
-init :: proc(config: velux.Config) -> (engine: velux.Engine, err: velux.Error) {
-	err = velux.init(&engine, config)
-	return engine, err
-}
-
 run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
-
 	compile_log, compile_err := velux.compile_slang("assets/hollow.slang", "assets/hollow.spv", context.temp_allocator)
 	if compile_err != .None {
 		if compile_log != "" do log.error(compile_log)
@@ -34,8 +28,8 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 	}
 	if compile_log != "" do log.warn(compile_log)
 
-	shader := velux.create_shader(engine, "assets/hollow.spv", context.temp_allocator) or_return
-	defer velux.destroy_shader(engine, shader)
+	shader := velux.create_shader("assets/hollow.spv", context.temp_allocator) or_return
+	defer velux.destroy_shader(shader)
 
 	for velux.running(engine) {
 	}

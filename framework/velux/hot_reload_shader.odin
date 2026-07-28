@@ -3,18 +3,11 @@ package velux
 import "base:runtime"
 import "core:log"
 import "core:os"
-import "core:path/filepath"
 import "core:strings"
 import "core:time"
 
 import "vlx:shaders"
 
-Hot_Reload_Shader_Error :: enum {
-	None,
-	File_Not_Found,
-	Compiler_Not_Found,
-	Compile_Failed,
-}
 Shader_Watch :: struct {
 	pipeline:   ^Graphics_Pipeline,
 	slang_path: string,
@@ -36,7 +29,7 @@ poll_shader_watches :: proc(engine: ^Engine) {
 		watch.last_write = last_write
 
 		start := time.now()
-		output, compile_err := compile_slang(watch.slang_path, watch.spv_path, context.temp_allocator); if compile_err != .None {
+		output, compile_err := shaders.compile_slang(watch.slang_path, watch.spv_path, context.temp_allocator); if compile_err != .None {
 			log.errorf("shader compile failed (%v): %s", compile_err, watch.slang_path)
 			if output != "" do log.error(output)
 			continue
@@ -61,13 +54,7 @@ poll_shader_watches :: proc(engine: ^Engine) {
 	}
 }
 
-create_watch_shader :: proc(
-	engine: ^Engine,
-	pipeline: ^Graphics_Pipeline,
-	slang_path, spv_path: string,
-) -> (
-	err: Hot_Reload_Shader_Error,
-) {
+create_watch_shader :: proc(engine: ^Engine, pipeline: ^Graphics_Pipeline, slang_path, spv_path: string) -> (err: shaders.Error) {
 	when !ODIN_DEBUG do return .None
 
 	last_write, stat_err := os.modification_time_by_path(slang_path); if stat_err != nil {
@@ -99,51 +86,4 @@ destroy_watch_shaders :: proc(engine: ^Engine) {
 		delete(watch.spv_path)
 	}
 	delete(engine.watch_shaders)
-}
-
-compile_slang :: proc(slang_path, spv_path: string, allocator: runtime.Allocator) -> (output: string, err: Hot_Reload_Shader_Error) {
-	when ODIN_OS == .Windows {
-		SLANGC_NAME :: "slangc.exe"
-		SLANGC_DIR :: "Bin"
-	} else {
-		SLANGC_NAME :: "slangc"
-		SLANGC_DIR :: "bin"
-	}
-	if !os.exists(slang_path) do return "", .File_Not_Found
-
-	slangc := SLANGC_NAME
-	sdk := os.get_env("VULKAN_SDK", allocator)
-	defer delete(sdk, allocator)
-
-	candidate: string
-	defer delete(candidate, allocator)
-
-	if sdk != "" {
-		candidate, _ = filepath.join({sdk, SLANGC_DIR, SLANGC_NAME}, allocator)
-		if os.exists(candidate) do slangc = candidate
-	}
-
-	slang_dir := filepath.dir(slang_path)
-	cmd := []string {
-		slangc,
-		slang_path,
-		"-I",
-		slang_dir,
-		"-I",
-		shaders.ENGINE_SHADER_DIR,
-		"-target",
-		"spirv",
-		"-fvk-use-entrypoint-name",
-		"-o",
-		spv_path,
-	}
-	state, stdout, stderr, exec_err := os.process_exec({command = cmd}, allocator)
-	defer delete(stdout, allocator)
-	defer delete(stderr, allocator)
-	if exec_err != nil do return "", .Compiler_Not_Found
-
-	output = strings.concatenate({string(stdout), string(stderr)}, allocator)
-	if state.exit_code != 0 do return output, .Compile_Failed
-
-	return output, .None
 }

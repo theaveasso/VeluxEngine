@@ -1,6 +1,7 @@
 package velux
 
 import "core:time"
+import "vlx:shaders"
 
 import "vlx:gpu"
 import "vlx:platform"
@@ -28,10 +29,33 @@ Engine :: struct {
 }
 
 Error :: union #shared_nil {
-	Hot_Reload_Shader_Error,
 	gpu.Error,
 	platform.Error,
+	shaders.Error,
 	ui.Error,
+}
+
+@(private = "package")
+g_engine: ^Engine
+
+@(require_results)
+create :: proc(config: Config, allocator := context.allocator) -> (engine: ^Engine, err: Error) {
+	engine = new(Engine, allocator)
+	if err = init(engine, config); err != nil {
+		free(engine)
+		return nil, err
+	}
+
+	g_engine = engine
+	return engine, nil
+}
+
+destroy :: proc(engine: ^Engine) {
+	if engine == nil do return
+	shutdown(engine)
+
+	if g_engine == engine do g_engine = nil
+	free(g_engine)
 }
 
 @(require_results)

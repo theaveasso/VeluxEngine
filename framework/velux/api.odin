@@ -1,6 +1,7 @@
 package velux
 
 import "base:runtime"
+import "vlx:shaders"
 
 import vma "third_party:odin-vma"
 import vk "vendor:vulkan"
@@ -238,3 +239,7 @@ prof_zone_begin :: #force_inline proc(engine: ^Engine, frame: Frame, name: strin
 prof_zone_end :: #force_inline proc(engine: ^Engine, frame: Frame, loc := #caller_location) {
 	gpu.zone_end(&engine.device, frame, loc)
 }
+
+// begin vlx:shaders 	---
+compile_slang :: shaders.compile_slang
+// end vlx:shaders 		---

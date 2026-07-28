@@ -1,5 +1,6 @@
 package velux
 
+import "base:runtime"
 import "core:math"
 
 Voxel :: Block_Type
@@ -8,7 +9,7 @@ WORLD_DIMENSION :: [3]int{255, 128, 255}
 
 BLAST_RADIUS :: 5
 
-BLOCK_PALLETTE :: [Block_Type][3]f32 {
+BLOCK_PALETTE :: [Block_Type][3]f32 {
 	.Air   = {0.0, 0.0, 0.0},
 	.Grass = {0.45, 0.62, 0.28},
 	.Dirt  = {0.48, 0.35, 0.24},
@@ -29,11 +30,12 @@ Voxel_Vertex :: struct {
 	data1: u32,
 }
 Voxel_Grid :: struct {
-	voxels: []Voxel,
+	voxels:     []Voxel,
+	dimensions: [3]int,
 }
 
-voxel_index :: proc(x, y, z: int) -> int {
-	return x + y * WORLD_DIMENSION[0] + z * WORLD_DIMENSION[0] * WORLD_DIMENSION[1]
+voxel_index :: proc(grid: ^Voxel_Grid, x, y, z: int) -> int {
+	return x + y * grid.dimensions.x + z * grid.dimensions.x * grid.dimensions.y
 }
 
 grid_to_u32 :: proc(grid: ^Voxel_Grid, allocator := context.allocator) -> []u32 {
@@ -44,14 +46,14 @@ grid_to_u32 :: proc(grid: ^Voxel_Grid, allocator := context.allocator) -> []u32 
 
 voxel_at :: proc(grid: ^Voxel_Grid, x, y, z: int) -> Voxel {
 	if x < 0 || y < 0 || z < 0 do return .Air
-	if x >= WORLD_DIMENSION[0] || y >= WORLD_DIMENSION[1] || z >= WORLD_DIMENSION[2] do return .Air
-	return grid.voxels[voxel_index(x, y, z)]
+	if x >= grid.dimensions.x || y >= grid.dimensions.y || z >= grid.dimensions.z do return .Air
+	return grid.voxels[voxel_index(grid, x, y, z)]
 }
 
 voxel_set :: proc(grid: ^Voxel_Grid, x, y, z: int, block: Block_Type) {
 	if x < 0 || y < 0 || z < 0 do return
-	if x >= WORLD_DIMENSION[0] || y >= WORLD_DIMENSION[1] || z >= WORLD_DIMENSION[2] do return
-	grid.voxels[voxel_index(x, y, z)] = block
+	if x >= grid.dimensions.x || y >= grid.dimensions.y || z >= grid.dimensions.z do return
+	grid.voxels[voxel_index(grid, x, y, z)] = block
 }
 
 pack_vertex :: proc(x, y, z, normal, ao, block: u32) -> Voxel_Vertex {
@@ -60,13 +62,23 @@ pack_vertex :: proc(x, y, z, normal, ao, block: u32) -> Voxel_Vertex {
 	return {data0 = x | (y << 8) | (z << 16) | (normal << 24) | (ao << 27), data1 = block}
 }
 
-create_glade :: proc(grid: ^Voxel_Grid) {
-	grid.voxels = make([]Voxel, WORLD_DIMENSION[0] * WORLD_DIMENSION[1] * WORLD_DIMENSION[2])
+@(require_results)
+create_voxel_grid :: proc(dimensions: [3]int, allocator := context.allocator) -> (voxel_grid: Voxel_Grid) {
+	voxel_grid.voxels = make([]Voxel, dimensions.x * dimensions.y * dimensions.z, allocator)
+	voxel_grid.dimensions = dimensions
+	return
+}
 
+destroy_voxel_grid :: proc(voxel_grid: ^Voxel_Grid) {
+	delete(voxel_grid.voxels)
+	voxel_grid^ = {}
+}
+
+generate_glade :: proc(grid: ^Voxel_Grid) {
 	GROUND :: 20
 
-	for z in 0 ..< WORLD_DIMENSION[2] {
-		for x in 0 ..< WORLD_DIMENSION[0] {
+	for z in 0 ..< grid.dimensions.z {
+		for x in 0 ..< grid.dimensions.x {
 			for y in 0 ..< GROUND {
 				voxel_set(grid, x, y, z, .Dirt)
 			}
@@ -80,10 +92,6 @@ create_glade :: proc(grid: ^Voxel_Grid) {
 	place_tree(grid, 20, 60, GROUND + 1)
 	place_tree(grid, 10, 30, GROUND + 1)
 	place_tree(grid, 85, 75, GROUND + 1)
-}
-
-destroy_glade :: proc(grid: ^Voxel_Grid) {
-	delete(grid.voxels)
 }
 
 hash3 :: proc(x, y, z: int) -> f32 {

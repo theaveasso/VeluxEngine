@@ -1,6 +1,8 @@
 @echo off
 setlocal enabledelayedexpansion
 
+set "ROOT=%~dp0"
+
 set "IN="
 set "OUT="
 
@@ -19,9 +21,10 @@ set "SLANGC=slangc"
 if defined VULKAN_SDK if exist "%VULKAN_SDK%\Bin\slangc.exe" set "SLANGC=%VULKAN_SDK%\Bin\slangc.exe"
 
 for %%F in ("%OUT%") do if not exist "%%~dpF" mkdir "%%~dpF"
+for %%F in ("%IN%") do set "IN_DIR=%%~dpF."
 
-"%SLANGC%" "%IN%" -target spirv -fvk-use-entrypoint-name -o "%OUT%"
-if errorlevel 1 (
+"%SLANGC%" "%IN%" -I "%IN_DIR%" -I "%ROOT%framework\shaders" -target spirv -fvk-use-entrypoint-name -o "%OUT%"
+if %errorlevel% neq 0 (
   echo Shader compilation failed: %IN%
   exit /b 1
 )

@@ -48,9 +48,10 @@ voxel_mesh_build :: proc(grid: ^Voxel_Grid, allocator := context.allocator) -> (
 	vertices = make([dynamic]Voxel_Vertex, 0, len(grid.voxels), allocator)
 	indices = make([dynamic]u32, 0, len(grid.voxels), allocator)
 
-	for z in 0 ..< WORLD_DIMENSION[2] {
-		for y in 0 ..< WORLD_DIMENSION[1] {
-			for x in 0 ..< WORLD_DIMENSION[0] {
+	dims := grid.dimensions
+	for z in 0 ..< dims.z {
+		for y in 0 ..< dims.y {
+			for x in 0 ..< dims.x {
 				voxel := voxel_at(grid, x, y, z)
 				if voxel == .Air do continue
 

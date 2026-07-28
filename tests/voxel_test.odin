@@ -3,24 +3,23 @@ package tests
 import "core:testing"
 import "vlx:velux"
 
+TEST_GRID_DIMS: [3]int : {20, 20, 20}
+
 @(test)
 carve_sphere_removes_center_and_keeps_far :: proc(t: ^testing.T) {
-	grid: velux.Voxel_Grid
-	grid.voxels = make([]velux.Voxel, velux.WORLD_DIMENSION[0] * velux.WORLD_DIMENSION[1] * velux.WORLD_DIMENSION[2])
-	defer delete(grid.voxels)
-
+	grid := velux.create_voxel_grid(TEST_GRID_DIMS)
+	defer velux.destroy_voxel_grid(&grid)
 	for i in 0 ..< len(grid.voxels) do grid.voxels[i] = velux.Block_Type.Stone
 
-	velux.carve_sphere(&grid, 20, 20, 20)
-	testing.expect(t, velux.voxel_at(&grid, 20, 20, 20) == velux.Block_Type.Air, "center should be carved")
-	testing.expect(t, velux.voxel_at(&grid, 20, 20 + velux.BLAST_RADIUS + 1, 20) == velux.Block_Type.Stone, "far voxel should remain")
+	velux.carve_sphere(&grid, 5, 5, 5)
+	testing.expect(t, velux.voxel_at(&grid, 5, 5, 5) == velux.Block_Type.Air, "center should be carved")
+	testing.expect(t, velux.voxel_at(&grid, 10, 10 + velux.BLAST_RADIUS + 1, 10) == velux.Block_Type.Stone, "far voxel should remain")
 }
 
 @(test)
 raycast_hits_solid_voxel :: proc(t: ^testing.T) {
-	grid: velux.Voxel_Grid
-	grid.voxels = make([]velux.Voxel, velux.WORLD_DIMENSION[0] * velux.WORLD_DIMENSION[1] * velux.WORLD_DIMENSION[2])
-	defer delete(grid.voxels)
+	grid := velux.create_voxel_grid(TEST_GRID_DIMS)
+	defer velux.destroy_voxel_grid(&grid)
 	velux.voxel_set(&grid, 10, 10, 10, .Stone)
 
 	cell, normal, hit := velux.voxel_raycast(&grid, {10.5, 10.5, 0.5}, {0, 0, 1}, 64)
@@ -30,18 +29,16 @@ raycast_hits_solid_voxel :: proc(t: ^testing.T) {
 }
 @(test)
 raycast_misses_in_empty_grid :: proc(t: ^testing.T) {
-	grid: velux.Voxel_Grid
-	grid.voxels = make([]velux.Voxel, velux.WORLD_DIMENSION[0] * velux.WORLD_DIMENSION[1] * velux.WORLD_DIMENSION[2])
-	defer delete(grid.voxels)
+	grid := velux.create_voxel_grid(TEST_GRID_DIMS)
+	defer velux.destroy_voxel_grid(&grid)
 
 	_, _, hit := velux.voxel_raycast(&grid, {10.5, 10.5, 0.5}, {0, 0, 1}, 64)
 	testing.expect(t, !hit, "should miss")
 }
 @(test)
 raycast_stops_at_nearest_solid :: proc(t: ^testing.T) {
-	grid: velux.Voxel_Grid
-	grid.voxels = make([]velux.Voxel, velux.WORLD_DIMENSION[0] * velux.WORLD_DIMENSION[1] * velux.WORLD_DIMENSION[2])
-	defer delete(grid.voxels)
+	grid := velux.create_voxel_grid(TEST_GRID_DIMS)
+	defer velux.destroy_voxel_grid(&grid)
 	velux.voxel_set(&grid, 10, 10, 5, .Stone)
 	velux.voxel_set(&grid, 10, 10, 10, .Stone)
 
@@ -52,25 +49,22 @@ raycast_stops_at_nearest_solid :: proc(t: ^testing.T) {
 }
 @(test)
 raycast_hits_along_negative_direction :: proc(t: ^testing.T) {
-	grid: velux.Voxel_Grid
-	grid.voxels = make([]velux.Voxel, velux.WORLD_DIMENSION[0] * velux.WORLD_DIMENSION[1] * velux.WORLD_DIMENSION[2])
-	defer delete(grid.voxels)
+	grid := velux.create_voxel_grid(TEST_GRID_DIMS)
+	defer velux.destroy_voxel_grid(&grid)
 }
 @(test)
 raycast_respects_max_distance :: proc(t: ^testing.T) {
-	grid: velux.Voxel_Grid
-	grid.voxels = make([]velux.Voxel, velux.WORLD_DIMENSION[0] * velux.WORLD_DIMENSION[1] * velux.WORLD_DIMENSION[2])
-	defer delete(grid.voxels)
+	grid := velux.create_voxel_grid(TEST_GRID_DIMS)
+	defer velux.destroy_voxel_grid(&grid)
 }
 @(test)
 grid_to_u32_maps_block_ids :: proc(t: ^testing.T) {
-	grid: velux.Voxel_Grid
-	grid.voxels = make([]velux.Voxel, velux.WORLD_DIMENSION[0] * velux.WORLD_DIMENSION[1] * velux.WORLD_DIMENSION[2])
-	defer delete(grid.voxels)
+	grid := velux.create_voxel_grid(TEST_GRID_DIMS)
+	defer velux.destroy_voxel_grid(&grid)
 	velux.voxel_set(&grid, 3, 4, 5, .Stone)
 
 	data := velux.grid_to_u32(&grid)
 	defer delete(data)
-	testing.expect(t, data[velux.voxel_index(3, 4, 5)] == u32(velux.Block_Type.Stone), "block id maps to u32")
+	testing.expect(t, data[velux.voxel_index(&grid, 3, 4, 5)] == u32(velux.Block_Type.Stone), "block id maps to u32")
 	testing.expect(t, data[0] == u32(velux.Block_Type.Air), "empty stays Air(0)")
 }

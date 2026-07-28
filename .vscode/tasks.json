@@ -2,6 +2,13 @@
 	"version": "2.0.0",
 	"inputs": [
 		{
+			"id": "game",
+			"type": "pickString",
+			"description": "Select game",
+			"options": ["hollow"],
+			"default": "hollow"
+		},
+		{
 			"id": "sample",
 			"type": "pickString",
 			"description": "Select sample",
@@ -17,10 +24,10 @@
 	],
 	"tasks": [
 		{
-			"label": "build",
+			"label": "build game",
 			"type": "shell",
-			"command": "${workspaceFolder}/build.bat",
-			"args": ["${input:sample}"],
+			"command": "${workspaceFolder}/build_game.bat",
+			"args": ["${input:game}"],
 			"options": { "cwd": "${workspaceFolder}" },
 			"group": { "kind": "build", "isDefault": true },
 			"presentation": { "reveal": "always", "panel": "shared", "clear": true },
@@ -38,6 +45,37 @@
 			}
 		},
 		{
+			"label": "run game",
+			"type": "process",
+			"command": "${workspaceFolder}/game/${input:game}/${input:game}.exe",
+			"options": { "cwd": "${workspaceFolder}/game/${input:game}" },
+			"dependsOn": "build game",
+			"presentation": { "reveal": "always", "panel": "shared" },
+			"problemMatcher": []
+		},
+		{
+			"label": "debug game (RAD Debugger)",
+			"type": "process",
+			"command": "raddbg",
+			"args": ["${workspaceFolder}/game/${input:game}/${input:game}.exe"],
+			"options": { "cwd": "${workspaceFolder}/game/${input:game}" },
+			"dependsOn": "build game",
+			"problemMatcher": []
+		},
+		{
+			"label": "debug game (RenderDoc capture)",
+			"type": "process",
+			"command": "C:/Program Files/RenderDoc/renderdoccmd.exe",
+			"args": [
+				"capture",
+				"--working-dir", "${workspaceFolder}/game/${input:game}",
+				"${workspaceFolder}/game/${input:game}/${input:game}.exe"
+			],
+			"options": { "cwd": "${workspaceFolder}/game/${input:game}" },
+			"dependsOn": "build game",
+			"problemMatcher": []
+		},
+		{
 			"label": "test",
 			"type": "shell",
 			"command": "odin",
@@ -45,7 +83,7 @@
 				"test", "tests",
 				"-collection:vlx=framework",
 				"-collection:third_party=third_party",
-				"-out:tests/tests.exe"
+				"-out:build/tests.exe"
 			],
 			"options": { "cwd": "${workspaceFolder}" },
 			"group": { "kind": "test", "isDefault": true },
@@ -72,7 +110,7 @@
 				"-collection:vlx=framework",
 				"-collection:third_party=third_party",
 				"-define:ODIN_TEST_NAMES=tests.${input:testName}",
-				"-out:tests/tests.exe"
+				"-out:build/tests.exe"
 			],
 			"options": { "cwd": "${workspaceFolder}" },
 			"group": "test",
@@ -80,34 +118,57 @@
 			"problemMatcher": []
 		},
 		{
-			"label": "run",
+			"label": "check",
+			"type": "shell",
+			"command": "odin",
+			"args": [
+				"check", "game/${input:game}",
+				"-collection:vlx=framework",
+				"-collection:third_party=third_party"
+			],
+			"options": { "cwd": "${workspaceFolder}" },
+			"presentation": { "reveal": "always", "panel": "shared", "clear": true },
+			"problemMatcher": {
+				"owner": "odin",
+				"fileLocation": ["autoDetect", "${workspaceFolder}"],
+				"pattern": {
+					"regexp": "^(.*)\\((\\d+):(\\d+)\\)\\s+(Error|Warning):\\s+(.*)$",
+					"file": 1,
+					"line": 2,
+					"column": 3,
+					"severity": 4,
+					"message": 5
+				}
+			}
+		},
+		{
+			"label": "build sample",
+			"type": "shell",
+			"command": "${workspaceFolder}/build.bat",
+			"args": ["${input:sample}"],
+			"options": { "cwd": "${workspaceFolder}" },
+			"group": "build",
+			"presentation": { "reveal": "always", "panel": "shared", "clear": true },
+			"problemMatcher": {
+				"owner": "odin",
+				"fileLocation": ["autoDetect", "${workspaceFolder}"],
+				"pattern": {
+					"regexp": "^(.*)\\((\\d+):(\\d+)\\)\\s+(Error|Warning):\\s+(.*)$",
+					"file": 1,
+					"line": 2,
+					"column": 3,
+					"severity": 4,
+					"message": 5
+				}
+			}
+		},
+		{
+			"label": "run sample",
 			"type": "process",
 			"command": "${workspaceFolder}/samples/${input:sample}/${input:sample}.exe",
 			"options": { "cwd": "${workspaceFolder}/samples/${input:sample}" },
-			"dependsOn": "build",
+			"dependsOn": "build sample",
 			"presentation": { "reveal": "always", "panel": "shared" },
-			"problemMatcher": []
-		},
-		{
-			"label": "debug (RAD Debugger)",
-			"type": "process",
-			"command": "raddbg",
-			"args": ["${workspaceFolder}/samples/${input:sample}/${input:sample}.exe"],
-			"options": { "cwd": "${workspaceFolder}/samples/${input:sample}" },
-			"dependsOn": "build",
-			"problemMatcher": []
-		},
-		{
-			"label": "debug (RenderDoc capture)",
-			"type": "process",
-			"command": "C:/Program Files/RenderDoc/renderdoccmd.exe",
-			"args": [
-				"capture",
-				"--working-dir", "${workspaceFolder}/samples/${input:sample}",
-				"${workspaceFolder}/samples/${input:sample}/${input:sample}.exe"
-			],
-			"options": { "cwd": "${workspaceFolder}/samples/${input:sample}" },
-			"dependsOn": "build",
 			"problemMatcher": []
 		},
 		{

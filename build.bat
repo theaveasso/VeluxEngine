@@ -2,23 +2,36 @@
 setlocal enabledelayedexpansion
 
 set "SAMPLE=%~1"
-if "%SAMPLE%"=="" set "SAMPLE=04_voxel"
+if "%SAMPLE%"=="" set "SAMPLE=05_voxel_raycast"
 
 set "ODIN=odin"
+set "SAMPLE_DIR=samples\%SAMPLE%"
 
-call "%~dp0compile_shader.bat" -in shaders\mesh.slang                  -out shaders\out\mesh.spv                   || goto :err
-call "%~dp0compile_shader.bat" -in shaders\triangle.slang              -out shaders\out\triangle.spv               || goto :err
-call "%~dp0compile_shader.bat" -in samples\04_voxel\assets\voxel.slang -out samples\04_voxel\assets\voxel.spv      || goto :err
+if not exist "%SAMPLE_DIR%" (
+  echo No such sample: %SAMPLE_DIR%
+  exit /b 1
+)
 
-"%ODIN%" build samples\%SAMPLE% -debug -o:none ^
+for %%F in ("%SAMPLE_DIR%\assets\*.slang") do call :compile_one "%%~fF" || goto :err
+
+"%ODIN%" build %SAMPLE_DIR% -debug -o:none ^
   -collection:vlx=framework ^
   -collection:third_party=third_party ^
-  -out:samples\%SAMPLE%\%SAMPLE%.exe || goto :err
+  -out:%SAMPLE_DIR%\%SAMPLE%.exe || goto :err
 
 echo.
-echo Built samples\%SAMPLE%\%SAMPLE%.exe (debug symbols alongside it)
-echo Run it from its own folder so relative assets resolve:  samples\%SAMPLE%\%SAMPLE%.exe
+echo Built %SAMPLE_DIR%\%SAMPLE%.exe (debug symbols alongside it)
+echo Run it from its own folder so relative assets resolve:  %SAMPLE_DIR%\%SAMPLE%.exe
 exit /b 0
+
+:compile_one
+findstr /M /C:"[shader(" %1 >nul 2>&1
+if errorlevel 1 (
+  echo Skipping module %~nx1
+  exit /b 0
+)
+call "%~dp0compile_shader.bat" -in %1 -out "%~dpn1.spv"
+exit /b %errorlevel%
 
 :err
 echo Build failed

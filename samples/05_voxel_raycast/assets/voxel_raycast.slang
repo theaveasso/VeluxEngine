@@ -139,6 +139,16 @@ bool in_shadow(float3 origin, float3 dir)
     return false;
 }
 
+float3 heat_map(float amount)
+{
+    float t = saturate(amount);
+    if (t < 0.5)
+    {
+        return lerp(float3(0.0, 0.0, 0.0), float3(1.0, 0.0, 0.0), t * 2.0);
+    }
+    return lerp(float3(1.0, 0.0, 0.0), float3(1.0, 1.0, 1.0), (t - 0.5) * 2.0);
+}
+
 [shader("vertex")]
 V2P vertex_main(uint id: SV_VertexID)
 {
@@ -162,6 +172,7 @@ PS_Output fragment_main(V2P input)
         output.frag_color = float4(float3(value), 1.0);
         return output;
     }
+
     float exposure = pc.sun_direction.w;
     float tonemap_mode = pc.tonemap_mode;
 
@@ -184,8 +195,10 @@ PS_Output fragment_main(V2P input)
 
     PS_Output output;
 
+    int steps = 0;
     for (int i = 0; i < pc.dims.w; i++)
     {
+        steps += 1;
         int voxel = voxel_at(c);
         if (voxel != 0)
         {
@@ -205,6 +218,13 @@ PS_Output fragment_main(V2P input)
             }
 
             float3 hit_p = g_origin + g_dir * t_hit;
+
+            if (pc.debug_mode == 2)
+            {
+                output.frag_color = float4(heat_map(float(steps) / float(pc.dims.w)), 1.0);
+                return output;
+            }
+
             float ao = face_ao(c, N, hit_p);
             float ao_b = lerp(0.35, 1.0, ao);
 
@@ -252,6 +272,11 @@ PS_Output fragment_main(V2P input)
             t_max.z += t_delta.z;
             last_axis = 2;
         }
+    }
+    if (pc.debug_mode == 2)
+    {
+        output.frag_color = float4(heat_map(float(steps) / float(pc.dims.w)), 1.0);
+        return output;
     }
 
     float3 sky = sky_color(g_dir, pc.sun_direction.xyz);

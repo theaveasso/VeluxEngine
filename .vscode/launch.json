@@ -2,14 +2,31 @@
 	"version": "0.2.0",
 	"inputs": [
 		{
+			"id": "game",
+			"type": "pickString",
+			"description": "Select game",
+			"options": ["hollow"],
+			"default": "hollow"
+		},
+		{
 			"id": "sample",
 			"type": "pickString",
 			"description": "Select sample",
-			"options": ["01_window", "02_triangle", "03_mesh", "04_model"],
-			"default": "04_model"
+			"options": ["01_window", "02_triangle", "03_mesh", "04_voxel", "05_voxel_raycast"],
+			"default": "05_voxel_raycast"
 		}
 	],
 	"configurations": [
+		{
+			"name": "Debug game (cppvsdbg)",
+			"type": "cppvsdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/game/${input:game}/${input:game}.exe",
+			"args": [],
+			"cwd": "${workspaceFolder}/game/${input:game}",
+			"console": "integratedTerminal",
+			"preLaunchTask": "build game"
+		},
 		{
 			"name": "Debug sample (cppvsdbg)",
 			"type": "cppvsdbg",
@@ -18,7 +35,7 @@
 			"args": [],
 			"cwd": "${workspaceFolder}/samples/${input:sample}",
 			"console": "integratedTerminal",
-			"preLaunchTask": "build"
+			"preLaunchTask": "build sample"
 		}
 	]
 }

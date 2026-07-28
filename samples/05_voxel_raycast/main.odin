@@ -14,9 +14,9 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 		controller = velux.Free_Fly_Camera{speed = 10},
 	}
 
-	glade: velux.Voxel_Grid
-	velux.create_glade(&glade)
-	defer velux.destroy_glade(&glade)
+	glade := velux.create_voxel_grid(velux.WORLD_DIMENSION)
+	defer velux.destroy_voxel_grid(&glade)
+	velux.generate_glade(&glade)
 
 	voxels := velux.grid_to_u32(&glade)
 	defer delete(voxels)
@@ -41,7 +41,7 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 	}
 	pc := Push_Constants {
 		cam_pos       = {0, 0, 0, velux.VOXEL_SIZE},
-		dims          = {i32(velux.WORLD_DIMENSION[0]), i32(velux.WORLD_DIMENSION[1]), i32(velux.WORLD_DIMENSION[2]), 1024},
+		dims          = {i32(glade.dimensions.x), i32(glade.dimensions.y), i32(glade.dimensions.z), 1024},
 		sun_direction = [4]f32{0.5, 0.55, 0.35, 1.5},
 		voxels        = voxel_buffer.ptr,
 		tonemap_mode  = 2,
@@ -79,7 +79,7 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 
 		velux.ui_new_frame()
 		if velux.ui_begin_panel("Renderer") {
-			velux.ui_slider("Debug (Gray Test)", &pc.debug_mode, 0, 1)
+			velux.ui_slider("Debug", &pc.debug_mode, 0, 2)
 			velux.ui_slider("View Distance", &pc.dims.w, 1, 1024)
 			velux.ui_slider("Sun Direction", cast(^[3]f32)&pc.sun_direction, -1, 1)
 			velux.ui_slider("Exposure", &pc.sun_direction[3], -10, 10)
@@ -119,7 +119,9 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error = nil) {
 		velux.cmd_draw(frame, 3)
 		velux.prof_zone_end(engine, frame)
 
+		velux.prof_zone_begin(engine, frame, "ui")
 		velux.ui_draw(engine, frame)
+		velux.prof_zone_end(engine, frame)
 		velux.cmd_end_rendering(frame)
 		velux.end_frame(engine, frame) or_continue
 	}

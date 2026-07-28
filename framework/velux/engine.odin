@@ -55,7 +55,7 @@ destroy :: proc(engine: ^Engine) {
 	shutdown(engine)
 
 	if g_engine == engine do g_engine = nil
-	free(g_engine)
+	free(engine)
 }
 
 @(require_results)

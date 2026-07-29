@@ -55,6 +55,11 @@ PS_Output fragment_main(V2P input)
         return output;
     }
 
-    output.frag_color = float4(srgb_to_linear(palette_color(world, hit.voxel)), 1.0);
+    float ao = voxel_face_ao(world, hit.cell, hit.normal, hit.position);
+    float3 albedo = srgb_to_linear(palette_color(world, hit.voxel));
+
+    float falloff = 1.0 / (1.0 + hit.distance * hit.distance * 0.002);
+
+    output.frag_color = float4(albedo * lerp(0.35, 1.0, ao) * falloff, 1.0);
     return output;
 }

@@ -32,11 +32,13 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 	}
 	pc: Push_Constants
 
-	world := velux.create_voxel_world("assets/cave.vox") or_return
-	defer velux.destroy_voxel_world(&world)
+	level := velux.create_level("assets/den.vox", MARKER_FIRST) or_return
+	defer velux.destroy_level(&level)
+	report_markers(level.markers)
 
-	pc.dims = {i32(world.grid.dimensions.x), i32(world.grid.dimensions.y), i32(world.grid.dimensions.z), 1024}
-	pc.scene = world.buffer.ptr
+	grid := level.world.grid
+	pc.dims = {i32(grid.dimensions.x), i32(grid.dimensions.y), i32(grid.dimensions.z), 1024}
+	pc.scene = level.world.buffer.ptr
 
 	camera: velux.Camera = {
 		position = {-6.8, 3.7, -6.8},

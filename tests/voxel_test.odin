@@ -11,8 +11,8 @@ BLAST_RADIUS :: 5
 
 @(test)
 carve_sphere_removes_center_and_keeps_far :: proc(t: ^testing.T) {
-	grid := voxel.create(TEST_GRID_DIMS)
-	defer voxel.destroy(&grid)
+	grid := voxel.create_grid(TEST_GRID_DIMS)
+	defer voxel.destroy_grid(&grid)
 	for i in 0 ..< len(grid.voxels) do grid.voxels[i] = STONE
 
 	voxel.carve_sphere(&grid, {5, 5, 5}, BLAST_RADIUS, voxel.EMPTY)
@@ -22,8 +22,8 @@ carve_sphere_removes_center_and_keeps_far :: proc(t: ^testing.T) {
 
 @(test)
 raycast_hits_solid_voxel :: proc(t: ^testing.T) {
-	grid := voxel.create(TEST_GRID_DIMS)
-	defer voxel.destroy(&grid)
+	grid := voxel.create_grid(TEST_GRID_DIMS)
+	defer voxel.destroy_grid(&grid)
 	voxel.set(&grid, 10, 10, 10, STONE)
 
 	cell, normal, hit := voxel.raycast(&grid, {10.5, 10.5, 0.5}, {0, 0, 1}, 64)
@@ -34,8 +34,8 @@ raycast_hits_solid_voxel :: proc(t: ^testing.T) {
 
 @(test)
 raycast_misses_in_empty_grid :: proc(t: ^testing.T) {
-	grid := voxel.create(TEST_GRID_DIMS)
-	defer voxel.destroy(&grid)
+	grid := voxel.create_grid(TEST_GRID_DIMS)
+	defer voxel.destroy_grid(&grid)
 
 	_, _, hit := voxel.raycast(&grid, {10.5, 10.5, 0.5}, {0, 0, 1}, 64)
 	testing.expect(t, !hit, "should miss")
@@ -43,8 +43,8 @@ raycast_misses_in_empty_grid :: proc(t: ^testing.T) {
 
 @(test)
 raycast_stops_at_nearest_solid :: proc(t: ^testing.T) {
-	grid := voxel.create(TEST_GRID_DIMS)
-	defer voxel.destroy(&grid)
+	grid := voxel.create_grid(TEST_GRID_DIMS)
+	defer voxel.destroy_grid(&grid)
 	voxel.set(&grid, 10, 10, 5, STONE)
 	voxel.set(&grid, 10, 10, 10, STONE)
 
@@ -56,20 +56,20 @@ raycast_stops_at_nearest_solid :: proc(t: ^testing.T) {
 
 @(test)
 raycast_hits_along_negative_direction :: proc(t: ^testing.T) {
-	grid := voxel.create(TEST_GRID_DIMS)
-	defer voxel.destroy(&grid)
+	grid := voxel.create_grid(TEST_GRID_DIMS)
+	defer voxel.destroy_grid(&grid)
 }
 
 @(test)
 raycast_respects_max_distance :: proc(t: ^testing.T) {
-	grid := voxel.create(TEST_GRID_DIMS)
-	defer voxel.destroy(&grid)
+	grid := voxel.create_grid(TEST_GRID_DIMS)
+	defer voxel.destroy_grid(&grid)
 }
 
 @(test)
 grid_to_u32_maps_block_ids :: proc(t: ^testing.T) {
-	grid := voxel.create(TEST_GRID_DIMS)
-	defer voxel.destroy(&grid)
+	grid := voxel.create_grid(TEST_GRID_DIMS)
+	defer voxel.destroy_grid(&grid)
 	voxel.set(&grid, 3, 4, 5, STONE)
 
 	data := voxel.to_u32(&grid)
@@ -80,8 +80,8 @@ grid_to_u32_maps_block_ids :: proc(t: ^testing.T) {
 
 @(test)
 out_of_bounds_reads_are_empty :: proc(t: ^testing.T) {
-	grid := voxel.create({4, 4, 4})
-	defer voxel.destroy(&grid)
+	grid := voxel.create_grid({4, 4, 4})
+	defer voxel.destroy_grid(&grid)
 	voxel.set(&grid, 1, 1, 1, voxel.Voxel(7))
 
 	testing.expect(t, voxel.at(&grid, 1, 1, 1) == voxel.Voxel(7), "a set cell reads back")
@@ -96,8 +96,9 @@ from_vox_swaps_z_up_to_y_up :: proc(t: ^testing.T) {
 		voxels     = []vox.Entry{{1, 0, 3, 9}},
 	}
 
-	grid := voxel.from_vox(model)
-	defer voxel.destroy(&grid)
+	grid, markers := voxel.from_vox(model, 251)
+	defer voxel.destroy_grid(&grid)
+	defer delete(markers)
 
 	testing.expect(t, grid.dimensions == [3]int{2, 4, 3}, "dimensions swap y and z")
 	testing.expect(t, voxel.at(&grid, 1, 3, 0) == voxel.Voxel(9), "the voxel lands swapped")
@@ -111,12 +112,13 @@ from_vox_keeps_every_voxel_of_the_real_cave :: proc(t: ^testing.T) {
 	defer vox.destroy(&model)
 	if !testing.expect(t, err == .None, "the real file parses") do return
 
-	grid := voxel.from_vox(model)
-	defer voxel.destroy(&grid)
+	grid, markers := voxel.from_vox(model, 251)
+	defer voxel.destroy_grid(&grid)
+	defer delete(markers)
 
 	solid := 0
 	for value in grid.voxels do if value != voxel.EMPTY do solid += 1
 
 	testing.expect(t, grid.dimensions == [3]int{256, 256, 256}, "a cube stays a cube")
-	testing.expect(t, solid == len(model.voxels), "no voxel is lost or overwritten")
+	testing.expect(t, solid + len(markers) == len(model.voxels), "every voxel is either grid or marker")
 }

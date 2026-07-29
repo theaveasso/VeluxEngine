@@ -5,6 +5,7 @@ import "core:time"
 
 import "vlx:audio"
 import "vlx:gpu"
+import "vlx:internal/vox"
 import "vlx:platform"
 import "vlx:shaders"
 import "vlx:ui"
@@ -37,6 +38,7 @@ Error :: union #shared_nil {
 	platform.Error,
 	shaders.Error,
 	ui.Error,
+	vox.Error,
 }
 
 @(private = "package")

@@ -10,6 +10,15 @@ Grid :: struct {
 	dimensions: [3]int,
 }
 
+Hit :: struct {
+	hit:      bool,
+	cell:     [3]int,
+	normal:   [3]int,
+	distance: f32,
+	voxel:    Voxel,
+	steps:    int,
+}
+
 @(require_results)
 create_grid :: proc(dimensions: [3]int, allocator := context.allocator) -> (grid: Grid) {
 	grid.voxels = make([]Voxel, dimensions.x * dimensions.y * dimensions.z, allocator)
@@ -45,10 +54,14 @@ set :: proc(grid: ^Grid, x, y, z: int, value: Voxel) {
 }
 
 @(require_results)
-to_u32 :: proc(grid: ^Grid, allocator := context.allocator) -> []u32 {
-	out := make([]u32, len(grid.voxels), allocator)
-	for value, position in grid.voxels do out[position] = u32(value)
-	return out
+to_packed_u32 :: proc(grid: ^Grid, allocator := context.allocator) -> (packed: []u32) {
+	packed = make([]u32, (len(grid.voxels) + 3) / 4, allocator)
+	for value, position in grid.voxels {
+		word := position / 4
+		slot := position % 4
+		packed[word] |= u32(value) << uint(slot * 8)
+	}
+	return
 }
 
 carve_sphere :: proc(grid: ^Grid, center: [3]int, radius: f32, fill: Voxel) {
@@ -65,15 +78,25 @@ carve_sphere :: proc(grid: ^Grid, center: [3]int, radius: f32, fill: Voxel) {
 	}
 }
 
-raycast :: proc(grid: ^Grid, origin, direction: [3]f32, max_distance: f32) -> (cell: [3]int, normal: [3]int, hit: bool) {
-	STEP :: 0.1
-	position := origin
-	previous_cell := [3]int{int(position.x), int(position.y), int(position.z)}
-	for _ in 0 ..< int(max_distance / STEP) {
-		cell = {int(position.x), int(position.y), int(position.z)}
-		if at(grid, cell.x, cell.y, cell.z) != EMPTY do return cell, previous_cell - cell, true
-		previous_cell = cell
-		position += direction * STEP
-	}
-	return {}, {}, false
+// raycast :: proc(grid: ^Grid, origin, direction: [3]f32, max_distance: f32) -> (cell: [3]int, normal: [3]int, hit: bool) {
+// 	STEP :: 0.1
+// 	position := origin
+// 	previous_cell := [3]int{int(position.x), int(position.y), int(position.z)}
+// 	for _ in 0 ..< int(max_distance / STEP) {
+// 		cell = {int(position.x), int(position.y), int(position.z)}
+// 		if at(grid, cell.x, cell.y, cell.z) != EMPTY do return cell, previous_cell - cell, true
+// 		previous_cell = cell
+// 		position += direction * STEP
+// 	}
+// 	return {}, {}, false
+// }
+
+@(require_results)
+step_direction :: proc(value: f32) -> int {
+	return value > 1 ? 1 : value < 1 ? -1 : 0
+}
+
+@(require_results)
+raycast :: proc(grid: ^Grid, origin, direction: [3]f32, max_steps: int) -> (result: Hit) {
+	return
 }

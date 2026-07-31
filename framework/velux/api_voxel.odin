@@ -29,10 +29,11 @@ create_level :: proc(file_name: string, reserved_from: u8) -> (level: Level, err
 	defer vox.destroy(&model)
 
 	level.world.grid, level.markers = voxel.from_vox(model, reserved_from)
-	level.world.buffer = create_buffer(u32, PALETTE_SLOTS + len(level.world.grid.voxels)) or_return
+	packed_words := (len(level.world.grid.voxels) + 3) / 4
+	level.world.buffer = create_buffer(u32, PALETTE_SLOTS + packed_words) or_return
 
 	palette := vox.pack_palete(model)
-	voxels := voxel.to_u32(&level.world.grid, context.temp_allocator)
+	voxels := voxel.to_packed_u32(&level.world.grid, context.temp_allocator)
 
 	cmd := immediate_transfer_begin() or_return
 	write_staging_buffer_slice(cmd, &level.world.buffer, palette[:]) or_return

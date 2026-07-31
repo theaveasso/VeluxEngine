@@ -7,3 +7,5 @@ build
 *.cap
 
 *.spv
+
+*.ini

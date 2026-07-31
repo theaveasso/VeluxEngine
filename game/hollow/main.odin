@@ -28,8 +28,10 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 		inv_view_proj: matrix[4, 4]f32,
 		cam_pos:       [4]f32,
 		dims:          [4]i32,
+		world_offset:  [4]f32,
 		scene:         velux.Device_Address(u32),
 	}
+	#assert(size_of(Push_Constants) == 128)
 	pc: Push_Constants
 
 	level := velux.create_level("assets/den.vox", MARKER_FIRST) or_return
@@ -39,6 +41,7 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 	grid := level.world.grid
 	pc.dims = {i32(grid.dimensions.x), i32(grid.dimensions.y), i32(grid.dimensions.z), 1024}
 	pc.scene = level.world.buffer.ptr
+	pc.world_offset = {f32(grid.dimensions.x) * 0.5, f32(grid.dimensions.y) * 0.5, f32(grid.dimensions.z) * 0.5, 0}
 
 	camera: velux.Camera = {
 		position = {-6.8, 3.7, -6.8},
@@ -79,13 +82,14 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 		view := velux.camera_view(camera)
 
 		pc.inv_view_proj = linalg.inverse(proj * view)
-		pc.cam_pos = {camera.position[0], camera.position[1], camera.position[2], 0.1}
+		pc.cam_pos = {camera.position[0], camera.position[1], camera.position[2], 0.05}
 
 		frame, frame_err := velux.begin_frame()
 		if frame_err != nil {
 			velux.ui_end_frame()
 			continue
 		}
+
 		velux.cmd_begin_rendering(frame, [4]f32{0.05, 0.05, 0.1, 1})
 
 		velux.prof_zone_begin(frame, "raycast")
@@ -95,6 +99,12 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 		velux.prof_zone_end(frame)
 
 		velux.cmd_end_rendering(frame)
+
+		velux.ui_new_frame()
+		velux.prof_zone_begin(frame, "ui")
+		velux.ui_draw(frame)
+		velux.prof_zone_end(frame)
+
 		velux.end_frame(frame) or_continue
 	}
 	return

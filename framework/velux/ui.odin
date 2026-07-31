@@ -5,8 +5,8 @@ import "vlx:ui"
 ui_new_frame :: ui.new_frame
 ui_end_frame :: ui.end_frame
 
-ui_draw :: proc(engine: ^Engine, frame: Frame) {
-	hud_draw(engine)
+ui_draw :: proc(frame: Frame) {
+	hud_draw(g_engine)
 	ui.draw(frame)
 }
 

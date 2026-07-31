@@ -18,6 +18,7 @@ struct Push_Constants
     float4x4 inv_view_proj;
     float4 cam_pos;
     int4 dims;
+    float4 world_offset;
     uint *scene;
 }
 
@@ -46,7 +47,7 @@ PS_Output fragment_main(V2P input)
     float3 far_p = far_h.xyz / far_h.w;
     float3 dir = normalize(far_p - near_p);
 
-    float3 origin = pc.cam_pos.xyz / pc.cam_pos.w + float3(pc.dims.xyz) * 0.5;
+    float3 origin = pc.cam_pos.xyz / pc.cam_pos.w + pc.world_offset.xyz;
     Voxel_World world = { pc.scene, pc.dims.xyz, 0 };
     Voxel_Hit hit = voxel_raycast(world, origin, dir, pc.dims.w);
     if (!hit.hit)

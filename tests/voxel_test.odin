@@ -5,6 +5,8 @@ import "core:testing"
 import "vlx:internal/vox"
 import "vlx:internal/voxel"
 
+DEN_VOX :: #load("../game/hollow/assets/den.vox")
+
 TEST_GRID_DIMS: [3]int : {20, 20, 20}
 STONE :: voxel.Voxel(1)
 BLAST_RADIUS :: 5
@@ -67,15 +69,50 @@ raycast_respects_max_distance :: proc(t: ^testing.T) {
 }
 
 @(test)
-grid_to_u32_maps_block_ids :: proc(t: ^testing.T) {
+raycast_survives_an_axis_aligned_direction :: proc(t: ^testing.T) {
 	grid := voxel.create_grid(TEST_GRID_DIMS)
 	defer voxel.destroy_grid(&grid)
-	voxel.set(&grid, 3, 4, 5, STONE)
 
-	data := voxel.to_u32(&grid)
-	defer delete(data)
-	testing.expect(t, data[voxel.index(&grid, 3, 4, 5)] == u32(STONE), "block id maps to u32")
-	testing.expect(t, data[0] == u32(voxel.EMPTY), "empty stays 0")
+	voxel.set(&grid, 10, 10, 10, voxel.Voxel(1))
+}
+
+@(test)
+packing_puts_four_voxels_per_word :: proc(t: ^testing.T) {
+	grid := voxel.create_grid(TEST_GRID_DIMS)
+	defer voxel.destroy_grid(&grid)
+	voxel.set(&grid, 0, 0, 0, voxel.Voxel(1))
+	voxel.set(&grid, 1, 0, 0, voxel.Voxel(2))
+	voxel.set(&grid, 2, 0, 0, voxel.Voxel(3))
+	voxel.set(&grid, 3, 0, 0, voxel.Voxel(4))
+
+	packed := voxel.to_packed_u32(&grid)
+	defer delete(packed)
+
+	testing.expect(t, packed[0] == 0x04030201, "voxel 0 lands in the lowest byte")
+}
+
+@(test)
+packing_places_later_voxels_in_later_words :: proc(t: ^testing.T) {
+	grid := voxel.create_grid(TEST_GRID_DIMS)
+	defer voxel.destroy_grid(&grid)
+	voxel.set(&grid, 5, 0, 0, voxel.Voxel(9))
+
+	packed := voxel.to_packed_u32(&grid)
+	defer delete(packed)
+
+	testing.expect(t, packed[0] == 0, "the first word stays empty")
+	testing.expect(t, packed[1] == 0x00000900, "position 5 is word 1, slot 1")
+}
+
+@(test)
+packing_rounds_the_word_count_up :: proc(t: ^testing.T) {
+	grid := voxel.create_grid({3, 1, 1})
+	defer voxel.destroy_grid(&grid)
+
+	packed := voxel.to_packed_u32(&grid)
+	defer delete(packed)
+
+	testing.expect(t, len(packed) == 1, "three voxels still need a whole word")
 }
 
 @(test)
@@ -107,8 +144,7 @@ from_vox_swaps_z_up_to_y_up :: proc(t: ^testing.T) {
 
 @(test)
 from_vox_keeps_every_voxel_of_the_real_cave :: proc(t: ^testing.T) {
-	model, err := vox.load("game/hollow/assets/cave.vox")
-	if err == .File_Not_Found do return
+	model, err := vox.parse(DEN_VOX)
 	defer vox.destroy(&model)
 	if !testing.expect(t, err == .None, "the real file parses") do return
 

@@ -10,15 +10,6 @@ Grid :: struct {
 	dimensions: [3]int,
 }
 
-Hit :: struct {
-	hit:      bool,
-	cell:     [3]int,
-	normal:   [3]int,
-	distance: f32,
-	voxel:    Voxel,
-	steps:    int,
-}
-
 @(require_results)
 create_grid :: proc(dimensions: [3]int, allocator := context.allocator) -> (grid: Grid) {
 	grid.voxels = make([]Voxel, dimensions.x * dimensions.y * dimensions.z, allocator)
@@ -61,42 +52,5 @@ to_packed_u32 :: proc(grid: ^Grid, allocator := context.allocator) -> (packed: [
 		slot := position % 4
 		packed[word] |= u32(value) << uint(slot * 8)
 	}
-	return
-}
-
-carve_sphere :: proc(grid: ^Grid, center: [3]int, radius: f32, fill: Voxel) {
-	reach := int(radius) + 1
-	for offset_z in -reach ..= reach {
-		for offset_y in -reach ..= reach {
-			for offset_x in -reach ..= reach {
-				distance := math.sqrt(f32(offset_x * offset_x + offset_y * offset_y + offset_z * offset_z))
-				if distance <= radius {
-					set(grid, center.x + offset_x, center.y + offset_y, center.z + offset_z, fill)
-				}
-			}
-		}
-	}
-}
-
-// raycast :: proc(grid: ^Grid, origin, direction: [3]f32, max_distance: f32) -> (cell: [3]int, normal: [3]int, hit: bool) {
-// 	STEP :: 0.1
-// 	position := origin
-// 	previous_cell := [3]int{int(position.x), int(position.y), int(position.z)}
-// 	for _ in 0 ..< int(max_distance / STEP) {
-// 		cell = {int(position.x), int(position.y), int(position.z)}
-// 		if at(grid, cell.x, cell.y, cell.z) != EMPTY do return cell, previous_cell - cell, true
-// 		previous_cell = cell
-// 		position += direction * STEP
-// 	}
-// 	return {}, {}, false
-// }
-
-@(require_results)
-step_direction :: proc(value: f32) -> int {
-	return value > 1 ? 1 : value < 1 ? -1 : 0
-}
-
-@(require_results)
-raycast :: proc(grid: ^Grid, origin, direction: [3]f32, max_steps: int) -> (result: Hit) {
 	return
 }

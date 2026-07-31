@@ -14,29 +14,6 @@
 			"description": "Select sample",
 			"options": ["01_window", "02_triangle", "03_mesh", "04_voxel", "05_voxel_raycast"],
 			"default": "05_voxel_raycast"
-		},
-		{
-			"id": "testPick",
-			"type": "pickString",
-			"description": "Select test",
-			"options": [
-				"bad_sound_handles_are_ignored",
-				"loading_a_missing_file_returns_an_invalid_handle",
-				"carve_sphere_removes_center_and_keeps_far",
-				"raycast_hits_solid_voxel",
-				"raycast_misses_in_empty_grid",
-				"raycast_stops_at_nearest_solid",
-				"raycast_hits_along_negative_direction",
-				"raycast_respects_max_distance",
-				"grid_to_u32_maps_block_ids"
-			],
-			"default": "bad_sound_handles_are_ignored"
-		},
-		{
-			"id": "testName",
-			"type": "promptString",
-			"description": "Fully qualified test names, comma separated (e.g. tests.a,tests.b)",
-			"default": "tests.bad_sound_handles_are_ignored,tests.loading_a_missing_file_returns_an_invalid_handle"
 		}
 	],
 	"tasks": [
@@ -90,64 +67,6 @@
 			],
 			"options": { "cwd": "${workspaceFolder}/game/${input:game}" },
 			"dependsOn": "build game",
-			"problemMatcher": []
-		},
-		{
-			"label": "test",
-			"type": "shell",
-			"command": "odin",
-			"args": [
-				"test", "tests",
-				"-collection:vlx=framework",
-				"-collection:third_party=third_party",
-				"-out:build/tests.exe"
-			],
-			"options": { "cwd": "${workspaceFolder}" },
-			"group": { "kind": "test", "isDefault": true },
-			"presentation": { "reveal": "always", "panel": "shared", "clear": true },
-			"problemMatcher": {
-				"owner": "odin",
-				"fileLocation": ["autoDetect", "${workspaceFolder}"],
-				"pattern": {
-					"regexp": "^(.*)\\((\\d+):(\\d+)\\)\\s+(Error|Warning):\\s+(.*)$",
-					"file": 1,
-					"line": 2,
-					"column": 3,
-					"severity": 4,
-					"message": 5
-				}
-			}
-		},
-		{
-			"label": "test (single)",
-			"type": "shell",
-			"command": "odin",
-			"args": [
-				"test", "tests",
-				"-collection:vlx=framework",
-				"-collection:third_party=third_party",
-				"-define:ODIN_TEST_NAMES=tests.${input:testPick}",
-				"-out:build/tests.exe"
-			],
-			"options": { "cwd": "${workspaceFolder}" },
-			"group": "test",
-			"presentation": { "reveal": "always", "panel": "shared", "clear": true },
-			"problemMatcher": []
-		},
-		{
-			"label": "test (by name)",
-			"type": "shell",
-			"command": "odin",
-			"args": [
-				"test", "tests",
-				"-collection:vlx=framework",
-				"-collection:third_party=third_party",
-				"-define:ODIN_TEST_NAMES=${input:testName}",
-				"-out:build/tests.exe"
-			],
-			"options": { "cwd": "${workspaceFolder}" },
-			"group": "test",
-			"presentation": { "reveal": "always", "panel": "shared", "clear": true },
 			"problemMatcher": []
 		},
 		{

@@ -12,8 +12,8 @@
 			"id": "sample",
 			"type": "pickString",
 			"description": "Select sample",
-			"options": ["01_window", "02_triangle", "03_mesh", "04_voxel", "05_voxel_raycast"],
-			"default": "05_voxel_raycast"
+			"options": ["01_window", "02_triangle", "03_mesh", "04_voxel", "05_voxel_raycast", "sponza"],
+			"default": "sponza"
 		}
 	],
 	"tasks": [
@@ -122,6 +122,78 @@
 			"dependsOn": "build sample",
 			"presentation": { "reveal": "always", "panel": "shared" },
 			"problemMatcher": []
+		},
+		{
+			"label": "debug sample (RAD Debugger)",
+			"type": "process",
+			"command": "raddbg",
+			"args": ["${workspaceFolder}/samples/${input:sample}/${input:sample}.exe"],
+			"options": { "cwd": "${workspaceFolder}/samples/${input:sample}" },
+			"dependsOn": "build sample",
+			"problemMatcher": []
+		},
+		{
+			"label": "debug sample (RenderDoc capture)",
+			"type": "process",
+			"command": "C:/Program Files/RenderDoc/renderdoccmd.exe",
+			"args": [
+				"capture",
+				"--working-dir", "${workspaceFolder}/samples/${input:sample}",
+				"${workspaceFolder}/samples/${input:sample}/${input:sample}.exe"
+			],
+			"options": { "cwd": "${workspaceFolder}/samples/${input:sample}" },
+			"dependsOn": "build sample",
+			"problemMatcher": []
+		},
+		{
+			"label": "check sample",
+			"type": "shell",
+			"command": "odin",
+			"args": [
+				"check", "samples/${input:sample}",
+				"-collection:vlx=framework",
+				"-collection:third_party=third_party"
+			],
+			"options": { "cwd": "${workspaceFolder}" },
+			"presentation": { "reveal": "always", "panel": "shared", "clear": true },
+			"problemMatcher": {
+				"owner": "odin",
+				"fileLocation": ["autoDetect", "${workspaceFolder}"],
+				"pattern": {
+					"regexp": "^(.*)\\((\\d+):(\\d+)\\)\\s+(Error|Warning):\\s+(.*)$",
+					"file": 1,
+					"line": 2,
+					"column": 3,
+					"severity": 4,
+					"message": 5
+				}
+			}
+		},
+		{
+			"label": "test file",
+			"type": "shell",
+			"command": "odin",
+			"args": [
+				"test", "${relativeFile}",
+				"-file",
+				"-collection:vlx=framework",
+				"-collection:third_party=third_party"
+			],
+			"options": { "cwd": "${workspaceFolder}" },
+			"group": { "kind": "test", "isDefault": true },
+			"presentation": { "reveal": "always", "panel": "shared", "clear": true },
+			"problemMatcher": {
+				"owner": "odin",
+				"fileLocation": ["autoDetect", "${workspaceFolder}"],
+				"pattern": {
+					"regexp": "^(.*)\\((\\d+):(\\d+)\\)\\s+(Error|Warning):\\s+(.*)$",
+					"file": 1,
+					"line": 2,
+					"column": 3,
+					"severity": 4,
+					"message": 5
+				}
+			}
 		},
 		{
 			"label": "open RenderDoc UI",

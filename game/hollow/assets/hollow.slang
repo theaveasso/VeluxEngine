@@ -59,7 +59,9 @@ PS_Output fragment_main(V2P input)
     float ao = voxel_face_ao(world, hit.cell, hit.normal, hit.position);
     float3 albedo = srgb_to_linear(palette_color(world, hit.voxel));
 
-    float falloff = 1.0 / (1.0 + hit.distance * hit.distance * 0.002);
+    const float FOG_DENSITY = 0.8;
+    float distance_metres = hit.distance * pc.cam_pos.w;
+    float falloff = 1.0 / (1.0 + distance_metres * distance_metres * FOG_DENSITY);
 
     output.frag_color = float4(albedo * lerp(0.35, 1.0, ao) * falloff, 1.0);
     return output;

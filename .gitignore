@@ -9,3 +9,6 @@ build
 *.spv
 
 *.ini
+
+*.vox
+*.log

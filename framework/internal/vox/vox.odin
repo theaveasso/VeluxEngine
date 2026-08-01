@@ -23,15 +23,46 @@ Entry :: struct {
 	color_index: u8,
 }
 
+Tile :: struct {
+	size:        [3]int,
+	translation: [3]int,
+	voxels:      []Entry,
+}
+
 Model :: struct {
-	dimensions: [3]int,
-	voxels:     []Entry,
-	palette:    [256][4]u8,
-	version:    i32,
+	tiles:   []Tile,
+	palette: [256][4]u8,
+	version: i32,
 }
 
 CHUNK_HEADER_SIZE :: 12
 PALETTE_SLOTS :: 256
+
+read_string :: proc(data: []u8, offset: int) -> (value: string, next: int, ok: bool) {
+	length, after_length, length_ok := read_i32(data, offset)
+	if !length_ok || length < 0 do return "", offset, false
+
+	end := after_length + int(length)
+	if end < after_length || end > len(data) do return "", offset, false
+	return string(data[after_length:end]), end, true
+}
+
+read_dict :: proc(data: []u8, offset: int, key: string) -> (value: string, next: int, ok: bool) {
+	count, cursor, count_ok := read_i32(data, offset)
+	if !count_ok || count < 0 do return "", offset, false
+
+	for _ in 0 ..< int(count) {
+		pair_key, after_key, key_ok := read_string(data, cursor)
+		if !key_ok do return "", offset, false
+
+		pair_value, after_value, value_ok := read_string(data, after_key)
+		if !value_ok do return "", offset, false
+
+		if pair_key == key do value = pair_value
+		cursor = after_value
+	}
+	return value, cursor, true
+}
 
 read_i32 :: proc(data: []u8, offset: int) -> (value: i32, next: int, ok: bool) {
 	if offset < 0 || offset + 4 > len(data) do return 0, offset, false
@@ -81,8 +112,15 @@ parse :: proc(data: []u8, allocator := context.allocator) -> (model: Model, err:
 	if !main_ok do return {}, .Truncated
 	if !is_id(main_chunk, "MAIN") do return {}, .Bad_Magic
 
-	found_size := false
-	found_voxels := false
+	scratch := context.temp_allocator
+
+	sizes := make([dynamic][3]int, 0, 16, scratch)
+	voxel_lists := make([dynamic][]Entry, 0, 16, scratch)
+
+	scene: Scene
+	scene.transforms = make(map[i32]Transform_Node, 16, scratch)
+	scene.groups = make(map[i32]Group_Node, 4, scratch)
+	scene.shapes = make(map[i32]Shape_Node, 16, scratch)
 
 	offset := 0
 	body := main_chunk.children
@@ -92,33 +130,29 @@ parse :: proc(data: []u8, allocator := context.allocator) -> (model: Model, err:
 
 		switch {
 		case is_id(chunk, "SIZE"):
-			if found_size do break
-			if len(chunk.content) < 12 do return {}, .Truncated
 			size_x, after_x, ok_x := read_i32(chunk.content, 0)
 			size_y, after_y, ok_y := read_i32(chunk.content, after_x)
 			size_z, _, ok_z := read_i32(chunk.content, after_y)
 			if !ok_x || !ok_y || !ok_z do return {}, .Truncated
 			if size_x <= 0 || size_y <= 0 || size_z <= 0 do return {}, .Truncated
-			model.dimensions = {int(size_x), int(size_y), int(size_z)}
-			found_size = true
+			append(&sizes, [3]int{int(size_x), int(size_y), int(size_z)})
 
 		case is_id(chunk, "XYZI"):
-			if found_voxels do break
 			count, after_count, ok_count := read_i32(chunk.content, 0)
 			if !ok_count || count < 0 do return {}, .Truncated
 			if after_count + int(count) * 4 > len(chunk.content) do return {}, .Truncated
 
-			model.voxels = make([]Entry, int(count), allocator)
+			entries := make([]Entry, int(count), scratch)
 			for index in 0 ..< int(count) {
 				base := after_count + index * 4
-				model.voxels[index] = {
+				entries[index] = {
 					x           = chunk.content[base],
 					y           = chunk.content[base + 1],
 					z           = chunk.content[base + 2],
 					color_index = chunk.content[base + 3],
 				}
 			}
-			found_voxels = true
+			append(&voxel_lists, entries)
 
 		case is_id(chunk, "RGBA"):
 			if len(chunk.content) < PALETTE_SLOTS * 4 do return {}, .Truncated
@@ -126,25 +160,71 @@ parse :: proc(data: []u8, allocator := context.allocator) -> (model: Model, err:
 				base := slot * 4
 				model.palette[slot] = {chunk.content[base], chunk.content[base + 1], chunk.content[base + 2], chunk.content[base + 3]}
 			}
+
+		case is_id(chunk, "nTRN"):
+			node, node_ok := read_transform_node(chunk.content)
+			if !node_ok do return {}, .Truncated
+			scene.transforms[node.id] = node
+
+		case is_id(chunk, "nGRP"):
+			node, node_ok := read_group_node(chunk.content, scratch)
+			if !node_ok do return {}, .Truncated
+			scene.groups[node.id] = node
+
+		case is_id(chunk, "nSHP"):
+			node, node_ok := read_shape_node(chunk.content, scratch)
+			if !node_ok do return {}, .Truncated
+			scene.shapes[node.id] = node
 		}
 
 		offset = next
 	}
 
-	if !found_size || !found_voxels {
-		if model.voxels != nil do delete(model.voxels, allocator)
-		return {}, .No_Models
+	if len(sizes) == 0 || len(sizes) != len(voxel_lists) do return {}, .No_Models
+
+	placements := make([dynamic]Placement, 0, 16, scratch)
+	if len(scene.transforms) == 0 && len(scene.groups) == 0 && len(scene.shapes) == 0 {
+		append(&placements, Placement{model_id = 0, translation = {0, 0, 0}})
+	} else {
+		walk_node(&scene, 0, {0, 0, 0}, &placements)
 	}
+	if len(placements) == 0 do return {}, .No_Models
+
+	model.tiles = make([]Tile, len(placements), allocator)
+	for placement, index in placements {
+		model_id := int(placement.model_id)
+		if model_id < 0 || model_id >= len(sizes) {
+			for filled in 0 ..< index {
+				delete(model.tiles[filled].voxels, allocator)
+			}
+			delete(model.tiles, allocator)
+			return {}, .No_Models
+		}
+
+		source := voxel_lists[model_id]
+		voxels := make([]Entry, len(source), allocator)
+		copy(voxels, source)
+
+		model.tiles[index] = {
+			size        = sizes[model_id],
+			translation = placement.translation,
+			voxels      = voxels,
+		}
+	}
+
 	return model, .None
+}
+
+destroy :: proc(model: ^Model, allocator := context.allocator) {
+	for tile in model.tiles {
+		delete(tile.voxels, allocator)
+	}
+	if model.tiles != nil do delete(model.tiles, allocator)
+	model^ = {}
 }
 
 load :: proc(file_name: string, allocator := context.allocator) -> (model: Model, err: Error) {
 	data, read_err := os.read_entire_file(file_name, context.temp_allocator)
 	if read_err != nil do return {}, .File_Not_Found
 	return parse(data, allocator)
-}
-
-destroy :: proc(model: ^Model, allocator := context.allocator) {
-	if model.voxels != nil do delete(model.voxels, allocator)
-	model^ = {}
 }

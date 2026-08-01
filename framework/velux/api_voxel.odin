@@ -11,8 +11,6 @@ Voxel :: voxel.Voxel
 Marker :: voxel.Marker
 Voxel_Grid :: voxel.Grid
 
-marker_vox_position :: voxel.vox_position
-
 Voxel_World :: struct {
 	grid:   Voxel_Grid,
 	buffer: Buffer(u32),
@@ -29,6 +27,7 @@ create_level :: proc(file_name: string, reserved_from: u8) -> (level: Level, err
 	defer vox.destroy(&model)
 
 	level.world.grid, level.markers = voxel.from_vox(model, reserved_from)
+
 	packed_words := (len(level.world.grid.voxels) + 3) / 4
 	level.world.buffer = create_buffer(u32, PALETTE_SLOTS + packed_words) or_return
 

@@ -8,7 +8,6 @@ import vma "third_party:odin-vma"
 import vk "vendor:vulkan"
 
 import gpu "vlx:gpu"
-import platform "vlx:platform"
 
 DEFAULT_VERTEX_ENTRY :: gpu.DEFAULT_VERTEX_ENTRY
 DEFAULT_FRAGMENT_ENTRY :: gpu.DEFAULT_FRAGMENT_ENTRY
@@ -31,9 +30,6 @@ Pipeline_Blend_Mode :: gpu.Pipeline_Blend_Mode
 Graphics_Pipeline :: gpu.Graphics_Pipeline
 Graphics_Pipeline_Create_Info :: gpu.Graphics_Pipeline_Create_Info
 
-Mouse_Button :: platform.Mouse_Button
-Key :: platform.Key
-
 Command_Buffer :: vk.CommandBuffer
 Shader_Module :: vk.ShaderModule
 Format :: vk.Format
@@ -47,16 +43,6 @@ cmd_bind_index_buffer :: gpu.cmd_bind_index_buffer
 cmd_draw :: gpu.cmd_draw
 cmd_draw_indexed :: gpu.cmd_draw_indexed
 cmd_end_rendering :: gpu.cmd_end_rendering
-
-time :: platform.time
-
-mouse_delta :: platform.mouse_delta
-scroll_delta :: platform.scroll_delta
-is_mouse_down :: platform.is_mouse_down
-is_key_down :: platform.is_key_down
-is_key_pressed :: platform.is_key_pressed
-set_cursor_captured :: platform.set_cursor_captured
-is_cursor_captured :: platform.is_cursor_captured
 
 // begin	vlx:gpu			---
 @(require_results)

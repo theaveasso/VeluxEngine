@@ -5,8 +5,8 @@
 			"id": "game",
 			"type": "pickString",
 			"description": "Select game",
-			"options": ["hollow"],
-			"default": "hollow"
+			"options": ["her_body_waits"],
+			"default": "her_body_waits"
 		},
 		{
 			"id": "sample",

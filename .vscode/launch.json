@@ -5,15 +5,15 @@
 			"id": "game",
 			"type": "pickString",
 			"description": "Select game",
-			"options": ["hollow"],
-			"default": "hollow"
+			"options": ["her_body_waits"],
+			"default": "her_body_waits"
 		},
 		{
 			"id": "sample",
 			"type": "pickString",
 			"description": "Select sample",
-			"options": ["01_window", "02_triangle", "03_mesh", "04_voxel", "05_voxel_raycast"],
-			"default": "05_voxel_raycast"
+			"options": ["01_window", "02_triangle", "03_mesh", "04_voxel", "05_voxel_raycast", "sponza"],
+			"default": "sponza"
 		}
 	],
 	"configurations": [

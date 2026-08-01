@@ -1,11 +1,15 @@
 package main
 
 import "core:log"
+import "core:math"
 import "core:math/linalg"
 
 import "vlx:velux"
 
 MARKER_FIRST :: 251
+
+DAY_LENGTH_SECONDS :: f32(240)
+SUN_LEAN :: f32(0.35)
 
 main :: proc() {
 	context.logger = log.create_console_logger()
@@ -30,27 +34,19 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 		inv_view_proj: matrix[4, 4]f32,
 		cam_pos:       [4]f32,
 		dims:          [4]i32,
-		world_offset:  [4]f32,
+		sun:           [4]f32,
 		scene:         velux.Device_Address(u32),
 	}
 	#assert(size_of(Push_Constants) == 128)
 	pc: Push_Constants
 
-	level := velux.create_level("assets/den.vox", MARKER_FIRST) or_return
-	defer velux.destroy_level(&level)
-
-	grid := level.world.grid
-	log.infof("level grid %v markers %v", grid.dimensions, len(level.markers))
-
-	pc.dims = {i32(grid.dimensions.x), i32(grid.dimensions.y), i32(grid.dimensions.z), 1024}
-	pc.scene = level.world.buffer.ptr
-	pc.world_offset = {f32(grid.dimensions.x) * 0.5, f32(grid.dimensions.y) * 0.5, f32(grid.dimensions.z) * 0.5, 0}
+	pc.dims = {0, 0, 0, 1024}
 
 	voxel_size: f32 = 0.1
 
 	camera: velux.Camera = {
-		position   = {-6.8, 3.7, -6.8},
-		target     = {0, 0, 0},
+		position = {0, 6, -18},
+		target = {0, 5, 0},
 		projection = velux.Perspective{linalg.to_radians(f32(60)), 0.1, 500.0},
 		controller = velux.Free_Fly_Camera{speed = 8},
 	}
@@ -79,13 +75,21 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 
 	velux.create_watch_shader(engine, &pipeline, "assets/main.slang", "assets/main.spv") or_return
 
+	time_of_day: f32 = 0.75
 	for velux.running(engine) {
 		window_extent := velux.window_extent(engine)
 
+		time_of_day += engine.dt / DAY_LENGTH_SECONDS
+		time_of_day = math.mod(time_of_day, 1)
+
+		angle := (time_of_day - 0.25) * 2 * math.PI
+		sun_direction := linalg.normalize([3]f32{math.cos(angle), math.sin(angle), SUN_LEAN})
+		day_amount := math.smoothstep(f32(-0.10), f32(0.15), sun_direction.y)
+		pc.sun = {sun_direction.x, sun_direction.y, sun_direction.z, day_amount}
+
 		velux.ui_new_frame()
 		if velux.ui_begin_panel("Her Body Waits") {
-			velux.ui_slider("Voxel size (m)", &voxel_size, 0.02, 0.3)
-			velux.ui_slider("View distance", &pc.dims.w, 64, 2048)
+			velux.ui_slider("Time of day", &time_of_day, 0, 1)
 		}
 		velux.ui_end_panel()
 

@@ -1,5 +1,6 @@
-import voxel;
 import color;
+import tonemap;
+import world;
 
 struct V2P
 {
@@ -18,40 +19,34 @@ struct Push_Constants
     float4x4 inv_view_proj;
     float4 cam_pos;
     int4 dims;
-    float4 world_offset;
+    float4 sun;
     uint *scene;
 }
 
 [vk_push_constant]
 Push_Constants pc;
 
-static const float3 SUN_DIRECTION = normalize(float3(0.42, 0.82, 0.38));
-static const float3 SUN_COLOR = float3(1.00, 0.94, 0.80) * 2.6;
-static const float3 SKY_ZENITH = float3(0.24, 0.42, 0.78);
-static const float3 SKY_HORIZON = float3(0.78, 0.84, 0.92);
-static const float3 GROUND_BOUNCE = float3(0.32, 0.27, 0.21);
-static const int SHADOW_STEPS = 384;
-static const float EXPOSURE = 0.85;
+static const float3 SUN_HIGH_COLOR = float3(1.00, 0.97, 0.90);
+static const float3 SUN_LOW_COLOR = float3(1.00, 0.42, 0.14);
+static const float3 MOON_COLOR = float3(0.75, 0.82, 1.00);
 
-float3 sky_color(float3 direction)
-{
-    float height = direction.y * 0.5 + 0.5;
-    float3 base = lerp(GROUND_BOUNCE, SKY_HORIZON, smoothstep(0.42, 0.52, height));
-    base = lerp(base, SKY_ZENITH, saturate((height - 0.5) * 2.0));
+static const float SUN_DISC_SHARPNESS = 512.0;
+static const float SUN_DISC_INTENSITY = 4.0;
+static const float MOON_DISC_SHARPNESS = 2048.0;
+static const float MOON_DISC_INTENSITY = 1.5;
 
-    float disc = pow(saturate(dot(direction, SUN_DIRECTION)), 512.0);
-    return base + SUN_COLOR * disc;
-}
+static const float3 SUN_LIGHT_COLOR = float3(1.00, 0.95, 0.85);
+static const float SUN_LIGHT_STRENGTH = 2.60;
+static const float3 MOON_LIGHT_COLOR = float3(0.55, 0.65, 0.95);
+static const float MOON_LIGHT_STRENGTH = 0.22;
 
-float3 tonemap(float3 value)
-{
-    const float a = 2.51;
-    const float b = 0.03;
-    const float c = 2.43;
-    const float d = 0.59;
-    const float e = 0.14;
-    return saturate((value * (a * value + b)) / (value * (c * value + d) + e));
-}
+static const float3 GROUND_BASE = float3(0.10, 0.11, 0.13);
+static const float3 GROUND_LINE = float3(0.20, 0.22, 0.26);
+static const float GRID_CELL_SIZE = 4.0;
+
+static const float AMBIENT_STRENGTH = 0.5;
+static const float FOG_DENSITY = 0.008;
+static const float EXPOSURE = 1.0;
 
 [shader("vertex")]
 V2P vertex_main(uint id: SV_VertexID)
@@ -74,39 +69,49 @@ PS_Output fragment_main(V2P input)
     float3 near_p = near_h.xyz / near_h.w;
     float3 far_p = far_h.xyz / far_h.w;
     float3 direction = normalize(far_p - near_p);
+    float3 origin = pc.cam_pos.xyz;
 
-    float voxel_size = pc.cam_pos.w;
-    float3 origin = pc.cam_pos.xyz / voxel_size + pc.world_offset.xyz;
+    float3 sun_direction = pc.sun.xyz;
+    float3 moon_direction = -sun_direction;
+    float day = pc.sun.w;
 
-    Voxel_World world = { pc.scene, pc.dims.xyz, 0 };
-    Voxel_Hit hit = voxel_raycast(world, origin, direction, pc.dims.w);
+    Sky_Palette palette = sky_palette_lerp(sky_palette_night(), sky_palette_day(), day);
 
-    if (!hit.hit)
+    float3 sun_tint = lerp(
+        srgb_to_linear(SUN_LOW_COLOR),
+        srgb_to_linear(SUN_HIGH_COLOR),
+        saturate(sun_direction.y * 3.0));
+
+    float3 sky = sky_gradient(direction, palette);
+    sky += sky_disc(direction, sun_direction, sun_tint, SUN_DISC_SHARPNESS, SUN_DISC_INTENSITY) * day;
+    sky += sky_disc(direction, moon_direction, srgb_to_linear(MOON_COLOR), MOON_DISC_SHARPNESS, MOON_DISC_INTENSITY) * (1.0 - day);
+
+    float ground_distance = ground_plane_hit(origin, direction, 0.0);
+    if (ground_distance >= FAR_AWAY)
     {
-        output.frag_color = float4(tonemap(sky_color(direction) * EXPOSURE), 1.0);
+        output.frag_color = float4(tonemap_aces(sky * EXPOSURE), 1.0);
         return output;
     }
 
-    float3 albedo = srgb_to_linear(palette_color(world, hit.voxel));
-    float occlusion = voxel_face_ao(world, hit.cell, hit.normal, hit.position);
-    float ambient_strength = lerp(0.28, 1.0, occlusion);
+    float3 position = origin + direction * ground_distance;
+    float3 normal = float3(0.0, 1.0, 0.0);
 
-    float n_dot_l = max(dot(hit.normal, SUN_DIRECTION), 0.0);
-    float shadow = 1.0;
-    if (n_dot_l > 0.0)
-    {
-        float3 shadow_origin = hit.position + hit.normal * 0.05;
-        Voxel_Hit blocker = voxel_raycast(world, shadow_origin, SUN_DIRECTION, SHADOW_STEPS);
-        shadow = blocker.hit ? 0.0 : 1.0;
-    }
+    float3 albedo = grid_albedo(
+        position,
+        GRID_CELL_SIZE,
+        srgb_to_linear(GROUND_BASE),
+        srgb_to_linear(GROUND_LINE));
 
-    float3 ambient = lerp(GROUND_BOUNCE, SKY_HORIZON, hit.normal.y * 0.5 + 0.5);
-    float3 lit = albedo * (ambient * ambient_strength * 0.7 + SUN_COLOR * n_dot_l * shadow);
+    float sun_lambert = max(dot(normal, sun_direction), 0.0) * day;
+    float moon_lambert = max(dot(normal, moon_direction), 0.0) * (1.0 - day);
 
-    float distance_metres = hit.distance * voxel_size;
-    float fog = 1.0 - exp(-distance_metres * 0.012);
-    lit = lerp(lit, sky_color(direction), fog);
+    float3 ambient = lerp(palette.horizon, palette.zenith, normal.y * 0.5 + 0.5) * AMBIENT_STRENGTH;
+    float3 key = srgb_to_linear(SUN_LIGHT_COLOR) * SUN_LIGHT_STRENGTH * sun_lambert
+        + srgb_to_linear(MOON_LIGHT_COLOR) * MOON_LIGHT_STRENGTH * moon_lambert;
 
-    output.frag_color = float4(tonemap(lit * EXPOSURE), 1.0);
+    float3 lit = albedo * (ambient + key);
+    lit = apply_fog(lit, sky, ground_distance, FOG_DENSITY);
+
+    output.frag_color = float4(tonemap_aces(lit * EXPOSURE), 1.0);
     return output;
 }

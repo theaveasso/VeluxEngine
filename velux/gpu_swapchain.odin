@@ -101,7 +101,7 @@ create_depth_resources :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) 
 
 @(private)
 destroy_depth_resources :: proc(device: ^GPU_Device) {
-	destroy_texture(&device.depth_image)
+	destroy_gpu_image(&device.depth_image)
 }
 
 @(private, require_results)

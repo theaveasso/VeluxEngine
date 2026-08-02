@@ -49,7 +49,7 @@ GPU_Device :: struct {
 	graphics_queue:             vk.Queue,
 	graphics_family:            u32,
 	swapchain:                  Swapchain,
-	depth_image:                Image,
+	depth_image:                GPU_Image,
 	frames:                     [MAX_FRAMES_IN_FLIGHT]Frame_Data,
 	render_finished_semaphores: []vk.Semaphore,
 	command_pool:               vk.CommandPool,

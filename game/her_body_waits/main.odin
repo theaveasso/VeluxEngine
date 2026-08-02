@@ -43,14 +43,14 @@ main :: proc() {
 }
 
 run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
-	defer velux.wait_for_idle(engine)
+	defer velux.wait_for_idle()
 
 	Push_Constants :: struct {
 		inv_view_proj: matrix[4, 4]f32,
 		cam_pos:       [4]f32,
 		dims:          [4]i32,
 		sun:           [4]f32,
-		tether:        velux.Device_Address([4]f32),
+		tether:        velux.GPU_Address([4]f32),
 	}
 	#assert(size_of(Push_Constants) == 128)
 	pc: Push_Constants
@@ -71,10 +71,10 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 	}
 	if compile_log != "" do log.warn(compile_log)
 
-	shader := velux.create_shader("assets/main.spv", context.temp_allocator) or_return
-	defer velux.destroy_shader(shader)
+	shader := velux.create_gpu_shader("assets/main.spv", context.temp_allocator) or_return
+	defer velux.destroy_gpu_shader(shader)
 
-	pipeline := velux.create_graphics_pipeline(
+	pipeline := velux.create_gpu_pipeline(
 		shader,
 		size_of(Push_Constants),
 		.TRIANGLE_LIST,
@@ -82,25 +82,25 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 		.COUNTER_CLOCKWISE,
 		{write_enabled = false, compare_op = .ALWAYS, format = velux.DEFAULT_DEPTH_FORMAT},
 		{},
-		velux.swapchain_format(engine),
+		velux.swapchain_format(),
 	) or_return
-	defer velux.destroy_pipeline(&pipeline)
+	defer velux.destroy_gpu_pipeline(&pipeline)
 
-	velux.create_watch_shader(engine, &pipeline, "assets/main.slang", "assets/main.spv") or_return
+	velux.watch_shader(&pipeline, "assets/main.slang", "assets/main.spv") or_return
 
 	tether_positions: [SPHERE_COUNT][4]f32
 
 	tether := create_tether(head_position)
 
-	tether_buffer := velux.create_buffer([4]f32, SPHERE_COUNT) or_return
-	defer velux.destroy_buffer(&tether_buffer)
+	tether_buffer := velux.create_gpu_buffer([4]f32, SPHERE_COUNT) or_return
+	defer velux.destroy_gpu_buffer(&tether_buffer)
 	pc.tether = tether_buffer.ptr
 
 	time_of_day: f32 = 0.75
-	for velux.running(engine) {
-		window_extent := velux.window_extent(engine)
+	for velux.running() {
+		window_extent := velux.window_extent()
 
-		time_of_day += engine.dt / DAY_LENGTH_SECONDS
+		time_of_day += velux.delta_time() / DAY_LENGTH_SECONDS
 		time_of_day = math.mod(time_of_day, 1)
 
 		angle := (time_of_day - 0.25) * 2 * math.PI
@@ -133,7 +133,7 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 		if linalg.dot(velocity, velocity) > 0 {
 			move_direction = linalg.normalize(velocity)
 			speed := HEAD_SPEED * (input.boost ? HEAD_BOOST : 1)
-			head_position += move_direction * speed * engine.dt
+			head_position += move_direction * speed * velux.delta_time()
 		}
 
 		camera.position = head_position - forward * CAMERA_DISTANCE + WORLD_UP * CAMERA_HEIGHT
@@ -145,7 +145,7 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 		pc.inv_view_proj = linalg.inverse(proj * view)
 		pc.cam_pos = {camera.position[0], camera.position[1], camera.position[2], f32(SPHERE_COUNT)}
 
-		update_tether(&tether, head_position, move_direction, engine.dt)
+		update_tether(&tether, head_position, move_direction, velux.delta_time())
 		for i in 0 ..< TETHER_POINTS {
 			point := tether.positions[i]
 			taper := f32(i - 1) / f32(TETHER_POINTS - 2)

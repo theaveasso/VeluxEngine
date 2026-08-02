@@ -6,7 +6,7 @@ Transfer_Context :: struct {
 	command_pool:    vk.CommandPool,
 	command_buffer:  vk.CommandBuffer,
 	fence:           vk.Fence,
-	staging_buffers: [dynamic]Buffer(u8),
+	staging_buffers: [dynamic]GPU_Buffer(u8),
 }
 
 @(private, require_results)
@@ -79,6 +79,6 @@ immediate_transfer_end :: proc() -> (err: GPU_Error = .None) {
 @(private)
 destroy_immediate_staging_buffers :: proc(device: ^GPU_Device) {
 	for &staging in device.imm_transfer_ctx.staging_buffers {
-		destroy_buffer(&staging)
+		destroy_gpu_buffer(&staging)
 	}
 }

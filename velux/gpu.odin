@@ -4,7 +4,7 @@ import vma "third_party:odin-vma"
 import vk "vendor:vulkan"
 
 Command_Buffer :: vk.CommandBuffer
-Shader_Module :: vk.ShaderModule
+GPU_Shader :: vk.ShaderModule
 Format :: vk.Format
 
 Vertex :: struct {
@@ -14,7 +14,7 @@ Vertex :: struct {
 }
 
 @(require_results)
-create_texture :: proc(
+create_gpu_image :: proc(
 	format: vk.Format,
 	extent: vk.Extent3D,
 	image_usage_flags: vk.ImageUsageFlags,
@@ -27,7 +27,7 @@ create_texture :: proc(
 	alloc_flags: vma.AllocationCreateFlags = {},
 	usage: vma.MemoryUsage = .AUTO,
 ) -> (
-	Image,
+	GPU_Image,
 	GPU_Error,
 ) {
 	info := image_create_info(
@@ -47,20 +47,20 @@ create_texture :: proc(
 }
 
 @(require_results)
-create_graphics_pipeline :: proc(
+create_gpu_pipeline :: proc(
 	shader: vk.ShaderModule,
 	push_constant_size: u32,
 	input_topology: vk.PrimitiveTopology,
 	polygon_mode: vk.PolygonMode,
 	front_face: vk.FrontFace,
-	depth_config: Depth_Config,
+	depth_config: GPU_Depth_Config,
 	cull_mode: vk.CullModeFlags = {},
 	color_format: Format = .UNDEFINED,
-	blend_mode: Pipeline_Blend_Mode = .None,
+	blend_mode: GPU_Blend_Mode = .None,
 	vertex_entry: cstring = DEFAULT_VERTEX_ENTRY,
 	fragment_entry: cstring = DEFAULT_FRAGMENT_ENTRY,
 ) -> (
-	Graphics_Pipeline,
+	GPU_Pipeline,
 	GPU_Error,
 ) {
 	info := pipeline_create_info(
@@ -75,5 +75,5 @@ create_graphics_pipeline :: proc(
 		vertex_entry,
 		fragment_entry,
 	)
-	return rebuild_graphics_pipeline(shader, info)
+	return rebuild_gpu_pipeline(shader, info)
 }

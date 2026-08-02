@@ -3,7 +3,7 @@ package velux
 import vma "third_party:odin-vma"
 import vk "vendor:vulkan"
 
-Image :: struct {
+GPU_Image :: struct {
 	handle:         vk.Image,
 	view:           vk.ImageView,
 	allocation:     vma.Allocation,
@@ -14,7 +14,7 @@ Image :: struct {
 	array_layers:   u32,
 }
 
-Image_Create_Info :: struct {
+GPU_Image_Info :: struct {
 	format:            vk.Format,
 	extent:            vk.Extent3D,
 	image_usage_flags: vk.ImageUsageFlags,
@@ -29,10 +29,10 @@ Image_Create_Info :: struct {
 }
 
 @(require_results)
-create_image :: proc(create_info: Image_Create_Info, loc := #caller_location) -> (image: Image, err: GPU_Error) {
+create_image :: proc(create_info: GPU_Image_Info, loc := #caller_location) -> (image: GPU_Image, err: GPU_Error) {
 	device := &g_engine.gpu
 	context.logger = device.logger
-	defer if err != .None do destroy_texture(&image)
+	defer if err != .None do destroy_gpu_image(&image)
 
 	image_info: vk.ImageCreateInfo = {
 		sType       = .IMAGE_CREATE_INFO,
@@ -89,7 +89,7 @@ create_image :: proc(create_info: Image_Create_Info, loc := #caller_location) ->
 	return image, .None
 }
 
-destroy_texture :: proc(image: ^Image) {
+destroy_gpu_image :: proc(image: ^GPU_Image) {
 	device := &g_engine.gpu
 	vk.DestroyImageView(device.device, image.view, nil)
 	vma.DestroyImage(device.vma_allocator, image.handle, image.allocation)
@@ -134,7 +134,7 @@ create_sampler :: proc(
 @(require_results)
 write_staging_image :: proc(
 	cmd: vk.CommandBuffer,
-	image: ^Image,
+	image: ^GPU_Image,
 	in_data: []$T,
 	offset: vk.DeviceSize = 0,
 	loc := #caller_location,
@@ -148,7 +148,7 @@ write_staging_image :: proc(
 	gpu_size := image.extent.width * image.extent.height * image.extent.depth * size_of(T)
 	assert(gpu_size >= cast(u32)size + cast(u32)offset, "size of the data and offset is larger than the buffer", loc)
 
-	staging := create_buffer(device, u8, size, .Staging) or_return
+	staging := create_gpu_buffer(device, u8, size, .Staging) or_return
 	write_buffer_slice(&staging, in_data, offset, loc)
 	append(&device.imm_transfer_ctx.staging_buffers, staging)
 

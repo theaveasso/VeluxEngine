@@ -98,13 +98,13 @@ cmd_bind_pipeline :: proc {
 	cmd_bind_graphics_pipeline,
 }
 
-cmd_bind_graphics_pipeline :: proc(frame: Frame, pipeline: Graphics_Pipeline) {
+cmd_bind_graphics_pipeline :: proc(frame: Frame, pipeline: GPU_Pipeline) {
 	vk.CmdBindPipeline(frame.cmd, .GRAPHICS, pipeline.handle)
 	bindless_set := frame.bindless_set
 	vk.CmdBindDescriptorSets(frame.cmd, .GRAPHICS, pipeline.layout, 0, 1, &bindless_set, 0, nil)
 }
 
-cmd_push_constants :: proc(frame: Frame, pipeline: Graphics_Pipeline, data: ^$T, loc := #caller_location) {
+cmd_push_constants :: proc(frame: Frame, pipeline: GPU_Pipeline, data: ^$T, loc := #caller_location) {
 	assert(size_of(T) == int(pipeline.info.push_constant_size), "push constants size mismatch with pipeline", loc)
 	vk.CmdPushConstants(frame.cmd, pipeline.layout, pipeline.stage_flags, 0, pipeline.info.push_constant_size, data)
 }

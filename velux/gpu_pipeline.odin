@@ -8,7 +8,7 @@ import "core:strings"
 
 import vk "vendor:vulkan"
 
-Pipeline_Blend_Mode :: enum {
+GPU_Blend_Mode :: enum {
 	None,
 	Additive,
 	Alpha,
@@ -20,36 +20,36 @@ Pipeline :: struct {
 	stage_flags: vk.ShaderStageFlags,
 }
 
-Depth_Config :: struct {
+GPU_Depth_Config :: struct {
 	write_enabled: b32,
 	compare_op:    vk.CompareOp,
 	format:        vk.Format,
 }
 
-Graphics_Pipeline_Create_Info :: struct {
+GPU_Pipeline_Info :: struct {
 	push_constant_size: u32,
 	input_topology:     vk.PrimitiveTopology,
 	polygon_mode:       vk.PolygonMode,
 	front_face:         vk.FrontFace,
-	depth_config:       Depth_Config,
+	depth_config:       GPU_Depth_Config,
 	color_format:       vk.Format,
 	cull_mode:          vk.CullModeFlags,
-	blend_mode:         Pipeline_Blend_Mode,
+	blend_mode:         GPU_Blend_Mode,
 	vertex_entry:       cstring,
 	fragment_entry:     cstring,
 }
 
-Graphics_Pipeline :: struct {
+GPU_Pipeline :: struct {
 	using common: Pipeline,
-	info:         Graphics_Pipeline_Create_Info,
+	info:         GPU_Pipeline_Info,
 }
 
 @(require_results)
-rebuild_graphics_pipeline :: proc(
+rebuild_gpu_pipeline :: proc(
 	shader: vk.ShaderModule,
-	create_info: Graphics_Pipeline_Create_Info,
+	create_info: GPU_Pipeline_Info,
 ) -> (
-	pipeline: Graphics_Pipeline,
+	pipeline: GPU_Pipeline,
 	err: GPU_Error,
 ) {
 	device := &g_engine.gpu
@@ -90,11 +90,7 @@ rebuild_graphics_pipeline :: proc(
 	return {layout = layout, handle = handle, stage_flags = {.VERTEX, .FRAGMENT}, info = info}, .None
 }
 
-destroy_pipeline :: proc {
-	destroy_graphics_pipeline,
-}
-
-destroy_graphics_pipeline :: proc(pipeline: ^Graphics_Pipeline) {
+destroy_gpu_pipeline :: proc(pipeline: ^GPU_Pipeline) {
 	device := &g_engine.gpu
 	delete(pipeline.info.vertex_entry)
 	delete(pipeline.info.fragment_entry)
@@ -136,7 +132,7 @@ create_pipeline_layout :: proc(
 }
 
 @(require_results)
-create_shader :: proc(
+create_gpu_shader :: proc(
 	file_name: string,
 	allocator: runtime.Allocator,
 	loc := #caller_location,
@@ -176,7 +172,7 @@ load_shader_module_from_bytes :: proc(device: ^GPU_Device, bytes: []u8) -> (vk.S
 	return module, .None
 }
 
-destroy_shader :: proc(module: vk.ShaderModule) {
+destroy_gpu_shader :: proc(module: vk.ShaderModule) {
 	device := &g_engine.gpu
 	vk.DestroyShaderModule(device.device, module, nil)
 }

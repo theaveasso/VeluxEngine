@@ -26,14 +26,14 @@ main :: proc() {
 }
 
 run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
-	defer velux.wait_for_idle(engine)
+	defer velux.wait_for_idle()
 
 	Push_Constants :: struct {
 		inv_view_proj: matrix[4, 4]f32,
 		cam_pos:       [4]f32,
 		dims:          [4]i32,
 		world_offset:  [4]f32,
-		scene:         velux.Device_Address(u32),
+		scene:         velux.GPU_Address(u32),
 	}
 	#assert(size_of(Push_Constants) == 128)
 	pc: Push_Constants
@@ -66,10 +66,10 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 	}
 	if compile_log != "" do log.warn(compile_log)
 
-	shader := velux.create_shader("assets/sponza.spv", context.temp_allocator) or_return
-	defer velux.destroy_shader(shader)
+	shader := velux.create_gpu_shader("assets/sponza.spv", context.temp_allocator) or_return
+	defer velux.destroy_gpu_shader(shader)
 
-	pipeline := velux.create_graphics_pipeline(
+	pipeline := velux.create_gpu_pipeline(
 		shader,
 		size_of(Push_Constants),
 		.TRIANGLE_LIST,
@@ -77,14 +77,14 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 		.COUNTER_CLOCKWISE,
 		{write_enabled = false, compare_op = .ALWAYS, format = velux.DEFAULT_DEPTH_FORMAT},
 		{},
-		velux.swapchain_format(engine),
+		velux.swapchain_format(),
 	) or_return
-	defer velux.destroy_pipeline(&pipeline)
+	defer velux.destroy_gpu_pipeline(&pipeline)
 
-	velux.create_watch_shader(engine, &pipeline, "assets/sponza.slang", "assets/sponza.spv") or_return
+	velux.watch_shader(&pipeline, "assets/sponza.slang", "assets/sponza.spv") or_return
 
-	for velux.running(engine) {
-		window_extent := velux.window_extent(engine)
+	for velux.running() {
+		window_extent := velux.window_extent()
 
 		velux.ui_new_frame()
 		if velux.ui_begin_panel("Sponza") {
@@ -95,7 +95,7 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 
 		if velux.is_key_pressed(.TAB) do velux.set_cursor_captured(!velux.is_cursor_captured())
 
-		velux.camera_update(&camera, velux.camera_input_from_platform(), engine.dt)
+		velux.camera_update(&camera, velux.camera_input_from_platform(), velux.delta_time())
 		proj := velux.camera_projection(camera, window_extent[0] / window_extent[1])
 		view := velux.camera_view(camera)
 

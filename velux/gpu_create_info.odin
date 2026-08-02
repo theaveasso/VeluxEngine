@@ -8,13 +8,13 @@ pipeline_create_info :: proc(
 	input_topology: vk.PrimitiveTopology,
 	polygon_mode: vk.PolygonMode,
 	front_face: vk.FrontFace,
-	depth_config: Depth_Config,
+	depth_config: GPU_Depth_Config,
 	cull_mode: vk.CullModeFlags = {},
 	color_format: vk.Format = .UNDEFINED,
-	blend_mode: Pipeline_Blend_Mode = .None,
+	blend_mode: GPU_Blend_Mode = .None,
 	vertex_entry: cstring = DEFAULT_VERTEX_ENTRY,
 	fragment_entry: cstring = DEFAULT_FRAGMENT_ENTRY,
-) -> Graphics_Pipeline_Create_Info {
+) -> GPU_Pipeline_Info {
 	return {
 		push_constant_size = push_constant_size,
 		input_topology = input_topology,
@@ -41,7 +41,7 @@ image_create_info :: proc(
 	flags: vk.ImageCreateFlags = {},
 	alloc_flags: vma.AllocationCreateFlags = {},
 	usage: vma.MemoryUsage = .AUTO,
-) -> Image_Create_Info {
+) -> GPU_Image_Info {
 	return {
 		format = format,
 		extent = extent,

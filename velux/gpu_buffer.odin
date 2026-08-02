@@ -5,30 +5,30 @@ import "core:mem"
 import vma "third_party:odin-vma"
 import vk "vendor:vulkan"
 
-Device_Address :: struct($T: typeid) {
+GPU_Address :: struct($T: typeid) {
 	address: vk.DeviceAddress,
 }
 
-Buffer :: struct($T: typeid) {
+GPU_Buffer :: struct($T: typeid) {
 	handle:     vk.Buffer,
 	allocation: vma.Allocation,
 	info:       vma.AllocationInfo,
-	ptr:        Device_Address(T),
+	ptr:        GPU_Address(T),
 }
 
-Buffer_Kind :: enum {
+GPU_Buffer_Kind :: enum {
 	Storage,
 	Index,
 	Staging,
 }
 
 @(require_results)
-create_buffer :: proc(
+create_gpu_buffer :: proc(
 	$T: typeid,
 	#any_int size: vk.DeviceSize = 1,
-	kind: Buffer_Kind = .Storage,
+	kind: GPU_Buffer_Kind = .Storage,
 ) -> (
-	buffer: Buffer(T),
+	buffer: GPU_Buffer(T),
 	err: GPU_Error,
 ) {
 	device := &g_engine.gpu
@@ -59,13 +59,13 @@ create_buffer :: proc(
 	return buffer, .None
 }
 
-destroy_buffer :: proc(buffer: ^Buffer($T)) {
+destroy_gpu_buffer :: proc(buffer: ^GPU_Buffer($T)) {
 	device := &g_engine.gpu
 	vma.DestroyBuffer(device.vma_allocator, buffer.handle, buffer.allocation)
 	buffer^ = {}
 }
 
-get_buffer_device_address :: proc(device: vk.Device, buffer: Buffer($T)) -> vk.DeviceAddress {
+get_buffer_device_address :: proc(device: vk.Device, buffer: GPU_Buffer($T)) -> vk.DeviceAddress {
 	device_address_info: vk.BufferDeviceAddressInfo = {
 		sType  = .BUFFER_DEVICE_ADDRESS_INFO,
 		buffer = buffer.handle,
@@ -73,7 +73,7 @@ get_buffer_device_address :: proc(device: vk.Device, buffer: Buffer($T)) -> vk.D
 	return vk.GetBufferDeviceAddress(device, &device_address_info)
 }
 
-vk_vma_buffer_flags :: proc(kind: Buffer_Kind) -> (vk.BufferUsageFlags, vma.AllocationCreateFlags) {
+vk_vma_buffer_flags :: proc(kind: GPU_Buffer_Kind) -> (vk.BufferUsageFlags, vma.AllocationCreateFlags) {
 	switch kind {
 	case .Storage:
 		return {.TRANSFER_DST, .STORAGE_BUFFER, .SHADER_DEVICE_ADDRESS}, {}
@@ -85,7 +85,7 @@ vk_vma_buffer_flags :: proc(kind: Buffer_Kind) -> (vk.BufferUsageFlags, vma.Allo
 	unreachable()
 }
 
-write_buffer :: proc(buffer: ^Buffer($T), in_data: ^$U, offset: vk.DeviceSize = 0, loc := #caller_location) {
+write_buffer :: proc(buffer: ^GPU_Buffer($T), in_data: ^$U, offset: vk.DeviceSize = 0, loc := #caller_location) {
 	size := size_of(U)
 	assert(
 		buffer.info.size >= cast(vk.DeviceSize)(cast(u64)size + cast(u64)offset),
@@ -98,7 +98,7 @@ write_buffer :: proc(buffer: ^Buffer($T), in_data: ^$U, offset: vk.DeviceSize = 
 	mem.copy(data[offset:], in_data, size)
 }
 
-write_buffer_slice :: proc(buffer: ^Buffer($T), in_data: []$U, offset: vk.DeviceSize = 0, loc := #caller_location) {
+write_buffer_slice :: proc(buffer: ^GPU_Buffer($T), in_data: []$U, offset: vk.DeviceSize = 0, loc := #caller_location) {
 	size := size_of(U) * len(in_data)
 	assert(
 		buffer.info.size >= cast(vk.DeviceSize)(cast(u64)size + cast(u64)offset),
@@ -116,7 +116,7 @@ write_buffer_slice :: proc(buffer: ^Buffer($T), in_data: []$U, offset: vk.Device
 @(require_results)
 write_staging_buffer :: proc(
 	cmd: vk.CommandBuffer,
-	buffer: ^Buffer($T),
+	buffer: ^GPU_Buffer($T),
 	in_data: ^$U,
 	offset: vk.DeviceSize = 0,
 	loc := #caller_location,
@@ -133,7 +133,7 @@ write_staging_buffer :: proc(
 		loc,
 	)
 
-	staging := create_buffer(u8, cast(vk.DeviceSize)size, .Staging) or_return
+	staging := create_gpu_buffer(u8, cast(vk.DeviceSize)size, .Staging) or_return
 	write_buffer(&staging, in_data)
 	append(&device.imm_transfer_ctx.staging_buffers, staging)
 
@@ -146,7 +146,7 @@ write_staging_buffer :: proc(
 @(require_results)
 write_staging_buffer_slice :: proc(
 	cmd: vk.CommandBuffer,
-	buffer: ^Buffer($T),
+	buffer: ^GPU_Buffer($T),
 	in_data: []$U,
 	offset: vk.DeviceSize = 0,
 	loc := #caller_location,
@@ -163,7 +163,7 @@ write_staging_buffer_slice :: proc(
 		loc,
 	)
 
-	staging := create_buffer(u8, cast(vk.DeviceSize)size, .Staging) or_return
+	staging := create_gpu_buffer(u8, cast(vk.DeviceSize)size, .Staging) or_return
 	write_buffer_slice(&staging, in_data)
 	append(&device.imm_transfer_ctx.staging_buffers, staging)
 

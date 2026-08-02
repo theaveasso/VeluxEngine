@@ -21,7 +21,7 @@ Marker :: struct {
 
 Voxel_World :: struct {
 	grid:   Voxel_Grid,
-	buffer: Buffer(u32),
+	buffer: GPU_Buffer(u32),
 }
 
 Level :: struct {
@@ -37,7 +37,7 @@ load_level :: proc(file_name: string, reserved_from: u8) -> (level: Level, err: 
 	level.world.grid, level.markers = grid_from_vox(model, reserved_from)
 
 	packed_words := (len(level.world.grid.voxels) + 3) / 4
-	level.world.buffer = create_buffer(u32, PALETTE_SLOTS + packed_words) or_return
+	level.world.buffer = create_gpu_buffer(u32, PALETTE_SLOTS + packed_words) or_return
 
 	palette := vox.pack_palete(model)
 	voxels := pack_voxels(&level.world.grid, context.temp_allocator)
@@ -51,7 +51,7 @@ load_level :: proc(file_name: string, reserved_from: u8) -> (level: Level, err: 
 
 unload_level :: proc(level: ^Level) {
 	delete(level.markers)
-	destroy_buffer(&level.world.buffer)
+	destroy_gpu_buffer(&level.world.buffer)
 	destroy_grid(&level.world.grid)
 	level^ = {}
 }

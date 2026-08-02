@@ -63,7 +63,7 @@ destroy :: proc(engine: ^Engine) {
 	free(engine)
 }
 
-@(require_results)
+@(private, require_results)
 init :: proc(engine: ^Engine, config: Config) -> Error {
 	config := config
 	if config.app_name == nil do config.app_name = "VeluxEngine"
@@ -99,7 +99,8 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 	return nil
 }
 
-running :: proc(engine: ^Engine) -> bool {
+running :: proc() -> bool {
+	engine := g_engine
 	free_all(context.temp_allocator)
 
 	poll_events()
@@ -118,24 +119,30 @@ running :: proc(engine: ^Engine) -> bool {
 	return !window_should_close(&engine.window)
 }
 
-swapchain_format :: proc(engine: ^Engine) -> Format {
-	return engine.gpu.swapchain.surface_format.format
+swapchain_format :: proc() -> Format {
+	return g_engine.gpu.swapchain.surface_format.format
 }
 
-window_extent :: proc(engine: ^Engine) -> [2]f32 {
-	return framebuffer_extent(&engine.window)
+window_extent :: proc() -> [2]f32 {
+	return framebuffer_extent(&g_engine.window)
 }
 
-wait_for_idle :: proc(engine: ^Engine) {
-	wait_idle(&engine.gpu)
+@(require_results)
+delta_time :: proc() -> f32 {
+	return g_engine.dt
 }
 
+wait_for_idle :: proc() {
+	wait_idle(&g_engine.gpu)
+}
+
+@(private)
 shutdown :: proc(engine: ^Engine) {
-	wait_for_idle(engine)
+	wait_for_idle()
 	destroy_ui(engine)
 	destroy_gpu(&engine.gpu)
 	destroy_audio(&engine.audio)
-	destroy_watch_shaders(engine)
+	destroy_shader_watches(engine)
 	destroy_window(&engine.window)
 	shutdown_platform()
 }

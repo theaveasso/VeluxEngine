@@ -20,6 +20,7 @@ ui_slider :: proc {
 	ui_slider_int,
 	ui_slider_float3,
 }
+
 ui_slider_f32 :: proc(label: string, v: ^f32, v_min, v_max: f32, allocator := context.temp_allocator) -> bool {
 	return ui_ready() ? imgui.SliderFloat(strings.clone_to_cstring(label, allocator), v, v_min, v_max) : false
 }
@@ -39,14 +40,7 @@ ui_text :: proc(t: string, allocator := context.temp_allocator) {
 	imgui.TextUnformatted(strings.clone_to_cstring(t, allocator))
 }
 
-ui_plot_lines :: proc(
-	label: string,
-	v: []f32,
-	s_min: f32 = 0,
-	s_max: f32 = 33,
-	height: f32 = 40,
-	allocator := context.temp_allocator,
-) {
+ui_plot_lines :: proc(label: string, v: []f32, s_min: f32 = 0, s_max: f32 = 33, height: f32 = 40, allocator := context.temp_allocator) {
 	if !ui_ready() do return
 	if len(v) == 0 do return
 

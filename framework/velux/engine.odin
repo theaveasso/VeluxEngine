@@ -5,7 +5,6 @@ import "core:time"
 
 import "vlx:gpu"
 import "vlx:internal/vox"
-import "vlx:platform"
 
 MAX_DELTA :: 0.1
 
@@ -19,8 +18,8 @@ Config :: struct {
 }
 
 Engine :: struct {
-	window:            platform.Window,
-	input:             platform.Input_State,
+	window:            Window,
+	input:             Input_State,
 	gpu:               gpu.Device,
 	audio:             Audio_Device,
 	watch_shaders:     [dynamic]Shader_Watch,
@@ -34,7 +33,7 @@ Engine :: struct {
 Error :: union #shared_nil {
 	Audio_Error,
 	gpu.Error,
-	platform.Error,
+	Platform_Error,
 	Shader_Error,
 	UI_Error,
 	vox.Error,
@@ -75,9 +74,9 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 	if config.enable_log || ODIN_DEBUG do config.enable_log = true
 	if config.enable_profiler || ODIN_DEBUG do config.enable_profiler = true
 
-	platform.init() or_return
-	platform.create_window(&engine.window, config.width, config.height, config.app_name) or_return
-	platform.input_init(&engine.window, &engine.input)
+	init_platform() or_return
+	create_window(&engine.window, config.width, config.height, config.app_name) or_return
+	input_init(engine)
 
 	gpu.init(
 		&engine.gpu,
@@ -96,27 +95,27 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 		log.warnf("audio unavailable, continuing withou sound: %v", audio_err)
 	}
 
-	engine.last_time = platform.time()
+	engine.last_time = now()
 	return nil
 }
 
 running :: proc(engine: ^Engine) -> bool {
 	free_all(context.temp_allocator)
 
-	platform.poll_events()
-	platform.input_new_frame()
+	poll_events()
+	input_new_frame()
 	when ODIN_DEBUG {
 		poll_shader_watches(engine)
 	}
 
-	now := platform.time()
-	raw := f32(now - engine.last_time)
+	current := now()
+	raw := f32(current - engine.last_time)
 	engine.dt = min(raw, MAX_DELTA)
-	engine.last_time = now
+	engine.last_time = current
 
 	if is_key_pressed(.F2) do engine.hud.show = !engine.hud.show
 	hud_update(engine)
-	return !platform.window_should_close(&engine.window)
+	return !window_should_close(&engine.window)
 }
 
 swapchain_format :: proc(engine: ^Engine) -> Format {
@@ -124,7 +123,7 @@ swapchain_format :: proc(engine: ^Engine) -> Format {
 }
 
 window_extent :: proc(engine: ^Engine) -> [2]f32 {
-	return platform.window_extent(&engine.window)
+	return framebuffer_extent(&engine.window)
 }
 
 wait_for_idle :: proc(engine: ^Engine) {
@@ -137,6 +136,6 @@ shutdown :: proc(engine: ^Engine) {
 	gpu.destroy(&engine.gpu)
 	destroy_audio(&engine.audio)
 	destroy_watch_shaders(engine)
-	platform.destroy_window(&engine.window)
-	platform.shutdown()
+	destroy_window(&engine.window)
+	shutdown_platform()
 }

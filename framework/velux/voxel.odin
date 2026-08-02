@@ -1,6 +1,6 @@
 package velux
 
-import "vlx:internal/vox"
+import vox "_vox"
 
 VOXEL_EMPTY :: Voxel(0)
 PALETTE_SLOTS :: vox.PALETTE_SLOTS

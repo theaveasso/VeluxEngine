@@ -4,7 +4,7 @@ import "core:log"
 import "core:time"
 
 
-import "vlx:internal/vox"
+import vox "_vox"
 
 MAX_DELTA :: 0.1
 

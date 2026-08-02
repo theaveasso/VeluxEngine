@@ -1,4 +1,4 @@
-package vox
+package _vox
 
 import "core:strconv"
 import "core:strings"

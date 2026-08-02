@@ -1,4 +1,4 @@
-package vox
+package _vox
 
 pack_palete :: proc(model: Model) -> (packed: [PALETTE_SLOTS]u32) {
 	packed[0] = 0

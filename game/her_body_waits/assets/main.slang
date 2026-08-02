@@ -20,7 +20,7 @@ struct Push_Constants
     float4 cam_pos;
     int4 dims;
     float4 sun;
-    uint *scene;
+    float4 *tether;
 }
 
 [vk_push_constant]
@@ -47,6 +47,43 @@ static const float GRID_CELL_SIZE = 4.0;
 static const float AMBIENT_STRENGTH = 0.5;
 static const float FOG_DENSITY = 0.008;
 static const float EXPOSURE = 1.0;
+
+static const float3 TETHER_COLOR = float3(0.42, 0.06, 0.07);
+
+float tether_hit(float3 origin, float3 direction, int count, out float3 normal)
+{
+    float nearest = FAR_AWAY;
+    normal = float3(0.0, 1.0, 0.0);
+
+    for (int index = 0; index < count; ++index)
+    {
+        float4 bead = pc.tether[index];
+        float3 center = bead.xyz;
+        float radius = bead.w;
+
+        float3 to_center = center - origin;
+        float along_ray = dot(to_center, direction);
+
+        float3 closest_point = origin + direction * along_ray;
+        float distance_to_center = length(closest_point - center);
+
+        if (distance_to_center > radius)
+        {
+            continue;
+        }
+
+        float half_chord = sqrt(radius * radius - distance_to_center * distance_to_center);
+        float distance = along_ray - half_chord;
+
+        if (distance <= 0.0 || distance >= nearest)
+        {
+            continue;
+        }
+        nearest = distance;
+        normal = normalize(origin + direction * distance - center);
+    }
+    return nearest;
+}
 
 [shader("vertex")]
 V2P vertex_main(uint id: SV_VertexID)
@@ -86,31 +123,44 @@ PS_Output fragment_main(V2P input)
     sky += sky_disc(direction, sun_direction, sun_tint, SUN_DISC_SHARPNESS, SUN_DISC_INTENSITY) * day;
     sky += sky_disc(direction, moon_direction, srgb_to_linear(MOON_COLOR), MOON_DISC_SHARPNESS, MOON_DISC_INTENSITY) * (1.0 - day);
 
+    float3 tether_normal;
+    float tether_distance = tether_hit(origin, direction, int(pc.cam_pos.w), tether_normal);
     float ground_distance = ground_plane_hit(origin, direction, 0.0);
-    if (ground_distance >= FAR_AWAY)
+
+    float nearest = min(tether_distance, ground_distance);
+    if (nearest >= FAR_AWAY)
     {
         output.frag_color = float4(tonemap_aces(sky * EXPOSURE), 1.0);
         return output;
     }
 
-    float3 position = origin + direction * ground_distance;
+    float3 position = origin + direction * nearest;
     float3 normal = float3(0.0, 1.0, 0.0);
+    float3 albedo;
 
-    float3 albedo = grid_albedo(
-        position,
-        GRID_CELL_SIZE,
-        srgb_to_linear(GROUND_BASE),
-        srgb_to_linear(GROUND_LINE));
+    if (tether_distance < ground_distance)
+    {
+        normal = tether_normal;
+        albedo = srgb_to_linear(TETHER_COLOR);
+    }
+    else
+    {
+        normal = float3(0.0, 1.0, 0.0);
+        albedo = grid_albedo(
+            position,
+            GRID_CELL_SIZE,
+            srgb_to_linear(GROUND_BASE),
+            srgb_to_linear(GROUND_LINE));
+    }
 
     float sun_lambert = max(dot(normal, sun_direction), 0.0) * day;
     float moon_lambert = max(dot(normal, moon_direction), 0.0) * (1.0 - day);
 
     float3 ambient = lerp(palette.horizon, palette.zenith, normal.y * 0.5 + 0.5) * AMBIENT_STRENGTH;
-    float3 key = srgb_to_linear(SUN_LIGHT_COLOR) * SUN_LIGHT_STRENGTH * sun_lambert
-        + srgb_to_linear(MOON_LIGHT_COLOR) * MOON_LIGHT_STRENGTH * moon_lambert;
+    float3 key = srgb_to_linear(SUN_LIGHT_COLOR) * SUN_LIGHT_STRENGTH * sun_lambert + srgb_to_linear(MOON_LIGHT_COLOR) * MOON_LIGHT_STRENGTH * moon_lambert;
 
     float3 lit = albedo * (ambient + key);
-    lit = apply_fog(lit, sky, ground_distance, FOG_DENSITY);
+    lit = apply_fog(lit, sky, nearest, FOG_DENSITY);
 
     output.frag_color = float4(tonemap_aces(lit * EXPOSURE), 1.0);
     return output;

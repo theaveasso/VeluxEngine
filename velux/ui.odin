@@ -13,6 +13,7 @@ UI_Error :: enum {
 	ImGui_Call_Failed,
 }
 
+@(private)
 ui_new_frame :: proc() {
 	if !ui_ready() do return
 	imgui_vk.NewFrame()
@@ -20,11 +21,13 @@ ui_new_frame :: proc() {
 	imgui.NewFrame()
 }
 
+@(private)
 ui_end_frame :: proc() {
 	if !ui_ready() do return
 	imgui.EndFrame()
 }
 
+@(private)
 ui_draw :: proc(frame: Frame) {
 	hud_draw(g_engine)
 	if !ui_ready() do return

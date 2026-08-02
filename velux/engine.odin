@@ -26,6 +26,7 @@ Engine :: struct {
 	ui_context:        ^UI_Context,
 	hud:               Hud,
 	last_shader_check: time.Time,
+	quit_requested:    bool,
 	dt:                f32,
 	last_time:         f64,
 }
@@ -100,6 +101,7 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 }
 
 @(require_results)
+@(private)
 running :: proc() -> bool {
 	engine := g_engine
 	free_all(context.temp_allocator)
@@ -117,6 +119,7 @@ running :: proc() -> bool {
 
 	if is_key_pressed(.F2) do engine.hud.show = !engine.hud.show
 	hud_update(engine)
+	if engine.quit_requested do return false
 	return !window_should_close(&engine.window)
 }
 

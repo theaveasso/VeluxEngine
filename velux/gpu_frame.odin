@@ -16,7 +16,7 @@ Frame :: struct {
 	frame_index:       u32,
 }
 
-@(require_results)
+@(private, require_results)
 begin_frame :: proc() -> (frame: Frame, err: GPU_Error) {
 	device := &g_engine.gpu
 	context.logger = device.logger
@@ -76,7 +76,7 @@ begin_frame :: proc() -> (frame: Frame, err: GPU_Error) {
 		.None
 }
 
-@(require_results)
+@(private, require_results)
 end_frame :: proc(frame: Frame) -> (err: GPU_Error = .None) {
 	device := &g_engine.gpu
 	context.logger = device.logger

@@ -1,5 +1,8 @@
 package velux
 
+import "core:log"
+import "core:strings"
+
 import vma "third_party:odin-vma"
 import vk "vendor:vulkan"
 
@@ -48,32 +51,45 @@ create_gpu_image :: proc(
 
 @(require_results)
 create_gpu_pipeline :: proc(
-	shader: vk.ShaderModule,
+	pipeline: ^GPU_Pipeline,
+	slang_path: string,
 	push_constant_size: u32,
-	input_topology: vk.PrimitiveTopology,
-	polygon_mode: vk.PolygonMode,
-	front_face: vk.FrontFace,
-	depth_config: GPU_Depth_Config,
+	topology: vk.PrimitiveTopology = .TRIANGLE_LIST,
+	polygon_mode: vk.PolygonMode = .FILL,
+	front_face: vk.FrontFace = .COUNTER_CLOCKWISE,
+	depth: GPU_Depth_Config = {write_enabled = false, compare_op = .ALWAYS, format = DEFAULT_DEPTH_FORMAT},
 	cull_mode: vk.CullModeFlags = {},
 	color_format: Format = .UNDEFINED,
 	blend_mode: GPU_Blend_Mode = .None,
 	vertex_entry: cstring = DEFAULT_VERTEX_ENTRY,
 	fragment_entry: cstring = DEFAULT_FRAGMENT_ENTRY,
-) -> (
-	GPU_Pipeline,
-	GPU_Error,
-) {
+) -> Error {
+	spv_path := strings.concatenate({strings.trim_suffix(slang_path, ".slang"), ".spv"}, context.temp_allocator)
+
+	output, compile_err := compile_slang(slang_path, spv_path, context.temp_allocator)
+	if compile_err != .None {
+		if output != "" do log.error(output)
+		return compile_err
+	}
+	if output != "" do log.warn(output)
+
+	shader := create_gpu_shader(spv_path, context.temp_allocator) or_return
+	defer destroy_gpu_shader(shader)
+
 	info := pipeline_create_info(
 		push_constant_size,
-		input_topology,
+		topology,
 		polygon_mode,
 		front_face,
-		depth_config,
+		depth,
 		cull_mode,
-		color_format,
+		color_format == .UNDEFINED ? swapchain_format() : color_format,
 		blend_mode,
 		vertex_entry,
 		fragment_entry,
 	)
-	return rebuild_gpu_pipeline(shader, info)
+	pipeline^ = rebuild_gpu_pipeline(shader, info) or_return
+
+	when ODIN_DEBUG do watch_shader(pipeline, slang_path, spv_path) or_return
+	return nil
 }

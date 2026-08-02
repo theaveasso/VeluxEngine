@@ -5,7 +5,7 @@ import "core:os"
 import "core:path/filepath"
 import "core:strings"
 
-ENGINE_SHADER_DIR :: "../../framework/velux/shaders"
+ENGINE_SHADER_DIR :: "../../velux/shaders"
 
 Shader_Error :: enum {
 	None,

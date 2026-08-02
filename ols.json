@@ -3,7 +3,7 @@
 	"collections": [
 		{
 			"name": "vlx",
-			"path": "framework"
+			"path": "."
 		},
 		{
 			"name": "third_party",

@@ -15,7 +15,7 @@ if not exist "%SAMPLE_DIR%" (
 for %%F in ("%SAMPLE_DIR%\assets\*.slang") do call :compile_one "%%~fF" || goto :err
 
 "%ODIN%" build %SAMPLE_DIR% -debug -o:none ^
-  -collection:vlx=framework ^
+  -collection:vlx=. ^
   -collection:third_party=third_party ^
   -out:%SAMPLE_DIR%\%SAMPLE%.exe || goto :err
 

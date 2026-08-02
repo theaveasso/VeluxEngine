@@ -1,4 +1,4 @@
-package gpu
+package velux
 
 import vma "third_party:odin-vma"
 import vk "vendor:vulkan"
@@ -29,9 +29,10 @@ Image_Create_Info :: struct {
 }
 
 @(require_results)
-create_image :: proc(device: ^Device, create_info: Image_Create_Info, loc := #caller_location) -> (image: Image, err: Error) {
+create_image :: proc(create_info: Image_Create_Info, loc := #caller_location) -> (image: Image, err: GPU_Error) {
+	device := &g_engine.gpu
 	context.logger = device.logger
-	defer if err != .None do destroy_image(device, &image)
+	defer if err != .None do destroy_texture(&image)
 
 	image_info: vk.ImageCreateInfo = {
 		sType       = .IMAGE_CREATE_INFO,
@@ -88,14 +89,15 @@ create_image :: proc(device: ^Device, create_info: Image_Create_Info, loc := #ca
 	return image, .None
 }
 
-destroy_image :: proc(device: ^Device, image: ^Image) {
+destroy_texture :: proc(image: ^Image) {
+	device := &g_engine.gpu
 	vk.DestroyImageView(device.device, image.view, nil)
 	vma.DestroyImage(device.vma_allocator, image.handle, image.allocation)
 	image^ = {}
 }
 
 create_sampler :: proc(
-	device: ^Device,
+	device: ^GPU_Device,
 	filter: vk.Filter,
 	address_mode: vk.SamplerAddressMode,
 	compare_op: vk.CompareOp = .NEVER,
@@ -104,7 +106,7 @@ create_sampler :: proc(
 	max_anisotropy: f32 = 1.0,
 ) -> (
 	sampler: vk.Sampler,
-	err: Error,
+	err: GPU_Error,
 ) {
 	sampler_info: vk.SamplerCreateInfo = {
 		sType            = .SAMPLER_CREATE_INFO,
@@ -131,15 +133,15 @@ create_sampler :: proc(
 
 @(require_results)
 write_staging_image :: proc(
-	device: ^Device,
 	cmd: vk.CommandBuffer,
 	image: ^Image,
 	in_data: []$T,
 	offset: vk.DeviceSize = 0,
 	loc := #caller_location,
 ) -> (
-	err: Error = .None,
+	err: GPU_Error = .None,
 ) {
+	device := &g_engine.gpu
 	assert(image.view != 0, "image is missing a valid view", loc)
 
 	size := size_of(T) * len(in_data)

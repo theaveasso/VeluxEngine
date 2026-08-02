@@ -1,4 +1,4 @@
-package gpu
+package velux
 
 import vma "third_party:odin-vma"
 import vk "vendor:vulkan"

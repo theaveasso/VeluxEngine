@@ -5,13 +5,13 @@ import "core:fmt"
 import vma "third_party:odin-vma"
 import vk "vendor:vulkan"
 
-import "vlx:gpu"
+
 
 FRAME_HISTORY :: 120
 
 Hud :: struct {
 	frame_ms:   [FRAME_HISTORY]f32,
-	zone_ms:    [gpu.MAX_ZONES]f32,
+	zone_ms:    [MAX_ZONES]f32,
 	head:       u32,
 	fps_smooth: f32,
 	show:       bool,

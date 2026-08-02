@@ -1,4 +1,4 @@
-package gpu
+package velux
 
 import vk "vendor:vulkan"
 
@@ -19,7 +19,7 @@ Profiler :: struct {
 }
 
 @(private, require_results)
-create_profiler :: proc(device: ^Device) -> (err: Error) {
+create_profiler :: proc(device: ^GPU_Device) -> (err: GPU_Error) {
 	if !device.enable_profiler do return
 	defer if err != .None do destroy_profiler(device)
 
@@ -37,7 +37,7 @@ create_profiler :: proc(device: ^Device) -> (err: Error) {
 }
 
 @(private)
-destroy_profiler :: proc(device: ^Device) {
+destroy_profiler :: proc(device: ^GPU_Device) {
 	if !device.enable_profiler do return
 
 	for &pool in device.profiler.pools {
@@ -45,7 +45,8 @@ destroy_profiler :: proc(device: ^Device) {
 	}
 }
 
-zone_begin :: proc(device: ^Device, frame: Frame, name: string, loc := #caller_location) -> (zone_index: u32) {
+prof_zone_begin :: proc(frame: Frame, name: string, loc := #caller_location) -> (zone_index: u32) {
+	device := &g_engine.gpu
 	if !device.enable_profiler do return 0
 
 	slot := frame.frame_index
@@ -58,17 +59,18 @@ zone_begin :: proc(device: ^Device, frame: Frame, name: string, loc := #caller_l
 	return zone_index
 }
 
-zone_end :: proc(device: ^Device, frame: Frame, loc := #caller_location) {
+prof_zone_end :: proc(frame: Frame, loc := #caller_location) {
+	device := &g_engine.gpu
 	if !device.enable_profiler do return
 
 	slot := frame.frame_index
-	assert(device.profiler.zone_count[slot] > 0, "zone_end without a matching zone_begin", loc)
+	assert(device.profiler.zone_count[slot] > 0, "prof_zone_end without a matching prof_zone_begin", loc)
 	zone_index := device.profiler.zone_count[slot] - 1
 	vk.CmdWriteTimestamp2(frame.cmd, {.BOTTOM_OF_PIPE}, device.profiler.pools[slot], zone_index * 2 + 1)
 }
 
 @(private, require_results)
-readback_profiler :: proc(device: ^Device, slot: u32) -> (err: Error = .None) {
+readback_profiler :: proc(device: ^GPU_Device, slot: u32) -> (err: GPU_Error = .None) {
 	if !device.enable_profiler do return
 
 	zone_count := device.profiler.zone_count[slot]
@@ -108,7 +110,7 @@ readback_profiler :: proc(device: ^Device, slot: u32) -> (err: Error = .None) {
 }
 
 @(private)
-reset_profiler :: proc(device: ^Device, cmd: vk.CommandBuffer, slot: u32) {
+reset_profiler :: proc(device: ^GPU_Device, cmd: vk.CommandBuffer, slot: u32) {
 	if !device.enable_profiler do return
 
 	vk.CmdResetQueryPool(cmd, device.profiler.pools[slot], 0, MAX_ZONES * 2)

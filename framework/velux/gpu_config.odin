@@ -1,4 +1,4 @@
-package gpu
+package velux
 
 import vk "vendor:vulkan"
 

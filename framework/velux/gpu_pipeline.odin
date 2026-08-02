@@ -1,4 +1,4 @@
-package gpu
+package velux
 
 import "base:runtime"
 import "core:log"
@@ -45,14 +45,14 @@ Graphics_Pipeline :: struct {
 }
 
 @(require_results)
-create_graphics_pipeline :: proc(
-	device: ^Device,
+rebuild_graphics_pipeline :: proc(
 	shader: vk.ShaderModule,
 	create_info: Graphics_Pipeline_Create_Info,
 ) -> (
 	pipeline: Graphics_Pipeline,
-	err: Error,
+	err: GPU_Error,
 ) {
+	device := &g_engine.gpu
 	context.logger = device.logger
 
 	layout := create_pipeline_layout(device, create_info.push_constant_size) or_return
@@ -94,7 +94,8 @@ destroy_pipeline :: proc {
 	destroy_graphics_pipeline,
 }
 
-destroy_graphics_pipeline :: proc(device: ^Device, pipeline: ^Graphics_Pipeline) {
+destroy_graphics_pipeline :: proc(pipeline: ^Graphics_Pipeline) {
+	device := &g_engine.gpu
 	delete(pipeline.info.vertex_entry)
 	delete(pipeline.info.fragment_entry)
 	vk.DestroyPipelineLayout(device.device, pipeline.layout, nil)
@@ -104,12 +105,12 @@ destroy_graphics_pipeline :: proc(device: ^Device, pipeline: ^Graphics_Pipeline)
 
 @(private, require_results)
 create_pipeline_layout :: proc(
-	device: ^Device,
+	device: ^GPU_Device,
 	push_constant_size: u32,
 	stage_flags: vk.ShaderStageFlags = {.VERTEX, .FRAGMENT},
 ) -> (
 	layout: vk.PipelineLayout,
-	err: Error,
+	err: GPU_Error,
 ) {
 
 	layout_info: vk.PipelineLayoutCreateInfo = {
@@ -135,15 +136,15 @@ create_pipeline_layout :: proc(
 }
 
 @(require_results)
-load_shader_module :: proc(
-	device: ^Device,
+create_shader :: proc(
 	file_name: string,
 	allocator: runtime.Allocator,
 	loc := #caller_location,
 ) -> (
 	vk.ShaderModule,
-	Error,
+	GPU_Error,
 ) {
+	device := &g_engine.gpu
 	context.logger = device.logger
 
 	buffer, err := os.read_entire_file(file_name, allocator)
@@ -157,7 +158,7 @@ load_shader_module :: proc(
 }
 
 @(private, require_results)
-load_shader_module_from_bytes :: proc(device: ^Device, bytes: []u8) -> (vk.ShaderModule, Error) {
+load_shader_module_from_bytes :: proc(device: ^GPU_Device, bytes: []u8) -> (vk.ShaderModule, GPU_Error) {
 	if len(bytes) % 4 != 0 do return 0, .Invalid_Handle
 
 	shader_info: vk.ShaderModuleCreateInfo = {
@@ -175,6 +176,7 @@ load_shader_module_from_bytes :: proc(device: ^Device, bytes: []u8) -> (vk.Shade
 	return module, .None
 }
 
-destroy_shader_module :: proc(device: ^Device, module: vk.ShaderModule) {
+destroy_shader :: proc(module: vk.ShaderModule) {
+	device := &g_engine.gpu
 	vk.DestroyShaderModule(device.device, module, nil)
 }

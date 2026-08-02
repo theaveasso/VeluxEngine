@@ -3,7 +3,7 @@ package velux
 import "core:log"
 import "core:time"
 
-import "vlx:gpu"
+
 import "vlx:internal/vox"
 
 MAX_DELTA :: 0.1
@@ -20,7 +20,7 @@ Config :: struct {
 Engine :: struct {
 	window:            Window,
 	input:             Input_State,
-	gpu:               gpu.Device,
+	gpu:               GPU_Device,
 	audio:             Audio_Device,
 	watch_shaders:     [dynamic]Shader_Watch,
 	ui_context:        ^UI_Context,
@@ -32,7 +32,7 @@ Engine :: struct {
 
 Error :: union #shared_nil {
 	Audio_Error,
-	gpu.Error,
+	GPU_Error,
 	Platform_Error,
 	Shader_Error,
 	UI_Error,
@@ -78,7 +78,7 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 	create_window(&engine.window, config.width, config.height, config.app_name) or_return
 	input_init(engine)
 
-	gpu.init(
+	init_gpu(
 		&engine.gpu,
 		{
 			app_name = config.app_name,
@@ -119,7 +119,7 @@ running :: proc(engine: ^Engine) -> bool {
 }
 
 swapchain_format :: proc(engine: ^Engine) -> Format {
-	return gpu.swapchain_format(&engine.gpu)
+	return engine.gpu.swapchain.surface_format.format
 }
 
 window_extent :: proc(engine: ^Engine) -> [2]f32 {
@@ -127,13 +127,13 @@ window_extent :: proc(engine: ^Engine) -> [2]f32 {
 }
 
 wait_for_idle :: proc(engine: ^Engine) {
-	gpu.wait_idle(&engine.gpu)
+	wait_idle(&engine.gpu)
 }
 
 shutdown :: proc(engine: ^Engine) {
 	wait_for_idle(engine)
 	destroy_ui(engine)
-	gpu.destroy(&engine.gpu)
+	destroy_gpu(&engine.gpu)
 	destroy_audio(&engine.audio)
 	destroy_watch_shaders(engine)
 	destroy_window(&engine.window)

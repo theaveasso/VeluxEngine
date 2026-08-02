@@ -1,4 +1,4 @@
-package gpu
+package velux
 
 import vk "vendor:vulkan"
 
@@ -17,7 +17,8 @@ Frame :: struct {
 }
 
 @(require_results)
-begin_frame :: proc(device: ^Device) -> (frame: Frame, err: Error) {
+begin_frame :: proc() -> (frame: Frame, err: GPU_Error) {
+	device := &g_engine.gpu
 	context.logger = device.logger
 
 	frame_data := device.frames[device.current_frame]
@@ -76,7 +77,8 @@ begin_frame :: proc(device: ^Device) -> (frame: Frame, err: Error) {
 }
 
 @(require_results)
-end_frame :: proc(device: ^Device, frame: Frame) -> (err: Error = .None) {
+end_frame :: proc(frame: Frame) -> (err: GPU_Error = .None) {
+	device := &g_engine.gpu
 	context.logger = device.logger
 	frame := frame
 

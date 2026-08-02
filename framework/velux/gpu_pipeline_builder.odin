@@ -1,6 +1,6 @@
 #+private
 
-package gpu
+package velux
 
 import "core:log"
 import vk "vendor:vulkan"
@@ -131,7 +131,7 @@ pipeline_builder_set_layout :: proc(builder: ^Pipeline_Builder, layout: vk.Pipel
 }
 
 @(require_results)
-pipeline_builder_build_pipeline :: proc(device: vk.Device, builder: ^Pipeline_Builder, loc := #caller_location) -> (vk.Pipeline, Error) {
+pipeline_builder_build_pipeline :: proc(device: vk.Device, builder: ^Pipeline_Builder, loc := #caller_location) -> (vk.Pipeline, GPU_Error) {
 	viewport_state: vk.PipelineViewportStateCreateInfo = {
 		sType         = .PIPELINE_VIEWPORT_STATE_CREATE_INFO,
 		viewportCount = 1,

@@ -1,4 +1,4 @@
-package gpu
+package velux
 
 import "core:mem"
 
@@ -24,14 +24,14 @@ Buffer_Kind :: enum {
 
 @(require_results)
 create_buffer :: proc(
-	device: ^Device,
 	$T: typeid,
 	#any_int size: vk.DeviceSize = 1,
-	kind: Buffer_Kind,
+	kind: Buffer_Kind = .Storage,
 ) -> (
 	buffer: Buffer(T),
-	err: Error,
+	err: GPU_Error,
 ) {
+	device := &g_engine.gpu
 	context.logger = device.logger
 
 	alloc_size := cast(vk.DeviceSize)(size_of(T) * size)
@@ -59,7 +59,8 @@ create_buffer :: proc(
 	return buffer, .None
 }
 
-destroy_buffer :: proc(device: ^Device, buffer: ^Buffer($T)) {
+destroy_buffer :: proc(buffer: ^Buffer($T)) {
+	device := &g_engine.gpu
 	vma.DestroyBuffer(device.vma_allocator, buffer.handle, buffer.allocation)
 	buffer^ = {}
 }
@@ -114,15 +115,15 @@ write_buffer_slice :: proc(buffer: ^Buffer($T), in_data: []$U, offset: vk.Device
 
 @(require_results)
 write_staging_buffer :: proc(
-	device: ^Device,
 	cmd: vk.CommandBuffer,
 	buffer: ^Buffer($T),
 	in_data: ^$U,
 	offset: vk.DeviceSize = 0,
 	loc := #caller_location,
 ) -> (
-	err: Error = .None,
+	err: GPU_Error = .None,
 ) {
+	device := &g_engine.gpu
 	context.logger = device.logger
 
 	size := size_of(U)
@@ -132,7 +133,7 @@ write_staging_buffer :: proc(
 		loc,
 	)
 
-	staging := create_buffer(device, u8, cast(vk.DeviceSize)size, .Staging) or_return
+	staging := create_buffer(u8, cast(vk.DeviceSize)size, .Staging) or_return
 	write_buffer(&staging, in_data)
 	append(&device.imm_transfer_ctx.staging_buffers, staging)
 
@@ -144,15 +145,15 @@ write_staging_buffer :: proc(
 
 @(require_results)
 write_staging_buffer_slice :: proc(
-	device: ^Device,
 	cmd: vk.CommandBuffer,
 	buffer: ^Buffer($T),
 	in_data: []$U,
 	offset: vk.DeviceSize = 0,
 	loc := #caller_location,
 ) -> (
-	err: Error = .None,
+	err: GPU_Error = .None,
 ) {
+	device := &g_engine.gpu
 	context.logger = device.logger
 
 	size := size_of(U) * len(in_data)
@@ -162,7 +163,7 @@ write_staging_buffer_slice :: proc(
 		loc,
 	)
 
-	staging := create_buffer(device, u8, cast(vk.DeviceSize)size, .Staging) or_return
+	staging := create_buffer(u8, cast(vk.DeviceSize)size, .Staging) or_return
 	write_buffer_slice(&staging, in_data)
 	append(&device.imm_transfer_ctx.staging_buffers, staging)
 

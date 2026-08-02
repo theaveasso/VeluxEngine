@@ -1,4 +1,4 @@
-package gpu
+package velux
 
 import vk "vendor:vulkan"
 
@@ -10,7 +10,7 @@ Transfer_Context :: struct {
 }
 
 @(private, require_results)
-create_immediate_transfer_context :: proc(device: ^Device) -> (err: Error = .None) {
+create_immediate_transfer_context :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
 	defer if err != .None do destroy_immediate_transfer_context(device)
 
 	pool_info: vk.CommandPoolCreateInfo = {
@@ -37,7 +37,7 @@ create_immediate_transfer_context :: proc(device: ^Device) -> (err: Error = .Non
 }
 
 @(private)
-destroy_immediate_transfer_context :: proc(device: ^Device) {
+destroy_immediate_transfer_context :: proc(device: ^GPU_Device) {
 	vk.DestroyCommandPool(device.device, device.imm_transfer_ctx.command_pool, nil)
 	vk.DestroyFence(device.device, device.imm_transfer_ctx.fence, nil)
 	destroy_immediate_staging_buffers(device)
@@ -45,7 +45,8 @@ destroy_immediate_transfer_context :: proc(device: ^Device) {
 }
 
 @(require_results)
-immediate_transfer_begin :: proc(device: ^Device) -> (cmd: vk.CommandBuffer, err: Error) {
+immediate_transfer_begin :: proc() -> (cmd: vk.CommandBuffer, err: GPU_Error) {
+	device := &g_engine.gpu
 	context.logger = device.logger
 
 	vk_check(vk.ResetFences(device.device, 1, &device.imm_transfer_ctx.fence)) or_return
@@ -58,7 +59,8 @@ immediate_transfer_begin :: proc(device: ^Device) -> (cmd: vk.CommandBuffer, err
 }
 
 @(require_results)
-immediate_transfer_end :: proc(device: ^Device) -> (err: Error = .None) {
+immediate_transfer_end :: proc() -> (err: GPU_Error = .None) {
+	device := &g_engine.gpu
 	defer {
 		destroy_immediate_staging_buffers(device)
 		clear(&device.imm_transfer_ctx.staging_buffers)
@@ -75,8 +77,8 @@ immediate_transfer_end :: proc(device: ^Device) -> (err: Error = .None) {
 }
 
 @(private)
-destroy_immediate_staging_buffers :: proc(device: ^Device) {
+destroy_immediate_staging_buffers :: proc(device: ^GPU_Device) {
 	for &staging in device.imm_transfer_ctx.staging_buffers {
-		destroy_buffer(device, &staging)
+		destroy_buffer(&staging)
 	}
 }

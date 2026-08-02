@@ -6,7 +6,6 @@ import "core:time"
 import "vlx:gpu"
 import "vlx:internal/vox"
 import "vlx:platform"
-import "vlx:ui"
 
 MAX_DELTA :: 0.1
 
@@ -37,7 +36,7 @@ Error :: union #shared_nil {
 	gpu.Error,
 	platform.Error,
 	Shader_Error,
-	ui.Error,
+	UI_Error,
 	vox.Error,
 }
 
@@ -47,12 +46,13 @@ g_engine: ^Engine
 @(require_results)
 create :: proc(config: Config, allocator := context.allocator) -> (engine: ^Engine, err: Error) {
 	engine = new(Engine, allocator)
+	g_engine = engine
 	if err = init(engine, config); err != nil {
+		g_engine = nil
 		free(engine)
 		return nil, err
 	}
 
-	g_engine = engine
 	return engine, nil
 }
 
@@ -90,7 +90,7 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 		},
 	) or_return
 
-	engine.ui_context = ui.init(&engine.gpu, &engine.window) or_return
+	init_ui(engine) or_return
 
 	if audio_err := init_audio(&engine.audio); audio_err != nil {
 		log.warnf("audio unavailable, continuing withou sound: %v", audio_err)
@@ -133,7 +133,7 @@ wait_for_idle :: proc(engine: ^Engine) {
 
 shutdown :: proc(engine: ^Engine) {
 	wait_for_idle(engine)
-	ui.destroy()
+	destroy_ui(engine)
 	gpu.destroy(&engine.gpu)
 	destroy_audio(&engine.audio)
 	destroy_watch_shaders(engine)

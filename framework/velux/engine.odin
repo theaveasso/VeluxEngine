@@ -3,7 +3,6 @@ package velux
 import "core:log"
 import "core:time"
 
-import "vlx:audio"
 import "vlx:gpu"
 import "vlx:internal/vox"
 import "vlx:platform"
@@ -25,8 +24,9 @@ Engine :: struct {
 	window:            platform.Window,
 	input:             platform.Input_State,
 	gpu:               gpu.Device,
-	audio:             audio.Device,
+	audio:             Audio_Device,
 	watch_shaders:     [dynamic]Shader_Watch,
+	ui_context:        ^UI_Context,
 	hud:               Hud,
 	last_shader_check: time.Time,
 	dt:                f32,
@@ -34,7 +34,7 @@ Engine :: struct {
 }
 
 Error :: union #shared_nil {
-	audio.Error,
+	Audio_Error,
 	gpu.Error,
 	platform.Error,
 	shaders.Error,
@@ -91,9 +91,9 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 		},
 	) or_return
 
-	ui.init(&engine.gpu, &engine.window) or_return
+	engine.ui_context = ui.init(&engine.gpu, &engine.window) or_return
 
-	if audio_err := audio.init(&engine.audio); audio_err != nil {
+	if audio_err := init_audio(&engine.audio); audio_err != nil {
 		log.warnf("audio unavailable, continuing withou sound: %v", audio_err)
 	}
 
@@ -136,7 +136,7 @@ shutdown :: proc(engine: ^Engine) {
 	wait_for_idle(engine)
 	ui.destroy()
 	gpu.destroy(&engine.gpu)
-	audio.destroy(&engine.audio)
+	destroy_audio(&engine.audio)
 	destroy_watch_shaders(engine)
 	platform.destroy_window(&engine.window)
 	platform.shutdown()

@@ -7,6 +7,7 @@ time :: platform.time
 Mouse_Button :: platform.Mouse_Button
 Key :: platform.Key
 
+bind_input :: platform.bind_input
 mouse_delta :: platform.mouse_delta
 scroll_delta :: platform.scroll_delta
 is_mouse_down :: platform.is_mouse_down

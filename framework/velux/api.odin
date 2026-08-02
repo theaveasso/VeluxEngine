@@ -1,7 +1,6 @@
 package velux
 
 import "base:runtime"
-import "vlx:audio"
 import "vlx:shaders"
 
 import vma "third_party:odin-vma"
@@ -33,8 +32,6 @@ Graphics_Pipeline_Create_Info :: gpu.Graphics_Pipeline_Create_Info
 Command_Buffer :: vk.CommandBuffer
 Shader_Module :: vk.ShaderModule
 Format :: vk.Format
-
-Sound_Handle :: audio.Sound_Handle
 
 cmd_begin_rendering :: gpu.cmd_begin_rendering
 cmd_bind_graphics_pipeline :: gpu.cmd_bind_graphics_pipeline
@@ -172,16 +169,3 @@ prof_zone_end :: #force_inline proc(frame: Frame, loc := #caller_location) {gpu.
 // begin	vlx:shaders		---
 compile_slang :: shaders.compile_slang
 // end		vlx:shaders		---
-
-// begin	vlx:audio		---
-@(require_results)
-load_sound :: #force_inline proc(file_name: string, spatial: bool) -> (Sound_Handle, Error) {
-	return audio.load(&g_engine.audio, file_name, spatial)
-}
-
-play_sound :: #force_inline proc(handle: Sound_Handle) {audio.play(&g_engine.audio, handle)}
-
-stop_sound :: #force_inline proc(handle: Sound_Handle) {audio.stop(&g_engine.audio, handle)}
-
-play_oneshot :: #force_inline proc(file_name: string) {audio.play_oneshot(&g_engine.audio, file_name)}
-// end		vlx:audio		---

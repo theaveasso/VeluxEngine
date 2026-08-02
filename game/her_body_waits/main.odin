@@ -48,13 +48,15 @@ Game :: struct {
 }
 
 main :: proc() {
-	vlx.run(vlx.App(Game){
-		config = {app_name = "Her Body Waits", width = 1600, height = 900},
-		init = game_init,
-		update = game_update,
-		draw = game_draw,
-		shutdown = game_shutdown,
-	})
+	vlx.run(
+		vlx.App(Game) {
+			config = {app_name = "Her Body Waits", width = 1600, height = 900},
+			init = game_init,
+			update = game_update,
+			draw = game_draw,
+			shutdown = game_shutdown,
+		},
+	)
 }
 
 game_init :: proc(game: ^Game) -> (err: vlx.Error) {
@@ -104,11 +106,7 @@ game_update :: proc(game: ^Game) -> (err: vlx.Error) {
 	game.head_pitch = clamp(game.head_pitch, -HEAD_PITCH_LIMIT, HEAD_PITCH_LIMIT)
 
 	cos_pitch := math.cos(game.head_pitch)
-	forward := [3]f32 {
-		cos_pitch * math.sin(game.head_yaw),
-		math.sin(game.head_pitch),
-		cos_pitch * math.cos(game.head_yaw),
-	}
+	forward := [3]f32{cos_pitch * math.sin(game.head_yaw), math.sin(game.head_pitch), cos_pitch * math.cos(game.head_yaw)}
 	right := linalg.normalize(linalg.cross(forward, WORLD_UP))
 
 	velocity := right * input.move.x + WORLD_UP * input.move.y + forward * input.move.z

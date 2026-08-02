@@ -6,6 +6,7 @@ Platform_Error :: enum {
 	None,
 	Init_Failed,
 	Window_Creation_Failed,
+	Allocation_Failed,
 }
 
 Window :: struct {

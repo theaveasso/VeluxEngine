@@ -49,13 +49,14 @@ Game :: struct {
 
 main :: proc() {
 	vlx.run(
-		vlx.App(Game) {
+		vlx.make_app(
+			Game,
 			config = {app_name = "Her Body Waits", width = 1600, height = 900},
 			init = game_init,
 			update = game_update,
 			draw = game_draw,
 			shutdown = game_shutdown,
-		},
+		),
 	)
 }
 

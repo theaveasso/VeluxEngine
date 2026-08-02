@@ -26,13 +26,16 @@ Game :: struct {
 }
 
 main :: proc() {
-	vlx.run(vlx.App(Game){
-		config = {app_name = "Sponza", width = 1600, height = 900},
-		init = game_init,
-		update = game_update,
-		draw = game_draw,
-		shutdown = game_shutdown,
-	})
+	vlx.run(
+		vlx.make_app(
+			Game,
+			config = {app_name = "Sponza", width = 1600, height = 900},
+			init = game_init,
+			update = game_update,
+			draw = game_draw,
+			shutdown = game_shutdown,
+		),
+	)
 }
 
 game_init :: proc(game: ^Game) -> (err: vlx.Error) {

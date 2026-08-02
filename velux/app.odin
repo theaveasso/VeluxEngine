@@ -1,16 +1,9 @@
 package velux
 
 import "core:log"
+import "core:mem"
 
-App :: struct($T: typeid) {
-	config:   Config,
-	init:     proc(game: ^T) -> Error,
-	update:   proc(game: ^T) -> Error,
-	draw:     proc(game: ^T, frame: Frame),
-	shutdown: proc(game: ^T),
-}
-
-App_Raw :: struct {
+App :: struct {
 	config:      Config,
 	init:        proc(game: rawptr) -> Error,
 	update:      proc(game: rawptr) -> Error,
@@ -24,13 +17,20 @@ App_Raw :: struct {
 }
 
 @(require_results)
-erase :: proc(app: App($T)) -> App_Raw {
+make_app :: proc(
+	$T: typeid,
+	config: Config,
+	init: proc(game: ^T) -> Error = nil,
+	update: proc(game: ^T) -> Error = nil,
+	draw: proc(game: ^T, frame: Frame) = nil,
+	shutdown: proc(game: ^T) = nil,
+) -> App {
 	return {
-		config = app.config,
-		init = transmute(proc(game: rawptr) -> Error)(app.init),
-		update = transmute(proc(game: rawptr) -> Error)(app.update),
-		draw = transmute(proc(game: rawptr, frame: Frame))(app.draw),
-		shutdown = transmute(proc(game: rawptr))(app.shutdown),
+		config = config,
+		init = transmute(proc(game: rawptr) -> Error)(init),
+		update = transmute(proc(game: rawptr) -> Error)(update),
+		draw = transmute(proc(game: rawptr, frame: Frame))(draw),
+		shutdown = transmute(proc(game: rawptr))(shutdown),
 		attach = attach,
 		state_size = size_of(T),
 		state_align = align_of(T),
@@ -39,7 +39,8 @@ erase :: proc(app: App($T)) -> App_Raw {
 	}
 }
 
-run :: proc(app: App($T), allocator := context.allocator) -> Error {
+run :: proc(app: App, allocator := context.allocator) -> Error {
+	app := app
 	owns_logger := context.logger.procedure == nil
 	if owns_logger do context.logger = log.create_console_logger()
 	defer if owns_logger do log.destroy_console_logger(context.logger)
@@ -51,22 +52,25 @@ run :: proc(app: App($T), allocator := context.allocator) -> Error {
 	}
 	defer destroy(engine)
 
-	raw := erase(app)
-	game := new(T, allocator)
+	game, alloc_err := mem.alloc(app.state_size, app.state_align, allocator)
+	if alloc_err != nil {
+		log.errorf("game state alloc failed: %v", alloc_err)
+		return Platform_Error.Allocation_Failed
+	}
 	defer free(game, allocator)
 
-	if raw.init != nil {
-		if init_err := raw.init(game); init_err != nil {
+	if app.init != nil {
+		if init_err := app.init(game); init_err != nil {
 			log.errorf("game init failed: %v", init_err)
 			return init_err
 		}
 	}
 	defer {
 		wait_for_idle()
-		if raw.shutdown != nil do raw.shutdown(game)
+		if app.shutdown != nil do app.shutdown(game)
 	}
 
-	for running() do app_frame(&raw, rawptr(game))
+	for running() do app_frame(&app, game)
 	return nil
 }
 
@@ -75,7 +79,7 @@ quit :: proc() {
 }
 
 @(private)
-app_frame :: proc(app: ^App_Raw, game: rawptr) {
+app_frame :: proc(app: ^App, game: rawptr) {
 	ui_new_frame()
 	if app.update != nil {
 		if update_err := app.update(game); update_err != nil {

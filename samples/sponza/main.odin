@@ -38,10 +38,10 @@ run :: proc(engine: ^velux.Engine) -> (err: velux.Error) {
 	#assert(size_of(Push_Constants) == 128)
 	pc: Push_Constants
 
-	now := velux.time()
-	level := velux.create_level(SPONZA, NO_MARKERS) or_return
-	defer velux.destroy_level(&level)
-	log.infof("create levels time took %.3f", velux.time() - now)
+	now := velux.now()
+	level := velux.load_level(SPONZA, NO_MARKERS) or_return
+	defer velux.unload_level(&level)
+	log.infof("create levels time took %.3f", velux.now() - now)
 
 	grid := level.world.grid
 	log.infof("sponza grid %v", grid.dimensions)

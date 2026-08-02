@@ -6,8 +6,6 @@ import "core:os"
 import "core:strings"
 import "core:time"
 
-import "vlx:shaders"
-
 Shader_Watch :: struct {
 	pipeline:   ^Graphics_Pipeline,
 	slang_path: string,
@@ -29,7 +27,7 @@ poll_shader_watches :: proc(engine: ^Engine) {
 		watch.last_write = last_write
 
 		start := time.now()
-		output, compile_err := shaders.compile_slang(watch.slang_path, watch.spv_path, context.temp_allocator); if compile_err != .None {
+		output, compile_err := compile_slang(watch.slang_path, watch.spv_path, context.temp_allocator); if compile_err != .None {
 			log.errorf("shader compile failed (%v): %s", compile_err, watch.slang_path)
 			if output != "" do log.error(output)
 			continue
@@ -54,7 +52,7 @@ poll_shader_watches :: proc(engine: ^Engine) {
 	}
 }
 
-create_watch_shader :: proc(engine: ^Engine, pipeline: ^Graphics_Pipeline, slang_path, spv_path: string) -> (err: shaders.Error) {
+create_watch_shader :: proc(engine: ^Engine, pipeline: ^Graphics_Pipeline, slang_path, spv_path: string) -> (err: Shader_Error) {
 	when !ODIN_DEBUG do return .None
 
 	last_write, stat_err := os.modification_time_by_path(slang_path); if stat_err != nil {

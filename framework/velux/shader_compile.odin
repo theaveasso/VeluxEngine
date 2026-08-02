@@ -1,18 +1,20 @@
-package shaders
+package velux
 
 import "base:runtime"
 import "core:os"
 import "core:path/filepath"
 import "core:strings"
 
-Error :: enum {
+ENGINE_SHADER_DIR :: "../../framework/velux/shaders"
+
+Shader_Error :: enum {
 	None,
 	File_Not_Found,
 	Compiler_Not_Found,
 	Compile_Failed,
 }
 
-compile_slang :: proc(slang_path, spv_path: string, allocator: runtime.Allocator) -> (output: string, err: Error) {
+compile_slang :: proc(slang_path, spv_path: string, allocator: runtime.Allocator) -> (output: string, err: Shader_Error) {
 	when ODIN_OS == .Windows {
 		SLANGC_NAME :: "slangc.exe"
 		SLANGC_DIR :: "Bin"

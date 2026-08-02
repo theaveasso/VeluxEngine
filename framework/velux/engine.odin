@@ -6,7 +6,6 @@ import "core:time"
 import "vlx:gpu"
 import "vlx:internal/vox"
 import "vlx:platform"
-import "vlx:shaders"
 import "vlx:ui"
 
 MAX_DELTA :: 0.1
@@ -37,7 +36,7 @@ Error :: union #shared_nil {
 	Audio_Error,
 	gpu.Error,
 	platform.Error,
-	shaders.Error,
+	Shader_Error,
 	ui.Error,
 	vox.Error,
 }

@@ -23,7 +23,7 @@ if defined VULKAN_SDK if exist "%VULKAN_SDK%\Bin\slangc.exe" set "SLANGC=%VULKAN
 for %%F in ("%OUT%") do if not exist "%%~dpF" mkdir "%%~dpF"
 for %%F in ("%IN%") do set "IN_DIR=%%~dpF."
 
-"%SLANGC%" "%IN%" -I "%IN_DIR%" -I "%ROOT%framework\shaders" -target spirv -fvk-use-entrypoint-name -o "%OUT%"
+"%SLANGC%" "%IN%" -I "%IN_DIR%" -I "%ROOT%framework\velux\shaders" -target spirv -fvk-use-entrypoint-name -o "%OUT%"
 if %errorlevel% neq 0 (
   echo Shader compilation failed: %IN%
   exit /b 1

@@ -52,6 +52,7 @@ main :: proc() {
 		config = {app_name = "Her Body Waits", width = 1600, height = 900},
 		init = game_init,
 		update = game_update,
+		draw = game_draw,
 		shutdown = game_shutdown,
 	})
 }
@@ -75,7 +76,7 @@ game_shutdown :: proc(game: ^Game) {
 	vlx.destroy_gpu_pipeline(&game.pipeline)
 }
 
-game_update :: proc(game: ^Game, frame: vlx.Frame) -> (err: vlx.Error) {
+game_update :: proc(game: ^Game) -> (err: vlx.Error) {
 	window_extent := vlx.window_extent()
 	dt := vlx.delta_time()
 
@@ -141,7 +142,10 @@ game_update :: proc(game: ^Game, frame: vlx.Frame) -> (err: vlx.Error) {
 	cmd := vlx.immediate_transfer_begin() or_return
 	vlx.write_staging_buffer_slice(cmd, &game.tether_buffer, game.tether_positions[:]) or_return
 	vlx.immediate_transfer_end() or_return
+	return
+}
 
+game_draw :: proc(game: ^Game, frame: vlx.Frame) {
 	vlx.cmd_begin_rendering(frame, [4]f32{0.02, 0.02, 0.05, 1})
 	vlx.prof_zone_begin(frame, "raycast")
 	vlx.cmd_bind_graphics_pipeline(frame, game.pipeline)
@@ -149,5 +153,4 @@ game_update :: proc(game: ^Game, frame: vlx.Frame) -> (err: vlx.Error) {
 	vlx.cmd_draw(frame, 3)
 	vlx.prof_zone_end(frame)
 	vlx.cmd_end_rendering(frame)
-	return
 }

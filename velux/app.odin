@@ -5,7 +5,8 @@ import "core:log"
 App :: struct($T: typeid) {
 	config:   Config,
 	init:     proc(game: ^T) -> Error,
-	update:   proc(game: ^T, frame: Frame) -> Error,
+	update:   proc(game: ^T) -> Error,
+	draw:     proc(game: ^T, frame: Frame),
 	shutdown: proc(game: ^T),
 }
 
@@ -36,13 +37,20 @@ run :: proc(app: App($T), allocator := context.allocator) -> Error {
 	}
 
 	for running() {
-		frame, frame_err := begin_frame()
-		if frame_err != nil do continue
-
 		ui_new_frame()
-		if update_err := app.update(game, frame); update_err != nil {
-			log.errorf("update: %v", update_err)
+		if app.update != nil {
+			if update_err := app.update(game); update_err != nil {
+				log.errorf("update: %v", update_err)
+			}
 		}
+
+		frame, frame_err := begin_frame()
+		if frame_err != nil {
+			ui_end_frame()
+			continue
+		}
+
+		if app.draw != nil do app.draw(game, frame)
 
 		cmd_begin_rendering(frame)
 		prof_zone_begin(frame, "ui")

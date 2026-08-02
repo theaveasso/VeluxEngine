@@ -30,6 +30,7 @@ main :: proc() {
 		config = {app_name = "Sponza", width = 1600, height = 900},
 		init = game_init,
 		update = game_update,
+		draw = game_draw,
 		shutdown = game_shutdown,
 	})
 }
@@ -68,7 +69,7 @@ game_shutdown :: proc(game: ^Game) {
 	vlx.unload_level(&game.level)
 }
 
-game_update :: proc(game: ^Game, frame: vlx.Frame) -> (err: vlx.Error) {
+game_update :: proc(game: ^Game) -> (err: vlx.Error) {
 	window_extent := vlx.window_extent()
 
 	if vlx.ui_begin_panel("Sponza") {
@@ -85,7 +86,10 @@ game_update :: proc(game: ^Game, frame: vlx.Frame) -> (err: vlx.Error) {
 
 	game.pc.inv_view_proj = linalg.inverse(proj * view)
 	game.pc.cam_pos = {game.camera.position[0], game.camera.position[1], game.camera.position[2], game.voxel_size}
+	return
+}
 
+game_draw :: proc(game: ^Game, frame: vlx.Frame) {
 	vlx.cmd_begin_rendering(frame, [4]f32{0.05, 0.05, 0.1, 1})
 	vlx.prof_zone_begin(frame, "raycast")
 	vlx.cmd_bind_graphics_pipeline(frame, game.pipeline)
@@ -93,5 +97,4 @@ game_update :: proc(game: ^Game, frame: vlx.Frame) -> (err: vlx.Error) {
 	vlx.cmd_draw(frame, 3)
 	vlx.prof_zone_end(frame)
 	vlx.cmd_end_rendering(frame)
-	return
 }

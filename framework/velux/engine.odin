@@ -23,6 +23,7 @@ Config :: struct {
 
 Engine :: struct {
 	window:            platform.Window,
+	input:             platform.Input_State,
 	gpu:               gpu.Device,
 	audio:             audio.Device,
 	watch_shaders:     [dynamic]Shader_Watch,
@@ -77,7 +78,7 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 
 	platform.init() or_return
 	platform.create_window(&engine.window, config.width, config.height, config.app_name) or_return
-	platform.input_init(&engine.window)
+	platform.input_init(&engine.window, &engine.input)
 
 	gpu.init(
 		&engine.gpu,

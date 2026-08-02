@@ -19,6 +19,9 @@ Key :: enum i32 {
 	TAB          = glfw.KEY_TAB,
 	F1           = glfw.KEY_F1,
 	F2           = glfw.KEY_F2,
+	F3           = glfw.KEY_F3,
+	F4           = glfw.KEY_F4,
+	F5           = glfw.KEY_F5,
 }
 
 Input_State :: struct {
@@ -33,65 +36,74 @@ Input_State :: struct {
 	ignore_next_delta:   bool,
 }
 
-g_input_state: Input_State
+g_input: ^Input_State
 
-input_init :: proc(window: ^Window) {
-	g_input_state.window_handle = window.handle
+input_init :: proc(window: ^Window, state: ^Input_State) {
+	g_input = state
+	g_input.window_handle = window.handle
 	curr_mx, curr_my := glfw.GetCursorPos(window.handle)
-	g_input_state.mouse_position = {f32(curr_mx), f32(curr_my)}
-	glfw.SetScrollCallback(g_input_state.window_handle, scroll_callback)
+	g_input.mouse_position = {f32(curr_mx), f32(curr_my)}
+	glfw.SetScrollCallback(g_input.window_handle, scroll_callback)
 }
 
 input_new_frame :: proc() {
-	mx, my := glfw.GetCursorPos(g_input_state.window_handle)
-	if g_input_state.ignore_next_delta {
-		g_input_state.mouse_delta = {}
-		g_input_state.ignore_next_delta = false
+	mx, my := glfw.GetCursorPos(g_input.window_handle)
+	if g_input.ignore_next_delta {
+		g_input.mouse_delta = {}
+		g_input.ignore_next_delta = false
 	} else {
-		g_input_state.mouse_delta = {f32(mx), f32(my)} - g_input_state.mouse_position
+		g_input.mouse_delta = {f32(mx), f32(my)} - g_input.mouse_position
 	}
-	g_input_state.mouse_position = {f32(mx), f32(my)}
-	g_input_state.scroll_delta = g_input_state.scroll_accumulation
-	g_input_state.scroll_accumulation = {}
+	g_input.mouse_position = {f32(mx), f32(my)}
+	g_input.scroll_delta = g_input.scroll_accumulation
+	g_input.scroll_accumulation = {}
 
-	g_input_state.keys_previous = g_input_state.keys_current
+	g_input.keys_previous = g_input.keys_current
 	for key in Key {
-		g_input_state.keys_current[key] = glfw.GetKey(g_input_state.window_handle, i32(key)) == glfw.PRESS
+		g_input.keys_current[key] = glfw.GetKey(g_input.window_handle, i32(key)) == glfw.PRESS
 	}
 }
+
+bind_input :: proc(state: ^Input_State) {g_input = state}
 
 @(require_results)
 is_mouse_down :: proc(mouse_button: Mouse_Button) -> bool {
-	return glfw.GetMouseButton(g_input_state.window_handle, i32(mouse_button)) == glfw.PRESS
+	return glfw.GetMouseButton(g_input.window_handle, i32(mouse_button)) == glfw.PRESS
 }
+
 @(require_results)
 is_key_down :: proc(key: Key) -> bool {
-	return g_input_state.keys_current[key]
+	return g_input.keys_current[key]
 }
+
 @(require_results)
 is_key_pressed :: proc(key: Key) -> bool {
-	return g_input_state.keys_current[key] && !g_input_state.keys_previous[key]
+	return g_input.keys_current[key] && !g_input.keys_previous[key]
 }
+
 @(require_results)
 mouse_delta :: proc() -> [2]f32 {
-	return g_input_state.mouse_delta
+	return g_input.mouse_delta
 }
+
 @(require_results)
 scroll_delta :: proc() -> [2]f32 {
-	return g_input_state.scroll_delta
+	return g_input.scroll_delta
 }
+
 set_cursor_captured :: proc(captured: bool) {
-	if g_input_state.cursor_captured == captured do return
-	g_input_state.cursor_captured = captured
+	if g_input.cursor_captured == captured do return
+	g_input.cursor_captured = captured
 	mode: i32 = captured ? glfw.CURSOR_DISABLED : glfw.CURSOR_NORMAL
-	glfw.SetInputMode(g_input_state.window_handle, glfw.CURSOR, mode)
-	g_input_state.ignore_next_delta = true
+	glfw.SetInputMode(g_input.window_handle, glfw.CURSOR, mode)
+	g_input.ignore_next_delta = true
 }
+
 @(require_results)
 is_cursor_captured :: proc() -> bool {
-	return g_input_state.cursor_captured
+	return g_input.cursor_captured
 }
 
 scroll_callback :: proc "c" (window: glfw.WindowHandle, xoffset, yoffset: f64) {
-	g_input_state.scroll_accumulation += {f32(xoffset), f32(yoffset)}
+	g_input.scroll_accumulation += {f32(xoffset), f32(yoffset)}
 }

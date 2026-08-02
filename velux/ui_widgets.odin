@@ -8,6 +8,7 @@ ui_demo :: proc() {
 	imgui.ShowDemoWindow()
 }
 
+@(require_results)
 ui_begin_panel :: proc(name: string, allocator := context.temp_allocator) -> bool {
 	return ui_ready() ? imgui.Begin(strings.clone_to_cstring(name, allocator)) : false
 }

@@ -13,6 +13,7 @@ Shader_Watch :: struct {
 	last_write: time.Time,
 }
 
+@(private)
 poll_shader_watches :: proc(engine: ^Engine) {
 	now := time.now()
 	if time.duration_milliseconds(time.diff(engine.last_shader_check, now)) < 250 do return
@@ -52,6 +53,7 @@ poll_shader_watches :: proc(engine: ^Engine) {
 	}
 }
 
+@(require_results)
 watch_shader :: proc(pipeline: ^GPU_Pipeline, slang_path, spv_path: string) -> (err: Shader_Error) {
 	when !ODIN_DEBUG do return .None
 	engine := g_engine

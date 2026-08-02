@@ -28,7 +28,7 @@ GPU_Image_Info :: struct {
 	usage:             vma.MemoryUsage,
 }
 
-@(require_results)
+@(private, require_results)
 create_image :: proc(create_info: GPU_Image_Info, loc := #caller_location) -> (image: GPU_Image, err: GPU_Error) {
 	device := &g_engine.gpu
 	context.logger = device.logger
@@ -96,6 +96,7 @@ destroy_gpu_image :: proc(image: ^GPU_Image) {
 	image^ = {}
 }
 
+@(require_results)
 create_sampler :: proc(
 	device: ^GPU_Device,
 	filter: vk.Filter,
@@ -161,7 +162,7 @@ write_staging_image :: proc(
 	return
 }
 
-@(require_results)
+@(private, require_results)
 is_depth_format :: proc(format: vk.Format) -> bool {
 	#partial switch format {
 	case .D16_UNORM, .D32_SFLOAT, .D16_UNORM_S8_UINT, .D24_UNORM_S8_UINT, .D32_SFLOAT_S8_UINT, .X8_D24_UNORM_PACK32:
@@ -170,7 +171,7 @@ is_depth_format :: proc(format: vk.Format) -> bool {
 	return false
 }
 
-@(require_results)
+@(private, require_results)
 is_stencil_format :: proc(format: vk.Format) -> bool {
 	#partial switch format {
 	case .S8_UINT, .D16_UNORM_S8_UINT, .D24_UNORM_S8_UINT, .D32_SFLOAT_S8_UINT:
@@ -179,6 +180,7 @@ is_stencil_format :: proc(format: vk.Format) -> bool {
 	return false
 }
 
+@(private)
 vk_aspect_of_format :: proc(format: vk.Format) -> (flags: vk.ImageAspectFlags) {
 	if !is_depth_format(format) && !is_stencil_format(format) do return {.COLOR}
 

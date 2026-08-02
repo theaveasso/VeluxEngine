@@ -14,6 +14,7 @@ Shader_Error :: enum {
 	Compile_Failed,
 }
 
+@(require_results)
 compile_slang :: proc(slang_path, spv_path: string, allocator: runtime.Allocator) -> (output: string, err: Shader_Error) {
 	when ODIN_OS == .Windows {
 		SLANGC_NAME :: "slangc.exe"

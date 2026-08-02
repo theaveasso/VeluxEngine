@@ -140,6 +140,7 @@ camera_set_controller :: proc(camera: ^Camera, controller: Camera_Controller) {
 	}
 }
 
+@(require_results)
 camera_input_from_platform :: proc() -> (input: Camera_Input) {
 	if !ui_wants_keyboard() {
 		if is_key_down(.D) do input.move.x += 1
@@ -158,10 +159,12 @@ camera_input_from_platform :: proc() -> (input: Camera_Input) {
 	return
 }
 
+@(require_results)
 camera_view :: proc(camera: Camera) -> matrix[4, 4]f32 {
 	return linalg.matrix4_look_at(camera.position, camera.target, [3]f32{0.0, 1.0, 0.0})
 }
 
+@(require_results)
 camera_projection :: proc(camera: Camera, aspect: f32) -> matrix[4, 4]f32 {
 	switch proj in camera.projection {
 	case Perspective:
@@ -178,12 +181,14 @@ projection :: proc {
 	projection_orthographic,
 }
 
+@(require_results)
 projection_perspective :: proc(p: Perspective, aspect: f32) -> matrix[4, 4]f32 {
 	m := linalg.matrix4_perspective(p.fov_y, aspect, p.near, p.far)
 	m[1, 1] *= -1
 	return m
 }
 
+@(require_results)
 projection_orthographic :: proc(o: Orthographic, aspect: f32 = 0) -> matrix[4, 4]f32 {
 	m := linalg.matrix_ortho3d(o.left, o.right, o.bottom, o.top, o.near, o.far)
 	return m

@@ -17,16 +17,19 @@ Pipeline_Builder :: struct {
 	render_info:             vk.PipelineRenderingCreateInfo,
 }
 
+@(private)
 create_pipeline_builder :: proc() -> Pipeline_Builder {
 	pipeline_builder: Pipeline_Builder
 	pipeline_builder_clear(&pipeline_builder)
 	return pipeline_builder
 }
 
+@(private)
 destroy_pipeline_builder :: proc(builder: ^Pipeline_Builder) {
 	delete(builder.shader_stages)
 }
 
+@(private)
 pipeline_builder_clear :: proc(builder: ^Pipeline_Builder) {
 	clear(&builder.shader_stages)
 	builder.input_assembly.sType = .PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO
@@ -39,6 +42,7 @@ pipeline_builder_clear :: proc(builder: ^Pipeline_Builder) {
 	builder.render_info.sType = .PIPELINE_RENDERING_CREATE_INFO
 }
 
+@(private)
 pipeline_builder_set_shaders :: proc(
 	builder: ^Pipeline_Builder,
 	shader: vk.ShaderModule,
@@ -62,21 +66,25 @@ pipeline_builder_set_shaders :: proc(
 	append(&builder.shader_stages, fragment_info)
 }
 
+@(private)
 pipeline_builder_set_topology :: proc(builder: ^Pipeline_Builder, topology: vk.PrimitiveTopology) {
 	builder.input_assembly.topology = topology
 	builder.input_assembly.primitiveRestartEnable = false
 }
 
+@(private)
 pipeline_builder_set_polygon_mode :: proc(builder: ^Pipeline_Builder, mode: vk.PolygonMode) {
 	builder.rasterizer.polygonMode = mode
 	builder.rasterizer.lineWidth = 1.0
 }
 
+@(private)
 pipeline_builder_set_cull_mode :: proc(builder: ^Pipeline_Builder, cull_mode: vk.CullModeFlags, front_face: vk.FrontFace) {
 	builder.rasterizer.cullMode = cull_mode
 	builder.rasterizer.frontFace = front_face
 }
 
+@(private)
 pipeline_builder_multisampling_none :: proc(builder: ^Pipeline_Builder) {
 	builder.multisampling.sampleShadingEnable = false
 	builder.multisampling.rasterizationSamples = {._1}
@@ -86,11 +94,13 @@ pipeline_builder_multisampling_none :: proc(builder: ^Pipeline_Builder) {
 	builder.multisampling.alphaToOneEnable = false
 }
 
+@(private)
 pipeline_builder_disable_blending :: proc(builder: ^Pipeline_Builder) {
 	builder.color_blend_attachment.colorWriteMask = {.R, .G, .B, .A}
 	builder.color_blend_attachment.blendEnable = false
 }
 
+@(private)
 pipeline_builder_disabled_depth_test :: proc(builder: ^Pipeline_Builder) {
 	builder.depth_stencil.depthTestEnable = false
 	builder.depth_stencil.depthWriteEnable = false
@@ -103,6 +113,7 @@ pipeline_builder_disabled_depth_test :: proc(builder: ^Pipeline_Builder) {
 	builder.depth_stencil.maxDepthBounds = 1.0
 }
 
+@(private)
 pipeline_builder_enable_depth_test :: proc(builder: ^Pipeline_Builder, depth_write_enable: b32, op: vk.CompareOp) {
 	builder.depth_stencil.depthTestEnable = true
 	builder.depth_stencil.depthWriteEnable = depth_write_enable
@@ -115,10 +126,12 @@ pipeline_builder_enable_depth_test :: proc(builder: ^Pipeline_Builder, depth_wri
 	builder.depth_stencil.maxDepthBounds = 1.0
 }
 
+@(private)
 pipeline_builder_set_depth_format :: proc(builder: ^Pipeline_Builder, format: vk.Format) {
 	builder.render_info.depthAttachmentFormat = format
 }
 
+@(private)
 pipeline_builder_set_attachment_format :: proc(builder: ^Pipeline_Builder, format: vk.Format) {
 	builder.color_attachment_format = format
 
@@ -126,11 +139,12 @@ pipeline_builder_set_attachment_format :: proc(builder: ^Pipeline_Builder, forma
 	builder.render_info.pColorAttachmentFormats = &builder.color_attachment_format
 }
 
+@(private)
 pipeline_builder_set_layout :: proc(builder: ^Pipeline_Builder, layout: vk.PipelineLayout) {
 	builder.pipeline_layout = layout
 }
 
-@(require_results)
+@(private, require_results)
 pipeline_builder_build_pipeline :: proc(device: vk.Device, builder: ^Pipeline_Builder, loc := #caller_location) -> (vk.Pipeline, GPU_Error) {
 	viewport_state: vk.PipelineViewportStateCreateInfo = {
 		sType         = .PIPELINE_VIEWPORT_STATE_CREATE_INFO,

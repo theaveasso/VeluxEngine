@@ -65,6 +65,7 @@ destroy_gpu_buffer :: proc(buffer: ^GPU_Buffer($T)) {
 	buffer^ = {}
 }
 
+@(private)
 get_buffer_device_address :: proc(device: vk.Device, buffer: GPU_Buffer($T)) -> vk.DeviceAddress {
 	device_address_info: vk.BufferDeviceAddressInfo = {
 		sType  = .BUFFER_DEVICE_ADDRESS_INFO,
@@ -73,6 +74,7 @@ get_buffer_device_address :: proc(device: vk.Device, buffer: GPU_Buffer($T)) -> 
 	return vk.GetBufferDeviceAddress(device, &device_address_info)
 }
 
+@(private)
 vk_vma_buffer_flags :: proc(kind: GPU_Buffer_Kind) -> (vk.BufferUsageFlags, vma.AllocationCreateFlags) {
 	switch kind {
 	case .Storage:

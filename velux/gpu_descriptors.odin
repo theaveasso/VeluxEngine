@@ -21,6 +21,7 @@ create_bindless :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
 	return
 }
 
+@(private)
 destroy_bindless :: proc(device: ^GPU_Device) {
 	vk.DestroySampler(device.device, device.bindless.default_sampler, nil)
 	vk.DestroyDescriptorSetLayout(device.device, device.bindless.layout, nil)

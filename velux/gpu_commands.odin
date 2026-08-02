@@ -9,10 +9,12 @@ Image_Transition :: struct {
 	new_layout: vk.ImageLayout,
 }
 
+@(private)
 cmd_transition_image :: proc(cmd: vk.CommandBuffer, image: vk.Image, aspect: vk.ImageAspectFlags, old_layout, new_layout: vk.ImageLayout) {
 	cmd_transition_images(cmd, {{image, aspect, old_layout, new_layout}})
 }
 
+@(private)
 cmd_transition_images :: proc(cmd: vk.CommandBuffer, transitions: []Image_Transition, loc := #caller_location) {
 	assert(len(transitions) < MAX_BATCH_TRANSITIONS, "transition batch too large", loc)
 
@@ -128,6 +130,7 @@ cmd_draw_indexed :: proc(
 	vk.CmdDrawIndexed(frame.cmd, index_count, instance_count, first_index, vertex_offset, first_instance)
 }
 
+@(private)
 cmd_copy_buffer2 :: proc(cmd: vk.CommandBuffer, src: vk.Buffer, dst: vk.Buffer, region: ^vk.BufferCopy2, count: u32 = 1) {
 	copy_info: vk.CopyBufferInfo2 = {
 		sType       = .COPY_BUFFER_INFO_2,
@@ -140,6 +143,7 @@ cmd_copy_buffer2 :: proc(cmd: vk.CommandBuffer, src: vk.Buffer, dst: vk.Buffer, 
 	vk.CmdCopyBuffer2(cmd, &copy_info)
 }
 
+@(private)
 cmd_copy_buffer_to_image2 :: proc(
 	cmd: vk.CommandBuffer,
 	src: vk.Buffer,

@@ -17,6 +17,7 @@ Hud :: struct {
 	show:       bool,
 }
 
+@(private)
 hud_update :: proc(engine: ^Engine) {
 	if engine.dt <= 0 do return
 
@@ -32,6 +33,7 @@ hud_update :: proc(engine: ^Engine) {
 	}
 }
 
+@(private)
 hud_draw :: proc(engine: ^Engine) {
 	if !engine.hud.show do return
 

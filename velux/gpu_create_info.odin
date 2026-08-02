@@ -3,6 +3,7 @@ package velux
 import vma "third_party:odin-vma"
 import vk "vendor:vulkan"
 
+@(private)
 pipeline_create_info :: proc(
 	push_constant_size: u32,
 	input_topology: vk.PrimitiveTopology,
@@ -29,6 +30,7 @@ pipeline_create_info :: proc(
 	}
 }
 
+@(private)
 image_create_info :: proc(
 	format: vk.Format,
 	extent: vk.Extent3D,

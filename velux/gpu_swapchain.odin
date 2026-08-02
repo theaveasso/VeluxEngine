@@ -124,6 +124,7 @@ recreate_swapchain :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
 	return
 }
 
+@(private)
 destroy_swapchain_resources :: proc(device: ^GPU_Device) {
 	for view in device.swapchain.views {
 		vk.DestroyImageView(device.device, view, nil)
@@ -135,6 +136,7 @@ destroy_swapchain_resources :: proc(device: ^GPU_Device) {
 
 }
 
+@(private)
 choose_swapchain_surface_format :: proc(formats: ^[]vk.SurfaceFormatKHR, loc := #caller_location) -> vk.SurfaceFormatKHR {
 	surface_format := formats[0]
 	for format in formats {
@@ -151,10 +153,12 @@ choose_swapchain_surface_format :: proc(formats: ^[]vk.SurfaceFormatKHR, loc := 
 	return surface_format
 }
 
+@(private)
 choose_swapchain_present_mode :: proc(present_modes: ^[]vk.PresentModeKHR) -> vk.PresentModeKHR {
 	return .FIFO
 }
 
+@(private)
 choose_swapchain_extent :: proc(window: glfw.WindowHandle, capabilities: ^vk.SurfaceCapabilitiesKHR) -> vk.Extent2D {
 	if (capabilities.currentExtent.width != max(u32)) {
 		return capabilities.currentExtent

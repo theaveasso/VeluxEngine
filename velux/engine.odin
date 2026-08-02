@@ -99,6 +99,7 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 	return nil
 }
 
+@(require_results)
 running :: proc() -> bool {
 	engine := g_engine
 	free_all(context.temp_allocator)
@@ -119,10 +120,12 @@ running :: proc() -> bool {
 	return !window_should_close(&engine.window)
 }
 
+@(require_results)
 swapchain_format :: proc() -> Format {
 	return g_engine.gpu.swapchain.surface_format.format
 }
 
+@(require_results)
 window_extent :: proc() -> [2]f32 {
 	return framebuffer_extent(&g_engine.window)
 }

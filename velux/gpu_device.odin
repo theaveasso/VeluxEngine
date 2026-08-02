@@ -77,18 +77,19 @@ Swapchain :: struct {
 	image_index:    u32,
 }
 
-@(require_results)
+@(private, require_results)
 vk_check :: proc(result: vk.Result, err: GPU_Error = .Vulkan_Call_Failed, loc := #caller_location) -> GPU_Error {
 	if result == .SUCCESS do return .None
 	log.errorf("vulkan call failed :%v (%v)", result, loc)
 	return err
 }
 
+@(private)
 wait_idle :: proc(device: ^GPU_Device) {
 	if device.device != nil do vk.DeviceWaitIdle(device.device)
 }
 
-@(require_results)
+@(private, require_results)
 init_gpu :: proc(device: ^GPU_Device, config: GPU_Config) -> (err: GPU_Error = .None) {
 	device.logger = logger_from_prefix(&device.log_state, "[gpu]: ")
 	context.logger = device.logger
@@ -114,6 +115,7 @@ init_gpu :: proc(device: ^GPU_Device, config: GPU_Config) -> (err: GPU_Error = .
 	return
 }
 
+@(private)
 destroy_gpu :: proc(device: ^GPU_Device) {
 	wait_idle(device)
 
@@ -132,6 +134,7 @@ destroy_gpu :: proc(device: ^GPU_Device) {
 	vk.DestroyInstance(device.instance, nil)
 }
 
+@(private)
 debug_callback :: proc "system" (
 	message_severity: vk.DebugUtilsMessageSeverityFlagsEXT,
 	message_type: vk.DebugUtilsMessageTypeFlagsEXT,
@@ -366,6 +369,7 @@ create_vma_allocator :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
 	return
 }
 
+@(private)
 get_required_extensions :: proc(enable_validation_layers: bool) -> [dynamic]cstring {
 	glfw_exts := glfw.GetRequiredInstanceExtensions()
 
@@ -384,6 +388,7 @@ get_required_extensions :: proc(enable_validation_layers: bool) -> [dynamic]cstr
 	return exts
 }
 
+@(private)
 get_required_layers :: proc(enable_validation_layers: bool) -> [dynamic]cstring {
 	layers: [dynamic]cstring
 	if enable_validation_layers {
@@ -397,6 +402,7 @@ get_required_layers :: proc(enable_validation_layers: bool) -> [dynamic]cstring 
 	return layers
 }
 
+@(private)
 is_device_suitable :: proc(physical_device: vk.PhysicalDevice, surface: vk.SurfaceKHR) -> (is_suitable, is_discrete: bool) {
 	properties: vk.PhysicalDeviceProperties
 	vk.GetPhysicalDeviceProperties(physical_device, &properties)
@@ -436,6 +442,7 @@ is_device_suitable :: proc(physical_device: vk.PhysicalDevice, surface: vk.Surfa
 	return swapchain_adequate && supports_extension && supports_features, properties.deviceType == .DISCRETE_GPU
 }
 
+@(private)
 supports_required_features :: proc(required: $T, test: T) -> bool {
 	required := required
 	test := test
@@ -482,6 +489,7 @@ supports_required_features :: proc(required: $T, test: T) -> bool {
 	return supports_all_flags
 }
 
+@(private)
 check_device_extension_support :: proc(device: vk.PhysicalDevice) -> bool {
 	exts_n: u32 = 0
 	vk.EnumerateDeviceExtensionProperties(device, nil, &exts_n, nil)

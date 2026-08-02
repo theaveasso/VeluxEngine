@@ -2,6 +2,7 @@ package velux
 
 import vk "vendor:vulkan"
 
+@(private)
 init_image_subresource_range :: proc(
 	aspect_mask: vk.ImageAspectFlags,
 	level_count: u32 = vk.REMAINING_MIP_LEVELS,
@@ -10,6 +11,7 @@ init_image_subresource_range :: proc(
 	return {aspectMask = aspect_mask, baseMipLevel = 0, levelCount = level_count, baseArrayLayer = 0, layerCount = layer_count}
 }
 
+@(private)
 init_image_subresource_layers :: proc(
 	aspect_mask: vk.ImageAspectFlags,
 	mip_levels: u32 = 0,
@@ -19,18 +21,22 @@ init_image_subresource_layers :: proc(
 	return {aspectMask = aspect_mask, mipLevel = mip_levels, baseArrayLayer = base_array_layers, layerCount = layer_count}
 }
 
+@(private)
 init_command_buffer_begin_info :: proc(flags: vk.CommandBufferUsageFlags) -> vk.CommandBufferBeginInfo {
 	return {sType = .COMMAND_BUFFER_BEGIN_INFO, flags = flags}
 }
 
+@(private)
 init_command_buffer_submit_info :: proc(command_buffer: vk.CommandBuffer) -> vk.CommandBufferSubmitInfo {
 	return {sType = .COMMAND_BUFFER_SUBMIT_INFO, commandBuffer = command_buffer}
 }
 
+@(private)
 init_semaphore_submit_info :: proc(semaphore: vk.Semaphore, stage_mask: vk.PipelineStageFlags2) -> vk.SemaphoreSubmitInfo {
 	return {sType = .SEMAPHORE_SUBMIT_INFO, semaphore = semaphore, stageMask = stage_mask}
 }
 
+@(private)
 init_submit_info :: proc(
 	wait_info: ^vk.SemaphoreSubmitInfo,
 	command_buffer_info: ^vk.CommandBufferSubmitInfo,
@@ -47,6 +53,7 @@ init_submit_info :: proc(
 	}
 }
 
+@(private)
 init_present_info :: proc(wait_semaphore: ^vk.Semaphore, swapchain: ^vk.SwapchainKHR, image_indices: ^u32) -> vk.PresentInfoKHR {
 	return {
 		sType = .PRESENT_INFO_KHR,
@@ -58,10 +65,12 @@ init_present_info :: proc(wait_semaphore: ^vk.Semaphore, swapchain: ^vk.Swapchai
 	}
 }
 
+@(private)
 init_buffer_copy2 :: proc(size: vk.DeviceSize, dst_offset: vk.DeviceSize = 0, src_offset: vk.DeviceSize = 0) -> vk.BufferCopy2 {
 	return {sType = .BUFFER_COPY_2, srcOffset = src_offset, dstOffset = dst_offset, size = size}
 }
 
+@(private)
 init_buffer_image_copy2 :: proc(
 	image_extent: vk.Extent3D,
 	image_subresource: vk.ImageSubresourceLayers,

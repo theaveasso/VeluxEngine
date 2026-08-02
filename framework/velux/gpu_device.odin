@@ -11,7 +11,6 @@ import vma "third_party:odin-vma"
 import glfw "vendor:glfw"
 import vk "vendor:vulkan"
 
-import core "vlx:core"
 
 
 GPU_Error :: enum {
@@ -39,7 +38,7 @@ GPU_Config :: struct {
 
 GPU_Device :: struct {
 	logger:                     log.Logger,
-	log_state:                  core.Prefix_Logger,
+	log_state:                  Prefix_Logger,
 	debug_messenger:            vk.DebugUtilsMessengerEXT,
 	vma_allocator:              vma.Allocator,
 	instance:                   vk.Instance,
@@ -91,7 +90,7 @@ wait_idle :: proc(device: ^GPU_Device) {
 
 @(require_results)
 init_gpu :: proc(device: ^GPU_Device, config: GPU_Config) -> (err: GPU_Error = .None) {
-	device.logger = core.logger_from_prefix(&device.log_state, "[gpu]: ")
+	device.logger = logger_from_prefix(&device.log_state, "[gpu]: ")
 	context.logger = device.logger
 	device.enable_validation_layer = config.enable_validation
 	device.enable_profiler = config.enable_profiler

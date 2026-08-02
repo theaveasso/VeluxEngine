@@ -11,7 +11,6 @@ import vma "third_party:odin-vma"
 import glfw "vendor:glfw"
 import vk "vendor:vulkan"
 
-import core "vlx:core"
 
 @(private, require_results)
 create_swapchain :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {

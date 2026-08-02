@@ -1,4 +1,4 @@
-package core
+package velux
 
 import "core:fmt"
 import "core:log"
@@ -8,6 +8,7 @@ Prefix_Logger :: struct {
 	prefix:  string,
 }
 
+@(private)
 logger_from_prefix :: proc(state: ^Prefix_Logger, prefix: string, backing := context.logger) -> log.Logger {
 	state.backing = backing
 	state.prefix = prefix
@@ -20,9 +21,10 @@ logger_from_prefix :: proc(state: ^Prefix_Logger, prefix: string, backing := con
 	}
 }
 
+@(private)
 prefix_logger_proc :: proc(data: rawptr, level: log.Level, text: string, options: log.Options, loc := #caller_location) {
-	d := cast(^Prefix_Logger)data
+	state := cast(^Prefix_Logger)data
 
-	tagged := fmt.tprintf("%s%s", d.prefix, text)
-	d.backing.procedure(d.backing.data, level, tagged, options, loc)
+	tagged := fmt.tprintf("%s%s", state.prefix, text)
+	state.backing.procedure(state.backing.data, level, tagged, options, loc)
 }

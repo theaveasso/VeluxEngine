@@ -9,26 +9,28 @@ import vox "_vox"
 MAX_DELTA :: 0.1
 
 Config :: struct {
-	app_name:          cstring,
-	width:             i32,
-	height:            i32,
-	enable_validation: bool,
-	enable_profiler:   bool,
-	enable_log:        bool,
+	app_name:           cstring,
+	width:              i32,
+	height:             i32,
+	shader_include_dir: string,
+	enable_validation:  bool,
+	enable_profiler:    bool,
+	enable_log:         bool,
 }
 
 Engine :: struct {
-	window:            Window,
-	input:             Input_State,
-	gpu:               GPU_Device,
-	audio:             Audio_Device,
-	watch_shaders:     [dynamic]Shader_Watch,
-	ui_context:        ^UI_Context,
-	hud:               Hud,
-	last_shader_check: time.Time,
-	quit_requested:    bool,
-	dt:                f32,
-	last_time:         f64,
+	shader_include_dir: string,
+	window:             Window,
+	input:              Input_State,
+	gpu:                GPU_Device,
+	audio:              Audio_Device,
+	watch_shaders:      [dynamic]Shader_Watch,
+	ui_context:         ^UI_Context,
+	hud:                Hud,
+	last_shader_check:  time.Time,
+	quit_requested:     bool,
+	dt:                 f32,
+	last_time:          f64,
 }
 
 Error :: union #shared_nil {
@@ -70,6 +72,8 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 	if config.app_name == nil do config.app_name = "VeluxEngine"
 	if config.width == 0 do config.width = 1280
 	if config.height == 0 do config.height = 720
+	if config.shader_include_dir == "" do config.shader_include_dir = DEFAULT_SHADER_INCLUDE_DIR
+	engine.shader_include_dir = config.shader_include_dir
 
 	if config.enable_validation || ODIN_DEBUG do config.enable_validation = true
 	if config.enable_log || ODIN_DEBUG do config.enable_log = true

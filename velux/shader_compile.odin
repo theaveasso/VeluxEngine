@@ -5,7 +5,7 @@ import "core:os"
 import "core:path/filepath"
 import "core:strings"
 
-ENGINE_SHADER_DIR :: "../../velux/shaders"
+DEFAULT_SHADER_INCLUDE_DIR :: "../../velux/shaders"
 
 Shader_Error :: enum {
 	None,
@@ -37,6 +37,9 @@ compile_slang :: proc(slang_path, spv_path: string, allocator: runtime.Allocator
 		if os.exists(candidate) do slangc = candidate
 	}
 
+	engine_shader_dir := DEFAULT_SHADER_INCLUDE_DIR
+	if g_engine != nil && g_engine.shader_include_dir != "" do engine_shader_dir = g_engine.shader_include_dir
+
 	slang_dir := filepath.dir(slang_path)
 	cmd := []string {
 		slangc,
@@ -44,7 +47,7 @@ compile_slang :: proc(slang_path, spv_path: string, allocator: runtime.Allocator
 		"-I",
 		slang_dir,
 		"-I",
-		ENGINE_SHADER_DIR,
+		engine_shader_dir,
 		"-target",
 		"spirv",
 		"-fvk-use-entrypoint-name",

@@ -2,10 +2,12 @@
 setlocal enabledelayedexpansion
 
 set "SAMPLE=%~1"
-if "%SAMPLE%"=="" set "SAMPLE=05_voxel_raycast"
+if "%SAMPLE%"=="" set "SAMPLE=sponza"
 
 set "ODIN=odin"
-set "SAMPLE_DIR=samples\%SAMPLE%"
+set "ROOT=%~dp0"
+set "ROOT=%ROOT:~0,-1%"
+set "SAMPLE_DIR=%ROOT%\samples\%SAMPLE%"
 
 if not exist "%SAMPLE_DIR%" (
   echo No such sample: %SAMPLE_DIR%
@@ -14,10 +16,10 @@ if not exist "%SAMPLE_DIR%" (
 
 for %%F in ("%SAMPLE_DIR%\assets\*.slang") do call :compile_one "%%~fF" || goto :err
 
-"%ODIN%" build %SAMPLE_DIR% -debug -o:none ^
-  -collection:vlx=. ^
-  -collection:third_party=third_party ^
-  -out:%SAMPLE_DIR%\%SAMPLE%.exe || goto :err
+"%ODIN%" build "%SAMPLE_DIR%" -debug -o:none ^
+  -collection:vlx="%ROOT%" ^
+  -collection:third_party="%ROOT%\third_party" ^
+  -out:"%SAMPLE_DIR%\%SAMPLE%.exe" || goto :err
 
 echo.
 echo Built %SAMPLE_DIR%\%SAMPLE%.exe (debug symbols alongside it)

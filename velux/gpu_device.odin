@@ -80,7 +80,7 @@ Swapchain :: struct {
 @(private, require_results)
 vk_check :: proc(result: vk.Result, err: GPU_Error = .Vulkan_Call_Failed, loc := #caller_location) -> GPU_Error {
 	if result == .SUCCESS do return .None
-	log.errorf("vulkan call failed :%v (%v)", result, loc)
+	fmt.eprintfln("vulkan call failed :%v (%v)", result, loc)
 	return err
 }
 
@@ -167,7 +167,15 @@ create_instance :: proc(device: ^GPU_Device, config: GPU_Config) -> (err: GPU_Er
 	vk.load_proc_addresses_global(rawptr(glfw.GetInstanceProcAddress))
 
 	if vk.GetInstanceProcAddr == nil {
-		lib, lib_ok := dynlib.load_library("vulkan-1.dll")
+		lib: dynlib.Library
+		lib_ok: bool
+		when ODIN_OS == .Windows {
+			lib, lib_ok = dynlib.load_library("vulkan-1.dll")
+		} else when ODIN_OS == .Darwin {
+			lib, lib_ok = dynlib.load_library("/opt/homebrew/lib/libvulkan.dylib")
+		} else {
+			lib, lib_ok = dynlib.load_library("libvulkan.so.1")
+		}
 		if !lib_ok do return .Library_Load_Failed
 
 		get_proc_addr, sym_ok := dynlib.symbol_address(lib, "vkGetInstanceProcAddr")
@@ -198,6 +206,10 @@ create_instance :: proc(device: ^GPU_Device, config: GPU_Config) -> (err: GPU_Er
 		ppEnabledExtensionNames = raw_data(extensions),
 		enabledLayerCount       = device.enable_validation_layer ? cast(u32)len(layers) : 0,
 		ppEnabledLayerNames     = device.enable_validation_layer ? raw_data(layers) : nil,
+	}
+	
+	when ODIN_OS == .Darwin {
+		create_info.flags = {.ENUMERATE_PORTABILITY_KHR}
 	}
 
 	validation_features: vk.ValidationFeaturesEXT
@@ -383,6 +395,10 @@ get_required_extensions :: proc(enable_validation_layers: bool) -> [dynamic]cstr
 
 	if enable_validation_layers {
 		append(&exts, vk.EXT_DEBUG_UTILS_EXTENSION_NAME)
+	}
+
+	when ODIN_OS == .Darwin {
+		append(&exts, vk.KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME)
 	}
 
 	return exts

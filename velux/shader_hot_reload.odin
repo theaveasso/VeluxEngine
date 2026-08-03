@@ -82,6 +82,15 @@ watch_shader :: proc(pipeline: ^GPU_Pipeline, slang_path, spv_path: string) -> (
 }
 
 @(private)
+reset_shader_watches :: proc(engine: ^Engine) {
+	for &watch in engine.watch_shaders {
+		delete(watch.slang_path)
+		delete(watch.spv_path)
+	}
+	clear(&engine.watch_shaders)
+}
+
+@(private)
 destroy_shader_watches :: proc(engine: ^Engine) {
 	for &watch in engine.watch_shaders {
 		delete(watch.slang_path)

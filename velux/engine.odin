@@ -1,6 +1,7 @@
 package velux
 
 import "core:log"
+import "core:strings"
 import "core:time"
 
 
@@ -73,7 +74,7 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 	if config.width == 0 do config.width = 1280
 	if config.height == 0 do config.height = 720
 	if config.shader_include_dir == "" do config.shader_include_dir = DEFAULT_SHADER_INCLUDE_DIR
-	engine.shader_include_dir = config.shader_include_dir
+	engine.shader_include_dir, _ = strings.clone(config.shader_include_dir)
 
 	if config.enable_validation || ODIN_DEBUG do config.enable_validation = true
 	if config.enable_log || ODIN_DEBUG do config.enable_log = true
@@ -155,4 +156,5 @@ shutdown :: proc(engine: ^Engine) {
 	destroy_shader_watches(engine)
 	destroy_window(&engine.window)
 	shutdown_platform()
+	delete(engine.shader_include_dir)
 }

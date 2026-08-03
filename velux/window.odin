@@ -7,6 +7,8 @@ Platform_Error :: enum {
 	Init_Failed,
 	Window_Creation_Failed,
 	Allocation_Failed,
+	Dll_Build_Failed,
+	Dll_Load_Failed,
 }
 
 Window :: struct {

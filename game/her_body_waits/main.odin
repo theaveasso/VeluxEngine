@@ -19,7 +19,7 @@ NOSE_OFFSET :: f32(0.42)
 NOSE_RADIUS :: f32(0.12)
 SPHERE_COUNT :: TETHER_POINTS + 1
 
-CAMERA_DISTANCE :: f32(5.0)
+CAMERA_DISTANCE :: f32(15.0)
 CAMERA_HEIGHT :: f32(2.2)
 CAMERA_LOOK_AHEAD :: f32(2.0)
 
@@ -47,18 +47,27 @@ Game :: struct {
 	time_of_day:      f32,
 }
 
-main :: proc() {
-	vlx.run(
-		vlx.make_app(
-			Game,
-			config = {app_name = "Her Body Waits", width = 1600, height = 900},
-			init = game_init,
-			update = game_update,
-			draw = game_draw,
-			shutdown = game_shutdown,
-		),
-	)
+when ODIN_BUILD_MODE != .Dynamic {
+	main :: proc() {
+		app := app()
+		vlx.run(app)
+	}
 }
+
+app :: proc() -> (app: vlx.App) {
+	app = vlx.make_app(
+		Game,
+		config = {app_name = "Her Body Waits", width = 1600, height = 900},
+		init = game_init,
+		update = game_update,
+		draw = game_draw,
+		shutdown = game_shutdown,
+	)
+	return
+}
+
+@(export)
+velux_app :: proc() -> vlx.App {return app()}
 
 game_init :: proc(game: ^Game) -> (err: vlx.Error) {
 	game.pc.dims = {0, 0, 0, 1024}

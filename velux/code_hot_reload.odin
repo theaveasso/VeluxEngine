@@ -11,6 +11,14 @@ import "core:time"
 
 ENGINE_ROOT :: #directory
 
+when ODIN_OS == .Windows {
+	SHARED_LIB_EXT :: ".dll"
+} else when ODIN_OS == .Darwin {
+	SHARED_LIB_EXT :: ".dylib"
+} else {
+	SHARED_LIB_EXT :: ".so"
+}
+
 SOURCE_POLL_INTERVAL_MS :: 250
 SOURCE_SETTLE_MS :: 300
 
@@ -19,6 +27,7 @@ Game_Host :: struct {
 	lib:               dynlib.Library,
 	memory:            rawptr,
 	source_dir:        string,
+	work_dir:          string,
 	output_dir:        string,
 	generation:        int,
 	last_build:        string,
@@ -30,7 +39,7 @@ Game_Host :: struct {
 	change_pending:    bool,
 }
 
-run_hot_reload :: proc(game_dir: string, allocator := context.allocator) -> (err: Error) {
+run_hot_reload :: proc(game_dir: string, work_dir := "", allocator := context.allocator) -> (err: Error) {
 	owns_logger := context.logger.procedure == nil
 	if owns_logger do context.logger = log.create_console_logger()
 	defer if owns_logger do log.destroy_console_logger(context.logger)
@@ -46,7 +55,22 @@ run_hot_reload :: proc(game_dir: string, allocator := context.allocator) -> (err
 	}
 	defer delete(host.source_dir, allocator)
 
-	host.output_dir, _ = filepath.join({engine_root(), "build", "hot"}, allocator)
+	run_dir := work_dir == "" ? game_dir : work_dir
+	host.work_dir, _ = filepath.abs(run_dir, allocator)
+	if host.work_dir == "" {
+		log.errorf("cannot resolve %s", run_dir)
+		return Platform_Error.Init_Failed
+	}
+	defer delete(host.work_dir, allocator)
+
+	launch_dir, launch_err := os.get_working_directory(allocator)
+	if launch_err != nil {
+		log.errorf("cannot read working directory: %v", launch_err)
+		return Platform_Error.Init_Failed
+	}
+	defer delete(launch_dir, allocator)
+
+	host.output_dir, _ = filepath.join({launch_dir, "build", "hot"}, allocator)
 	defer delete(host.output_dir, allocator)
 	os.make_directory_all(host.output_dir)
 
@@ -74,8 +98,8 @@ run_hot_reload :: proc(game_dir: string, allocator := context.allocator) -> (err
 	engine := create(host.app.config, allocator) or_return
 	defer destroy(engine)
 
-	if wd_err := os.set_working_directory(host.source_dir); wd_err != nil {
-		log.errorf("cannot enter %s: %v", host.source_dir, wd_err)
+	if wd_err := os.set_working_directory(host.work_dir); wd_err != nil {
+		log.errorf("cannot enter %s: %v", host.work_dir, wd_err)
 		return Platform_Error.Init_Failed
 	}
 
@@ -217,7 +241,7 @@ engine_root :: #force_inline proc() -> (path: string) {
 
 @(require_results)
 dll_path_for :: proc(host: ^Game_Host, allocator := context.allocator) -> (path: string) {
-	name := fmt.tprintf("game_%03d.dll", host.generation)
+	name := fmt.tprintf("game_%03d%s", host.generation, SHARED_LIB_EXT)
 	path, _ = filepath.join({host.output_dir, name}, allocator)
 	return
 }
@@ -238,32 +262,17 @@ load_game_dll :: proc(file_name: string) -> (app: App, lib: dynlib.Library, ok: 
 
 @(require_results)
 build_game_dll :: proc(host: ^Game_Host, out_path: string, allocator := context.allocator) -> (output: string, ok: bool) {
-	vlx_collection := fmt.aprintf("-collection:vlx=%s", engine_root(), allocator = allocator)
-	thp_collection := fmt.aprintf("-collection:third_party=%s/third_party", engine_root(), allocator = allocator)
-	pdb_name := fmt.aprintf("-pdb-name:%s.pdb", strings.trim_suffix(out_path, ".dll"), allocator = allocator)
-	out_flag := fmt.aprintf("-out:%s", out_path, allocator = allocator)
-
-	cmd := []string {
-		"odin",
-		"build",
-		host.source_dir,
-		"-build-mode:dll",
-		"-debug",
-		"-o:none",
-		"-define:GLFW_SHARED=true",
-		vlx_collection,
-		thp_collection,
-		out_flag,
-		pdb_name,
-	}
-	defer {
-		delete(vlx_collection, allocator)
-		delete(thp_collection, allocator)
-		delete(pdb_name, allocator)
-		delete(out_flag, allocator)
+	cmd := make([dynamic]string, 0, 12, context.temp_allocator)
+	append(&cmd, "odin", "build", host.source_dir)
+	append(&cmd, "-build-mode:dll", "-debug", "-o:none", "-define:GLFW_SHARED=true")
+	append(&cmd, fmt.tprintf("-collection:vlx=%s", engine_root()))
+	append(&cmd, fmt.tprintf("-collection:third_party=%s/third_party", engine_root()))
+	append(&cmd, fmt.tprintf("-out:%s", out_path))
+	when ODIN_OS == .Windows {
+		append(&cmd, fmt.tprintf("-pdb-name:%s.pdb", strings.trim_suffix(out_path, SHARED_LIB_EXT)))
 	}
 
-	state, stdout, stderr, exec_err := os.process_exec({command = cmd, working_dir = engine_root()}, allocator)
+	state, stdout, stderr, exec_err := os.process_exec({command = cmd[:], working_dir = engine_root()}, allocator)
 	defer {
 		delete(stdout, allocator)
 		delete(stderr, allocator)

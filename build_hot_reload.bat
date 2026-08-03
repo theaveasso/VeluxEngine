@@ -32,7 +32,7 @@ if not exist "%ROOT%\build\glfw3.dll" (
 
 echo.
 echo Built %ROOT%\build\velux_hot_reload.exe
-echo Run:  build\velux_hot_reload.exe game\her_body_waits
+echo Run from the repo root:  buildelux_hot_reload.exe gameher_body_waits
 exit /b 0
 
 :err

@@ -79,13 +79,18 @@ quit :: proc() {
 }
 
 @(private)
-app_frame :: proc(app: ^App, game: rawptr) {
+app_frame :: proc(app: ^App, game: rawptr, replay: ^Replay = nil) {
 	ui_new_frame()
+	if replay != nil {
+		replay_capture(replay)
+		replay_apply(replay, game, app.state_size)
+	}
 	if app.update != nil {
 		if update_err := app.update(game); update_err != nil {
 			log.errorf("update: %v", update_err)
 		}
 	}
+	if replay != nil do replay_unapply(replay)
 
 	frame, begin_frame_err := begin_frame()
 	if begin_frame_err != nil {

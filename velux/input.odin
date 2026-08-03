@@ -20,6 +20,7 @@ Key :: enum i32 {
 	F1           = glfw.KEY_F1,
 	F2           = glfw.KEY_F2,
 	F5           = glfw.KEY_F5,
+	F6           = glfw.KEY_F6,
 }
 
 Input_State :: struct {
@@ -30,13 +31,21 @@ Input_State :: struct {
 	scroll_delta:        [2]f32,
 	keys_current:        #sparse[Key]bool,
 	keys_previous:       #sparse[Key]bool,
+	mouse_current:       [Mouse_Button]bool,
+	mouse_previous:      [Mouse_Button]bool,
 	cursor_captured:     bool,
 	ignore_next_delta:   bool,
 }
 
 @(require_results)
 is_mouse_down :: proc(mouse_button: Mouse_Button) -> bool {
-	return glfw.GetMouseButton(g_engine.input.window_handle, i32(mouse_button)) == glfw.PRESS
+	return g_engine.input.mouse_current[mouse_button]
+}
+
+@(require_results)
+is_mouse_pressed :: proc(mouse_button: Mouse_Button) -> bool {
+	input := &g_engine.input
+	return input.mouse_current[mouse_button] && !input.mouse_previous[mouse_button]
 }
 
 @(require_results)
@@ -100,6 +109,11 @@ input_new_frame :: proc() {
 	input.keys_previous = input.keys_current
 	for key in Key {
 		input.keys_current[key] = glfw.GetKey(input.window_handle, i32(key)) == glfw.PRESS
+	}
+
+	input.mouse_previous = input.mouse_current
+	for button in Mouse_Button {
+		input.mouse_current[button] = glfw.GetMouseButton(input.window_handle, i32(button)) == glfw.PRESS
 	}
 }
 

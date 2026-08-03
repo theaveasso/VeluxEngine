@@ -32,6 +32,7 @@ Game_Host :: struct {
 	generation:        int,
 	last_build:        string,
 	retired:           [dynamic]dynlib.Library,
+	replay:            Replay,
 	auto_reload:       bool,
 	last_source_check: time.Time,
 	newest_source:     time.Time,
@@ -129,11 +130,26 @@ run_hot_reload :: proc(game_dir: string, work_dir := "", allocator := context.al
 
 	host.newest_source = newest_source_write(host.source_dir)
 
+	defer replay_destroy(&host.replay, allocator)
+
 	for running() {
-		when ODIN_DEBUG do poll_code_reload(&host, allocator)
-		app_frame(&host.app, host.memory)
+		when ODIN_DEBUG {
+			poll_replay(&host, allocator)
+			poll_code_reload(&host, allocator)
+		}
+		app_frame(&host.app, host.memory, &host.replay)
 	}
 	return
+}
+
+poll_replay :: proc(host: ^Game_Host, allocator := context.allocator) {
+	if g_engine.shader_reloads != host.replay.shader_reloads {
+		host.replay.shader_reloads = g_engine.shader_reloads
+		replay_discard(&host.replay, "shader reloaded", allocator)
+	}
+	if is_key_pressed(.F6) {
+		replay_toggle(&host.replay, host.memory, host.app.state_size, host.app.state_hash, allocator)
+	}
 }
 
 poll_code_reload :: proc(host: ^Game_Host, allocator := context.allocator) {
@@ -205,6 +221,7 @@ reload_game_code :: proc(host: ^Game_Host, allocator := context.allocator) {
 
 	hard := new_app.state_hash != host.app.state_hash
 	if hard {
+		replay_discard(&host.replay, "game layout changed", allocator)
 		reset_shader_watches(g_engine)
 		if host.app.shutdown != nil do host.app.shutdown(host.memory)
 		free(host.memory, allocator)

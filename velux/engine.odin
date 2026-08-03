@@ -26,6 +26,7 @@ Engine :: struct {
 	gpu:                GPU_Device,
 	audio:              Audio_Device,
 	watch_shaders:      [dynamic]Shader_Watch,
+	shader_reloads:     int,
 	ui_context:         ^UI_Context,
 	hud:                Hud,
 	last_shader_check:  time.Time,

@@ -48,6 +48,7 @@ poll_shader_watches :: proc(engine: ^Engine) {
 		wait_for_idle()
 		destroy_gpu_pipeline(watch.pipeline)
 		watch.pipeline^ = pipeline
+		engine.shader_reloads += 1
 		elapsed_ms := time.duration_milliseconds(time.since(start))
 		log.infof("reloaded %s (%.0f ms)", watch.slang_path, elapsed_ms)
 	}

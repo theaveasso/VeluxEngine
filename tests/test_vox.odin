@@ -2,7 +2,7 @@ package tests
 
 import "core:testing"
 
-import "vlx:internal/vox"
+import vox "vlx:velux/_vox"
 
 @(test)
 header_rejects_bad_magic :: proc(t: ^testing.T) {

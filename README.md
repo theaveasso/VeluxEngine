@@ -122,8 +122,38 @@ game/             games built on velux
 third_party/      odin-vma, odin-imgui (submodules)
 ```
 
+## Per-frame data
+
+Anything you upload every frame goes through the frame's upload ring, from `draw`,
+before `cmd_begin_rendering`:
+
+```odin
+game_draw :: proc(game: ^Game, frame: vlx.Frame) {
+    vlx.frame_upload_slice(frame, &game.some_buffer, game.some_data[:])
+    vlx.cmd_begin_rendering(frame, clear)
+    ...
+}
+```
+
+That records a copy out of a persistently mapped per-frame buffer — no allocation, no
+submit, no fence. `immediate_transfer_begin` / `write_staging_buffer_slice` /
+`immediate_transfer_end` still exist and still block; they are for load-time uploads.
+Calling them per frame stalls the CPU on the GPU once per call.
+
+## Errors
+
+`Error` holds only failures a caller can act on — a missing asset, a shader that would
+not compile, a swapchain that went out of date, audio that is unavailable. Everything
+else (no suitable GPU, a failed allocation, a Vulkan call that can only fail on misuse)
+stops the process at the point of failure with the parameters that caused it, rather
+than travelling up as an enum.
+
+Velux logs through `context.logger`. If you have not installed one, `run` and
+`run_hot_reload` install a console logger for the duration.
+
 ## Note on samples
 
-`samples/sponza` and `game/her_body_waits` track the current App API. Samples `01`–`05`
-predate it and do not compile; they are kept as reference for the rendering techniques
-only.
+`samples/01_window`, `samples/sponza` and `game/her_body_waits` track the current App
+API and compile. Samples `02`–`05` were written against a much older engine
+(`create_glade`, `create_buffer`, a `velux` collection) and were removed; `git log` has
+them if you want the rendering techniques back.

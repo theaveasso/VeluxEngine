@@ -31,6 +31,15 @@ Level :: struct {
 	markers: []Marker,
 }
 
+// Everything a .vox file yields, before any of it has touched a GPU. Parsing
+// and grid construction are pure CPU work and are testable without a device;
+// only upload_level needs Vulkan.
+Level_Data :: struct {
+	grid:    Voxel_Grid,
+	markers: []Marker,
+	palette: [PALETTE_SLOTS]u32,
+}
+
 @(private)
 error_from_vox :: proc(err: vox.Error) -> Error {
 	switch err {
@@ -44,27 +53,60 @@ error_from_vox :: proc(err: vox.Error) -> Error {
 	return .Asset_Malformed
 }
 
+// CPU only. No device, no allocation on the GPU, nothing to wait for.
 @(require_results)
-load_level :: proc(file_name: string, reserved_from: u8) -> (level: Level, err: Error) {
-	model, vox_err := vox.load(file_name)
+load_level_data :: proc(
+	file_name: string,
+	reserved_from: u8,
+	allocator := context.allocator,
+) -> (
+	data: Level_Data,
+	err: Error,
+) {
+	model, vox_err := vox.load(file_name, allocator)
 	if vox_err != .None {
 		log.errorf("cannot load '%v': %v", file_name, vox_err)
 		return {}, error_from_vox(vox_err)
 	}
-	defer vox.destroy(&model)
+	defer vox.destroy(&model, allocator)
 
-	level.world.grid, level.markers = grid_from_vox(model, reserved_from)
+	data.grid, data.markers = grid_from_vox(model, reserved_from, allocator)
+	data.palette = vox.pack_palete(model)
+	return data, .None
+}
 
-	packed_words := (len(level.world.grid.voxels) + 3) / 4
-	level.world.buffer = create_gpu_buffer(u32, PALETTE_SLOTS + packed_words)
+destroy_level_data :: proc(data: ^Level_Data) {
+	delete(data.markers)
+	destroy_grid(&data.grid)
+	data^ = {}
+}
 
-	palette := vox.pack_palete(model)
-	voxels := pack_voxels(&level.world.grid, context.temp_allocator)
+// The GPU half, on its own so it can be called at a moment of your choosing
+// rather than being welded to file IO. Blocking, and meant to be: this is
+// load-time work.
+@(require_results)
+upload_level :: proc(data: ^Level_Data) -> (world: Voxel_World) {
+	packed_words := (len(data.grid.voxels) + 3) / 4
+	world.buffer = create_gpu_buffer(u32, PALETTE_SLOTS + packed_words)
+	world.grid = data.grid
+
+	voxels := pack_voxels(&data.grid, context.temp_allocator)
 
 	cmd := immediate_transfer_begin()
-	write_staging_buffer_slice(cmd, &level.world.buffer, palette[:])
-	write_staging_buffer_slice(cmd, &level.world.buffer, voxels, PALETTE_BYTES)
+	write_staging_buffer_slice(cmd, &world.buffer, data.palette[:])
+	write_staging_buffer_slice(cmd, &world.buffer, voxels, PALETTE_BYTES)
 	immediate_transfer_end()
+	return world
+}
+
+// Convenience over the two halves above, for callers that want a level in one
+// line and do not care when the upload happens.
+@(require_results)
+load_level :: proc(file_name: string, reserved_from: u8) -> (level: Level, err: Error) {
+	data := load_level_data(file_name, reserved_from) or_return
+	// Ownership of grid and markers moves into the Level.
+	level.world = upload_level(&data)
+	level.markers = data.markers
 	return level, .None
 }
 

@@ -106,29 +106,6 @@ init :: proc(engine: ^Engine, config: Config) {
 }
 
 @(require_results)
-@(private)
-running :: proc() -> bool {
-	engine := g_engine
-	free_all(context.temp_allocator)
-
-	poll_events()
-	input_new_frame()
-	when ODIN_DEBUG {
-		poll_shader_watches(engine)
-	}
-
-	current := now()
-	raw := f32(current - engine.last_time)
-	engine.dt = min(raw, MAX_DELTA)
-	engine.last_time = current
-
-	if is_key_pressed(.F2) do engine.hud.show = !engine.hud.show
-	hud_update(engine)
-	if engine.quit_requested do return false
-	return !window_should_close(&engine.window)
-}
-
-@(require_results)
 swapchain_format :: proc() -> Format {
 	return g_engine.gpu.swapchain.surface_format.format
 }

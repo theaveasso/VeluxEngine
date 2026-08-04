@@ -1,7 +1,6 @@
 package velux
 
 import "core:log"
-import "core:mem"
 
 App :: struct {
 	config:      Config,
@@ -12,8 +11,10 @@ App :: struct {
 	attach:      proc(engine: ^Engine),
 	state_size:  int,
 	state_align: int,
+	// Identifies the game's state layout so a hot reload can tell "the same
+	// struct, new code" (keep the state) from "a different struct" (reset it).
+	// This is the one place a type hash earns its keep.
 	state_hash:  u64,
-	engine_hash: u64,
 }
 
 @(require_results)
@@ -35,12 +36,12 @@ make_app :: proc(
 		state_size = size_of(T),
 		state_align = align_of(T),
 		state_hash = type_signature(T),
-		engine_hash = type_signature(Engine),
 	}
 }
 
+// Entry point for a game compiled straight into the executable. For the
+// hot-reloading variant see run_hot_reload; both share host_run.
 run :: proc(app: App, allocator := context.allocator) -> Error {
-	app := app
 	owns_logger := context.logger.procedure == nil
 	if owns_logger do context.logger = log.create_console_logger()
 	defer if owns_logger do log.destroy_console_logger(context.logger)
@@ -48,56 +49,12 @@ run :: proc(app: App, allocator := context.allocator) -> Error {
 	engine := create(app.config, allocator)
 	defer destroy(engine)
 
-	game, alloc_err := mem.alloc(app.state_size, app.state_align, allocator)
-	if alloc_err != nil do fatal("cannot allocate %v bytes of game state: %v", app.state_size, alloc_err)
-	defer free(game, allocator)
-
-	if app.init != nil {
-		if init_err := app.init(game); init_err != .None {
-			log.errorf("game init failed: %v", init_err)
-			return init_err
-		}
+	host := Game_Host {
+		app = app,
 	}
-	defer {
-		wait_for_idle()
-		if app.shutdown != nil do app.shutdown(game)
-	}
-
-	for running() do app_frame(&app, game)
-	return .None
+	return host_run(&host, allocator)
 }
 
 quit :: proc() {
 	g_engine.quit_requested = true
-}
-
-@(private)
-app_frame :: proc(app: ^App, game: rawptr, replay: ^Replay = nil) {
-	ui_new_frame()
-	if replay != nil {
-		replay_capture(replay)
-		replay_apply(replay, game, app.state_size)
-	}
-	if app.update != nil {
-		if update_err := app.update(game); update_err != .None {
-			log.errorf("update: %v", update_err)
-		}
-	}
-	if replay != nil do replay_unapply(replay)
-
-	frame, begin_frame_err := begin_frame()
-	if begin_frame_err != .None {
-		ui_end_frame()
-		return
-	}
-
-	if app.draw != nil do app.draw(game, frame)
-
-	cmd_begin_rendering(frame)
-	prof_zone_begin(frame, "ui")
-	ui_draw(frame)
-	prof_zone_end(frame)
-	cmd_end_rendering(frame)
-
-	end_frame(frame)
 }

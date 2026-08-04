@@ -16,7 +16,9 @@ cmd_transition_image :: proc(cmd: vk.CommandBuffer, image: vk.Image, aspect: vk.
 
 @(private)
 cmd_transition_images :: proc(cmd: vk.CommandBuffer, transitions: []Image_Transition, loc := #caller_location) {
-	assert(len(transitions) < MAX_BATCH_TRANSITIONS, "transition batch too large", loc)
+	if len(transitions) > MAX_BATCH_TRANSITIONS {
+		fatal("%d image transitions in one batch, MAX_BATCH_TRANSITIONS is %d", len(transitions), MAX_BATCH_TRANSITIONS, loc = loc)
+	}
 
 	barriers: [MAX_BATCH_TRANSITIONS]vk.ImageMemoryBarrier2
 	for t, i in transitions {
@@ -107,7 +109,14 @@ cmd_bind_graphics_pipeline :: proc(frame: Frame, pipeline: GPU_Pipeline) {
 }
 
 cmd_push_constants :: proc(frame: Frame, pipeline: GPU_Pipeline, data: ^$T, loc := #caller_location) {
-	assert(size_of(T) == int(pipeline.info.push_constant_size), "push constants size mismatch with pipeline", loc)
+	if size_of(T) != int(pipeline.info.push_constant_size) {
+		fatal(
+			"push constant is %d bytes but the pipeline was built for %d",
+			size_of(T),
+			pipeline.info.push_constant_size,
+			loc = loc,
+		)
+	}
 	vk.CmdPushConstants(frame.cmd, pipeline.layout, pipeline.stage_flags, 0, pipeline.info.push_constant_size, data)
 }
 

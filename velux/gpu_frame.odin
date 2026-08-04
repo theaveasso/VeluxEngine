@@ -16,13 +16,15 @@ Frame :: struct {
 	frame_index:       u32,
 }
 
-@(private, require_results)
-begin_frame :: proc() -> (frame: Frame, err: GPU_Error) {
+// The only failure a caller can answer is Swapchain_Out_Of_Date: the window
+// changed size, this frame is gone, the next one will be fine.
+@(private)
+begin_frame :: proc() -> (frame: Frame, err: Error) {
 	device := &g_engine.gpu
 	context.logger = device.logger
 
 	frame_data := device.frames[device.current_frame]
-	vk_check(vk.WaitForFences(device.device, 1, &frame_data.in_flight_fence, true, max(u64))) or_return
+	vk_assert(vk.WaitForFences(device.device, 1, &frame_data.in_flight_fence, true, max(u64)), "vkWaitForFences")
 
 	image_index: u32 = max(u32)
 	acquire_result := vk.AcquireNextImageKHR(
@@ -37,19 +39,19 @@ begin_frame :: proc() -> (frame: Frame, err: GPU_Error) {
 	#partial switch acquire_result {
 	case .SUCCESS, .SUBOPTIMAL_KHR:
 	case .ERROR_OUT_OF_DATE_KHR:
-		recreate_swapchain(device) or_return
-		return {}, .Swapchain_Recreate
+		recreate_swapchain(device)
+		return {}, .Swapchain_Out_Of_Date
 	case:
-		return {}, .Vulkan_Call_Failed
+		fatal("vkAcquireNextImageKHR failed: %v", acquire_result)
 	}
 
-	vk_check(vk.ResetFences(device.device, 1, &frame_data.in_flight_fence)) or_return
-	vk_check(vk.ResetCommandBuffer(frame_data.command_buffer, {.RELEASE_RESOURCES})) or_return
+	vk_assert(vk.ResetFences(device.device, 1, &frame_data.in_flight_fence), "vkResetFences")
+	vk_assert(vk.ResetCommandBuffer(frame_data.command_buffer, {.RELEASE_RESOURCES}), "vkResetCommandBuffer")
 
 	begin_info: vk.CommandBufferBeginInfo = init_command_buffer_begin_info({.ONE_TIME_SUBMIT})
-	vk_check(vk.BeginCommandBuffer(frame_data.command_buffer, &begin_info)) or_return
+	vk_assert(vk.BeginCommandBuffer(frame_data.command_buffer, &begin_info), "vkBeginCommandBuffer")
 
-	readback_profiler(device, device.current_frame) or_return
+	readback_profiler(device, device.current_frame)
 	reset_profiler(device, frame_data.command_buffer, device.current_frame)
 
 	cmd_transition_images(
@@ -61,37 +63,37 @@ begin_frame :: proc() -> (frame: Frame, err: GPU_Error) {
 	)
 
 	return {
-			frame_data.command_buffer,
-			frame_data.in_flight_fence,
-			device.render_finished_semaphores[image_index],
-			frame_data.present_complete,
-			device.swapchain.images[image_index],
-			device.swapchain.views[image_index],
-			device.depth_image.view,
-			device.swapchain.extent,
-			device.bindless.set,
-			image_index,
-			device.current_frame,
+			cmd = frame_data.command_buffer,
+			in_flight_fence = frame_data.in_flight_fence,
+			render_finished = device.render_finished_semaphores[image_index],
+			present_completed = frame_data.present_complete,
+			image = device.swapchain.images[image_index],
+			view = device.swapchain.views[image_index],
+			depth_view = device.depth_image.view,
+			extent = device.swapchain.extent,
+			bindless_set = device.bindless.set,
+			image_index = image_index,
+			frame_index = device.current_frame,
 		},
 		.None
 }
 
-@(private, require_results)
-end_frame :: proc(frame: Frame) -> (err: GPU_Error = .None) {
+@(private)
+end_frame :: proc(frame: Frame) {
 	device := &g_engine.gpu
 	context.logger = device.logger
 	frame := frame
 
 	cmd_transition_image(frame.cmd, frame.image, {.COLOR}, .COLOR_ATTACHMENT_OPTIMAL, .PRESENT_SRC_KHR)
 
-	vk_check(vk.EndCommandBuffer(frame.cmd), .Vulkan_Call_Failed) or_return
+	vk_assert(vk.EndCommandBuffer(frame.cmd), "vkEndCommandBuffer")
 
 	wait_info := init_semaphore_submit_info(frame.present_completed, {.COLOR_ATTACHMENT_OUTPUT})
 	cmd_info := init_command_buffer_submit_info(frame.cmd)
 	signal_info := init_semaphore_submit_info(frame.render_finished, {.ALL_GRAPHICS})
 	submit_info := init_submit_info(&wait_info, &cmd_info, &signal_info)
 
-	vk_check(vk.QueueSubmit2(device.graphics_queue, 1, &submit_info, frame.in_flight_fence), .Vulkan_Call_Failed) or_return
+	vk_assert(vk.QueueSubmit2(device.graphics_queue, 1, &submit_info, frame.in_flight_fence), "vkQueueSubmit2")
 
 	present_info := init_present_info(&frame.render_finished, &device.swapchain.handle, &frame.image_index)
 
@@ -99,11 +101,10 @@ end_frame :: proc(frame: Frame) -> (err: GPU_Error = .None) {
 	#partial switch present_result {
 	case .SUCCESS:
 	case .ERROR_OUT_OF_DATE_KHR, .SUBOPTIMAL_KHR:
-		recreate_swapchain(device) or_return
+		recreate_swapchain(device)
 	case:
-		return .Vulkan_Call_Failed
+		fatal("vkQueuePresentKHR failed: %v", present_result)
 	}
 
 	device.current_frame = (device.current_frame + 1) % MAX_FRAMES_IN_FLIGHT
-	return
 }

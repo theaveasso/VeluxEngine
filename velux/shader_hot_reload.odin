@@ -1,6 +1,5 @@
 package velux
 
-import "base:runtime"
 import "core:log"
 import "core:os"
 import "core:strings"
@@ -55,12 +54,12 @@ poll_shader_watches :: proc(engine: ^Engine) {
 }
 
 @(require_results)
-watch_shader :: proc(pipeline: ^GPU_Pipeline, slang_path, spv_path: string) -> (err: Shader_Error) {
+watch_shader :: proc(pipeline: ^GPU_Pipeline, slang_path, spv_path: string) -> (err: Error) {
 	when !ODIN_DEBUG do return .None
 	engine := g_engine
 
 	last_write, stat_err := os.modification_time_by_path(slang_path); if stat_err != nil {
-		return .File_Not_Found
+		return .Asset_Not_Found
 	}
 
 	slang_path, _ := strings.clone(slang_path)

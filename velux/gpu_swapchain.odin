@@ -1,26 +1,20 @@
 package velux
 
-import "core:fmt"
-
 import glfw "vendor:glfw"
 import vk "vendor:vulkan"
 
-@(private, require_results)
-create_swapchain :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
-	defer if err != .None do destroy_swapchain_resources(device)
-
+@(private)
+create_swapchain :: proc(device: ^GPU_Device) {
 	capabilities: vk.SurfaceCapabilitiesKHR
 	vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(device.physical_device, device.surface, &capabilities)
 
 	format_n: u32 = 0
 	vk.GetPhysicalDeviceSurfaceFormatsKHR(device.physical_device, device.surface, &format_n, nil)
 
-	formats := make([]vk.SurfaceFormatKHR, format_n)
-	defer delete(formats)
+	formats := make([]vk.SurfaceFormatKHR, format_n, context.temp_allocator)
 	vk.GetPhysicalDeviceSurfaceFormatsKHR(device.physical_device, device.surface, &format_n, raw_data(formats))
 
 	surface_format := choose_swapchain_surface_format(formats)
-	present_mode := choose_swapchain_present_mode()
 	extent := choose_swapchain_extent(device.window, &capabilities)
 
 	image_count := capabilities.minImageCount + 1
@@ -29,24 +23,22 @@ create_swapchain :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
 	}
 
 	swapchain_info: vk.SwapchainCreateInfoKHR = {
-		sType                 = .SWAPCHAIN_CREATE_INFO_KHR,
-		surface               = device.surface,
-		minImageCount         = image_count,
-		imageFormat           = surface_format.format,
-		imageColorSpace       = surface_format.colorSpace,
-		imageExtent           = extent,
-		imageArrayLayers      = 1,
-		imageUsage            = {.COLOR_ATTACHMENT},
-		imageSharingMode      = .EXCLUSIVE,
-		queueFamilyIndexCount = 0,
-		pQueueFamilyIndices   = nil,
-		preTransform          = capabilities.currentTransform,
-		compositeAlpha        = {.OPAQUE},
-		presentMode           = present_mode,
-		clipped               = true,
+		sType            = .SWAPCHAIN_CREATE_INFO_KHR,
+		surface          = device.surface,
+		minImageCount    = image_count,
+		imageFormat      = surface_format.format,
+		imageColorSpace  = surface_format.colorSpace,
+		imageExtent      = extent,
+		imageArrayLayers = 1,
+		imageUsage       = {.COLOR_ATTACHMENT},
+		imageSharingMode = .EXCLUSIVE,
+		preTransform     = capabilities.currentTransform,
+		compositeAlpha   = {.OPAQUE},
+		presentMode      = .FIFO,
+		clipped          = true,
 	}
 
-	vk_check(vk.CreateSwapchainKHR(device.device, &swapchain_info, nil, &device.swapchain.handle), .Vulkan_Call_Failed) or_return
+	vk_assert(vk.CreateSwapchainKHR(device.device, &swapchain_info, nil, &device.swapchain.handle), "vkCreateSwapchainKHR")
 
 	vk.GetSwapchainImagesKHR(device.device, device.swapchain.handle, &image_count, nil)
 
@@ -67,22 +59,19 @@ create_swapchain :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
 			subresourceRange = init_image_subresource_range({.COLOR}),
 		}
 
-		vk_check(vk.CreateImageView(device.device, &view_info, nil, &device.swapchain.views[i]), .Vulkan_Call_Failed) or_return
+		vk_assert(vk.CreateImageView(device.device, &view_info, nil, &device.swapchain.views[i]), "vkCreateImageView")
 	}
-
-	return
 }
 
-@(private, require_results)
-create_depth_resources :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
+@(private)
+create_depth_resources :: proc(device: ^GPU_Device) {
 	device.depth_image = create_image(
 		image_create_info(
 			DEFAULT_DEPTH_FORMAT,
 			{device.swapchain.extent.width, device.swapchain.extent.height, 1},
 			{.DEPTH_STENCIL_ATTACHMENT},
 		),
-	) or_return
-	return
+	)
 }
 
 @(private)
@@ -90,8 +79,8 @@ destroy_depth_resources :: proc(device: ^GPU_Device) {
 	destroy_gpu_image(&device.depth_image)
 }
 
-@(private, require_results)
-recreate_swapchain :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
+@(private)
+recreate_swapchain :: proc(device: ^GPU_Device) {
 	width, height := glfw.GetFramebufferSize(device.window)
 	for width == 0 || height == 0 {
 		glfw.WaitEvents()
@@ -104,10 +93,9 @@ recreate_swapchain :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
 	destroy_per_image_semaphores(device)
 	destroy_swapchain_resources(device)
 
-	create_swapchain(device) or_return
-	create_depth_resources(device) or_return
-	create_per_image_semaphores(device) or_return
-	return
+	create_swapchain(device)
+	create_depth_resources(device)
+	create_per_image_semaphores(device)
 }
 
 @(private)
@@ -119,11 +107,10 @@ destroy_swapchain_resources :: proc(device: ^GPU_Device) {
 	delete(device.swapchain.images)
 	vk.DestroySwapchainKHR(device.device, device.swapchain.handle, nil)
 	device.swapchain = {}
-
 }
 
-// Anything but an sRGB-encoded swapchain silently wrecks every colour the engine
-// produces, so refuse to run rather than render wrong for the next hour.
+// Anything but an sRGB-encoded swapchain silently wrecks every colour the
+// engine produces, so refuse to run rather than render wrong for an hour.
 @(private)
 choose_swapchain_surface_format :: proc(formats: []vk.SurfaceFormatKHR, loc := #caller_location) -> vk.SurfaceFormatKHR {
 	for format in formats {
@@ -132,24 +119,16 @@ choose_swapchain_surface_format :: proc(formats: []vk.SurfaceFormatKHR, loc := #
 	for format in formats {
 		if format.colorSpace == .SRGB_NONLINEAR do return format
 	}
-	fmt.panicf("surface offers no SRGB_NONLINEAR format; got %v", formats, loc = loc)
-}
-
-@(private)
-choose_swapchain_present_mode :: proc() -> vk.PresentModeKHR {
-	return .FIFO
+	fatal("surface offers no SRGB_NONLINEAR format; got %v", formats, loc = loc)
 }
 
 @(private)
 choose_swapchain_extent :: proc(window: glfw.WindowHandle, capabilities: ^vk.SurfaceCapabilitiesKHR) -> vk.Extent2D {
-	if (capabilities.currentExtent.width != max(u32)) {
-		return capabilities.currentExtent
-	} else {
-		width, height := glfw.GetFramebufferSize(window)
+	if capabilities.currentExtent.width != max(u32) do return capabilities.currentExtent
 
-		actual_extent: vk.Extent2D = {cast(u32)width, cast(u32)height}
-		actual_extent.width = clamp(actual_extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width)
-		actual_extent.height = clamp(actual_extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height)
-		return actual_extent
+	width, height := glfw.GetFramebufferSize(window)
+	return {
+		clamp(cast(u32)width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
+		clamp(cast(u32)height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height),
 	}
 }

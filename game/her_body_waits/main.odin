@@ -78,7 +78,7 @@ game_init :: proc(game: ^Game) -> (err: vlx.Error) {
 	vlx.create_gpu_pipeline(&game.pipeline, "assets/main.slang", size_of(Push_Constants)) or_return
 
 	game.tether = create_tether(game.head_position)
-	game.tether_buffer = vlx.create_gpu_buffer([4]f32, SPHERE_COUNT) or_return
+	game.tether_buffer = vlx.create_gpu_buffer([4]f32, SPHERE_COUNT)
 	game.pc.tether = game.tether_buffer.ptr
 	return
 }
@@ -147,9 +147,9 @@ game_update :: proc(game: ^Game) -> (err: vlx.Error) {
 	nose := game.head_position + forward * NOSE_OFFSET
 	game.tether_positions[TETHER_POINTS] = {nose.x, nose.y, nose.z, NOSE_RADIUS}
 
-	cmd := vlx.immediate_transfer_begin() or_return
-	vlx.write_staging_buffer_slice(cmd, &game.tether_buffer, game.tether_positions[:]) or_return
-	vlx.immediate_transfer_end() or_return
+	cmd := vlx.immediate_transfer_begin()
+	vlx.write_staging_buffer_slice(cmd, &game.tether_buffer, game.tether_positions[:])
+	vlx.immediate_transfer_end()
 	return
 }
 

@@ -11,6 +11,10 @@ DEFAULT_COMPUTE_ENTRY: cstring : "compute_main"
 MAX_BATCH_TRANSITIONS :: 8
 MAX_TEXTURES :: 1024
 
+// Marks an image that never took a bindless slot, so destroy knows not to
+// return one.
+NO_BINDLESS_INDEX :: max(u32)
+
 REQUIRED_VULKAN_FEATURES: vk.PhysicalDeviceFeatures2 = {
 	sType = .PHYSICAL_DEVICE_FEATURES_2,
 	pNext = &REQUIRED_VULKAN_1_1_FEATURES,

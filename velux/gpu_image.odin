@@ -28,15 +28,13 @@ GPU_Image_Info :: struct {
 	usage:             vma.MemoryUsage,
 }
 
-@(private, require_results)
-create_image :: proc(create_info: GPU_Image_Info, loc := #caller_location) -> (image: GPU_Image, err: GPU_Error) {
+@(private)
+create_image :: proc(create_info: GPU_Image_Info, loc := #caller_location) -> (image: GPU_Image) {
 	device := &g_engine.gpu
 	context.logger = device.logger
-	defer if err != .None do destroy_gpu_image(&image)
 
 	image_info: vk.ImageCreateInfo = {
 		sType       = .IMAGE_CREATE_INFO,
-		pNext       = nil,
 		flags       = create_info.flags,
 		usage       = create_info.image_usage_flags,
 		imageType   = create_info.image_type,
@@ -54,7 +52,10 @@ create_image :: proc(create_info: GPU_Image_Info, loc := #caller_location) -> (i
 		flags         = create_info.alloc_flags,
 	}
 
-	vk_check(vma.CreateImage(device.vma_allocator, &image_info, &allocation_info, &image.handle, &image.allocation, nil)) or_return
+	if result := vma.CreateImage(device.vma_allocator, &image_info, &allocation_info, &image.handle, &image.allocation, nil);
+	   result != .SUCCESS {
+		fatal("vmaCreateImage failed: %v (%v %v)", result, create_info.format, create_info.extent, loc = loc)
+	}
 
 	view_type: vk.ImageViewType = .D1
 	if .CUBE_COMPATIBLE in create_info.flags {
@@ -76,21 +77,24 @@ create_image :: proc(create_info: GPU_Image_Info, loc := #caller_location) -> (i
 		),
 	}
 
-	vk_check(vk.CreateImageView(device.device, &view_info, nil, &image.view)) or_return
+	vk_assert(vk.CreateImageView(device.device, &view_info, nil, &image.view), "vkCreateImageView")
 
+	image.bindless_index = NO_BINDLESS_INDEX
 	if .SAMPLED in create_info.image_usage_flags {
-		image.bindless_index = register_bindless(device, image.view)
+		image.bindless_index = register_bindless(device, image.view, loc)
 	}
 
 	image.extent = create_info.extent
 	image.format = create_info.format
 	image.mip_levels = create_info.mip_levels
 	image.array_layers = create_info.array_layers
-	return image, .None
+	return image
 }
 
 destroy_gpu_image :: proc(image: ^GPU_Image) {
 	device := &g_engine.gpu
+	if image.handle == 0 do return
+
 	vk.DestroyImageView(device.device, image.view, nil)
 	vma.DestroyImage(device.vma_allocator, image.handle, image.allocation)
 	image^ = {}
@@ -98,7 +102,6 @@ destroy_gpu_image :: proc(image: ^GPU_Image) {
 
 @(require_results)
 create_sampler :: proc(
-	device: ^GPU_Device,
 	filter: vk.Filter,
 	address_mode: vk.SamplerAddressMode,
 	compare_op: vk.CompareOp = .NEVER,
@@ -107,11 +110,11 @@ create_sampler :: proc(
 	max_anisotropy: f32 = 1.0,
 ) -> (
 	sampler: vk.Sampler,
-	err: GPU_Error,
 ) {
+	device := &g_engine.gpu
+
 	sampler_info: vk.SamplerCreateInfo = {
 		sType            = .SAMPLER_CREATE_INFO,
-		pNext            = nil,
 		minFilter        = filter,
 		magFilter        = filter,
 		mipmapMode       = .LINEAR,
@@ -119,20 +122,20 @@ create_sampler :: proc(
 		addressModeV     = address_mode,
 		addressModeW     = address_mode,
 		mipLodBias       = 0.0,
-		anisotropyEnable = max_anisotropy > 1.0 ? true : false,
+		anisotropyEnable = b32(max_anisotropy > 1.0),
 		maxAnisotropy    = max_anisotropy,
 		minLod           = 0.0,
 		maxLod           = max_lod,
 		borderColor      = border_color,
 		compareOp        = compare_op,
-		compareEnable    = compare_op != .NEVER,
+		compareEnable    = b32(compare_op != .NEVER),
 	}
 
-	vk_check(vk.CreateSampler(device.device, &sampler_info, nil, &sampler)) or_return
-	return sampler, .None
+	vk_assert(vk.CreateSampler(device.device, &sampler_info, nil, &sampler), "vkCreateSampler")
+	return sampler
 }
 
-@(private, require_results)
+@(private)
 is_depth_format :: proc(format: vk.Format) -> bool {
 	#partial switch format {
 	case .D16_UNORM, .D32_SFLOAT, .D16_UNORM_S8_UINT, .D24_UNORM_S8_UINT, .D32_SFLOAT_S8_UINT, .X8_D24_UNORM_PACK32:
@@ -141,7 +144,7 @@ is_depth_format :: proc(format: vk.Format) -> bool {
 	return false
 }
 
-@(private, require_results)
+@(private)
 is_stencil_format :: proc(format: vk.Format) -> bool {
 	#partial switch format {
 	case .S8_UINT, .D16_UNORM_S8_UINT, .D24_UNORM_S8_UINT, .D32_SFLOAT_S8_UINT:

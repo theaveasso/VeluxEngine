@@ -2,31 +2,12 @@ package velux
 
 import "base:runtime"
 import "core:dynlib"
-import "core:fmt"
 import "core:log"
-import "core:reflect"
 import "core:strings"
 
 import vma "third_party:odin-vma"
 import glfw "vendor:glfw"
 import vk "vendor:vulkan"
-
-
-
-GPU_Error :: enum {
-	None,
-	Library_Load_Failed,
-	Symbol_Not_Found,
-	File_Read_Failed,
-	Invalid_Handle,
-	Invalid_Shader,
-	No_Suitable_Physical_Device,
-	No_Graphics_Queue_Supported,
-	Command_Buffer_Allocation_Failed,
-	Swapchain_Recreate,
-	Vulkan_Call_Failed,
-	VMA_Call_Failed,
-}
 
 GPU_Config :: struct {
 	app_name:          cstring,
@@ -53,7 +34,7 @@ GPU_Device :: struct {
 	frames:                     [MAX_FRAMES_IN_FLIGHT]Frame_Data,
 	render_finished_semaphores: []vk.Semaphore,
 	command_pool:               vk.CommandPool,
-	imm_transfer_ctx:           Transfer_Context,
+	transfer:                   Transfer_Context,
 	bindless:                   Bindless,
 	enable_validation_layer:    bool,
 	current_frame:              u32,
@@ -77,52 +58,48 @@ Swapchain :: struct {
 	image_index:    u32,
 }
 
-@(private, require_results)
-vk_check :: proc(result: vk.Result, err: GPU_Error = .Vulkan_Call_Failed, loc := #caller_location) -> GPU_Error {
-	if result == .SUCCESS do return .None
-	fmt.eprintfln("vulkan call failed :%v (%v)", result, loc)
-	return err
-}
-
 @(private)
 wait_idle :: proc(device: ^GPU_Device) {
 	if device.device != nil do vk.DeviceWaitIdle(device.device)
 }
 
-@(private, require_results)
-init_gpu :: proc(device: ^GPU_Device, config: GPU_Config) -> (err: GPU_Error = .None) {
+// Nothing in here is recoverable. If the machine cannot present a Vulkan
+// surface, velux has no second plan, and the fatal at the failing call names
+// what was missing.
+@(private)
+init_gpu :: proc(device: ^GPU_Device, config: GPU_Config) {
 	device.logger = logger_from_prefix(&device.log_state, "[gpu]: ")
 	context.logger = device.logger
 	device.enable_validation_layer = config.enable_validation
 	device.enable_profiler = config.enable_profiler
 
-	create_instance(device, config) or_return
-	setup_debug_utils_messenger(device, config) or_return
-	create_surface(device, config) or_return
-	pick_physical_device(device) or_return
-	find_queue_families(device) or_return
-	create_device(device) or_return
-	create_vma_allocator(device) or_return
-	create_swapchain(device) or_return
-	create_depth_resources(device) or_return
-	create_per_image_semaphores(device) or_return
-	create_command_pool(device) or_return
-	allocate_command_buffers(device) or_return
-	create_immediate_transfer_context(device) or_return
-	create_sync_objects(device) or_return
-	create_profiler(device) or_return
-	create_bindless(device) or_return
-	return
+	create_instance(device, config)
+	setup_debug_utils_messenger(device, config)
+	create_surface(device, config)
+	pick_physical_device(device)
+	find_queue_families(device)
+	create_device(device)
+	create_vma_allocator(device)
+	create_swapchain(device)
+	create_depth_resources(device)
+	create_per_image_semaphores(device)
+	create_command_pool(device)
+	allocate_command_buffers(device)
+	create_transfer_context(device)
+	create_sync_objects(device)
+	create_profiler(device)
+	create_bindless(device)
 }
 
 @(private)
 destroy_gpu :: proc(device: ^GPU_Device) {
+	if device.device == nil do return
 	wait_idle(device)
 
 	destroy_bindless(device)
 	destroy_profiler(device)
 	destroy_sync_objects(device)
-	destroy_immediate_transfer_context(device)
+	destroy_transfer_context(device)
 	vk.DestroyCommandPool(device.device, device.command_pool, nil)
 	destroy_per_image_semaphores(device)
 	destroy_depth_resources(device)
@@ -132,6 +109,7 @@ destroy_gpu :: proc(device: ^GPU_Device) {
 	vk.DestroySurfaceKHR(device.instance, device.surface, nil)
 	if device.enable_validation_layer do vk.DestroyDebugUtilsMessengerEXT(device.instance, device.debug_messenger, nil)
 	vk.DestroyInstance(device.instance, nil)
+	device^ = {}
 }
 
 @(private)
@@ -162,8 +140,8 @@ debug_callback :: proc "system" (
 	return false
 }
 
-@(private, require_results)
-create_instance :: proc(device: ^GPU_Device, config: GPU_Config) -> (err: GPU_Error = .None) {
+@(private)
+create_instance :: proc(device: ^GPU_Device, config: GPU_Config) {
 	vk.load_proc_addresses_global(rawptr(glfw.GetInstanceProcAddress))
 
 	if vk.GetInstanceProcAddr == nil {
@@ -176,10 +154,10 @@ create_instance :: proc(device: ^GPU_Device, config: GPU_Config) -> (err: GPU_Er
 		} else {
 			lib, lib_ok = dynlib.load_library("libvulkan.so.1")
 		}
-		if !lib_ok do return .Library_Load_Failed
+		if !lib_ok do fatal("no vulkan loader on this machine")
 
 		get_proc_addr, sym_ok := dynlib.symbol_address(lib, "vkGetInstanceProcAddr")
-		if !sym_ok do return .Symbol_Not_Found
+		if !sym_ok do fatal("vulkan loader has no vkGetInstanceProcAddr")
 
 		vk.load_proc_addresses_global(get_proc_addr)
 	}
@@ -206,13 +184,13 @@ create_instance :: proc(device: ^GPU_Device, config: GPU_Config) -> (err: GPU_Er
 		enabledLayerCount       = cast(u32)len(layers),
 		ppEnabledLayerNames     = raw_data(layers),
 	}
-	
+
 	when ODIN_OS == .Darwin {
 		create_info.flags = {.ENUMERATE_PORTABILITY_KHR}
 	}
 
-	// Covers messages emitted by vkCreateInstance itself; the standalone messenger
-	// created in setup_debug_utils_messenger takes over once the instance exists.
+	// Covers messages emitted by vkCreateInstance itself; the standalone
+	// messenger below takes over once the instance exists.
 	validation_features: vk.ValidationFeaturesEXT
 	debug_create_info: vk.DebugUtilsMessengerCreateInfoEXT
 	if device.enable_validation_layer {
@@ -220,10 +198,8 @@ create_instance :: proc(device: ^GPU_Device, config: GPU_Config) -> (err: GPU_Er
 		create_info.pNext = &debug_create_info
 	}
 
-	vk_check(vk.CreateInstance(&create_info, nil, &device.instance)) or_return
+	vk_assert(vk.CreateInstance(&create_info, nil, &device.instance), "vkCreateInstance")
 	vk.load_proc_addresses_instance(device.instance)
-
-	return
 }
 
 // `features` is written through and must outlive the returned struct: it is
@@ -248,65 +224,63 @@ debug_messenger_create_info :: proc(
 	}
 }
 
-@(private, require_results)
-setup_debug_utils_messenger :: proc(device: ^GPU_Device, config: GPU_Config) -> (err: GPU_Error = .None) {
+@(private)
+setup_debug_utils_messenger :: proc(device: ^GPU_Device, config: GPU_Config) {
 	if !config.enable_validation do return
 
 	validation_features: vk.ValidationFeaturesEXT
 	debug_create_info := debug_messenger_create_info(device, &validation_features)
 
-	vk_check(vk.CreateDebugUtilsMessengerEXT(device.instance, &debug_create_info, nil, &device.debug_messenger)) or_return
-	return
+	vk_assert(
+		vk.CreateDebugUtilsMessengerEXT(device.instance, &debug_create_info, nil, &device.debug_messenger),
+		"vkCreateDebugUtilsMessengerEXT",
+	)
 }
 
-@(private, require_results)
-create_surface :: proc(device: ^GPU_Device, config: GPU_Config) -> (err: GPU_Error = .None) {
+@(private)
+create_surface :: proc(device: ^GPU_Device, config: GPU_Config) {
 	device.window = config.window
-	if device.window == nil do return .Invalid_Handle
+	if device.window == nil do fatal("create_surface called before the window existed")
 
-	vk_check(glfw.CreateWindowSurface(device.instance, device.window, nil, &device.surface)) or_return
-
-	return
+	vk_assert(glfw.CreateWindowSurface(device.instance, device.window, nil, &device.surface), "glfwCreateWindowSurface")
 }
 
-@(private, require_results)
-pick_physical_device :: proc(device: ^GPU_Device) -> (err: GPU_Error = .No_Suitable_Physical_Device) {
+@(private)
+pick_physical_device :: proc(device: ^GPU_Device) {
 	device_n: u32 = 0
-	vk_check(vk.EnumeratePhysicalDevices(device.instance, &device_n, nil), .No_Suitable_Physical_Device) or_return
-	if device_n == 0 do return .No_Suitable_Physical_Device
+	vk_assert(vk.EnumeratePhysicalDevices(device.instance, &device_n, nil), "vkEnumeratePhysicalDevices")
+	if device_n == 0 do fatal("no vulkan physical devices")
 
-	devices := make([]vk.PhysicalDevice, device_n)
-	defer delete(devices)
-	vk_check(vk.EnumeratePhysicalDevices(device.instance, &device_n, raw_data(devices)), .No_Suitable_Physical_Device) or_return
+	devices := make([]vk.PhysicalDevice, device_n, context.temp_allocator)
+	vk_assert(vk.EnumeratePhysicalDevices(device.instance, &device_n, raw_data(devices)), "vkEnumeratePhysicalDevices")
 
-	// One pass: take the first discrete device that qualifies, otherwise fall back
-	// to the first qualifying device of any kind.
+	// One pass: take the first discrete device that qualifies, otherwise fall
+	// back to the first qualifying device of any kind.
 	chosen: vk.PhysicalDevice
 	for physical_device in devices {
-		is_suitable, is_discrete := is_device_suitable(physical_device, device.surface)
-		if !is_suitable do continue
-		if is_discrete {
+		if !device_is_suitable(physical_device, device.surface) do continue
+		if device_is_discrete(physical_device) {
 			chosen = physical_device
 			break
 		}
 		if chosen == nil do chosen = physical_device
 	}
-	if chosen == nil do return .No_Suitable_Physical_Device
+
+	if chosen == nil do fatal("no suitable GPU:\n%s", device_rejection_report(devices, device.surface))
 
 	device.physical_device = chosen
 	props: vk.PhysicalDeviceProperties
 	vk.GetPhysicalDeviceProperties(chosen, &props)
 	device.timestamp_period = props.limits.timestampPeriod
-	return .None
+	log.infof("using %s", cstring(&props.deviceName[0]))
 }
 
-@(private, require_results)
-find_queue_families :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
+@(private)
+find_queue_families :: proc(device: ^GPU_Device) {
 	queue_family_n: u32
 	vk.GetPhysicalDeviceQueueFamilyProperties(device.physical_device, &queue_family_n, nil)
 
-	queue_families := make([]vk.QueueFamilyProperties, queue_family_n)
-	defer delete(queue_families)
+	queue_families := make([]vk.QueueFamilyProperties, queue_family_n, context.temp_allocator)
 	vk.GetPhysicalDeviceQueueFamilyProperties(device.physical_device, &queue_family_n, raw_data(queue_families))
 
 	for &qf, i in queue_families {
@@ -314,14 +288,14 @@ find_queue_families :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
 		if !glfw.GetPhysicalDevicePresentationSupport(device.instance, device.physical_device, cast(u32)i) do continue
 
 		device.graphics_family = cast(u32)i
-		return .None
+		return
 	}
 
-	return .No_Graphics_Queue_Supported
+	fatal("GPU has no graphics queue that can present with timestamp support")
 }
 
-@(private, require_results)
-create_device :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
+@(private)
+create_device :: proc(device: ^GPU_Device) {
 	queue_priority: f32 = 1.0
 
 	queue_info: vk.DeviceQueueCreateInfo = {
@@ -340,17 +314,14 @@ create_device :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
 		ppEnabledExtensionNames = raw_data(DEVICE_EXTENSIONS),
 	}
 
-	vk_check(vk.CreateDevice(device.physical_device, &device_info, nil, &device.device), .Vulkan_Call_Failed) or_return
+	vk_assert(vk.CreateDevice(device.physical_device, &device_info, nil, &device.device), "vkCreateDevice")
 
 	vk.load_proc_addresses_device(device.device)
-
 	vk.GetDeviceQueue(device.device, device.graphics_family, 0, &device.graphics_queue)
-
-	return
 }
 
-@(private, require_results)
-create_vma_allocator :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
+@(private)
+create_vma_allocator :: proc(device: ^GPU_Device) {
 	vulkan_functions := vma.create_vulkan_functions()
 
 	allocator_info: vma.AllocatorCreateInfo = {
@@ -362,19 +333,15 @@ create_vma_allocator :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
 		pVulkanFunctions = &vulkan_functions,
 	}
 
-	vk_check(vma.CreateAllocator(&allocator_info, &device.vma_allocator), .Vulkan_Call_Failed) or_return
-
-	return
+	vk_assert(vma.CreateAllocator(&allocator_info, &device.vma_allocator), "vmaCreateAllocator")
 }
 
 @(private)
 get_required_extensions :: proc(enable_validation_layers: bool) -> [dynamic]cstring {
 	glfw_exts := glfw.GetRequiredInstanceExtensions()
 
-	exts_n := len(glfw_exts)
 	exts: [dynamic]cstring
-	resize(&exts, exts_n)
-
+	resize(&exts, len(glfw_exts))
 	for ext, i in glfw_exts {
 		exts[i] = ext
 	}
@@ -396,115 +363,112 @@ get_required_layers :: proc(enable_validation_layers: bool) -> []cstring {
 }
 
 @(private)
-is_device_suitable :: proc(physical_device: vk.PhysicalDevice, surface: vk.SurfaceKHR) -> (is_suitable, is_discrete: bool) {
+device_is_discrete :: proc(physical_device: vk.PhysicalDevice) -> bool {
 	properties: vk.PhysicalDeviceProperties
 	vk.GetPhysicalDeviceProperties(physical_device, &properties)
+	return properties.deviceType == .DISCRETE_GPU
+}
 
-	vk_13_features: vk.PhysicalDeviceVulkan13Features = {
+@(private)
+device_is_suitable :: proc(physical_device: vk.PhysicalDevice, surface: vk.SurfaceKHR) -> bool {
+	if len(device_missing_features(physical_device, context.temp_allocator)) > 0 do return false
+	if len(device_missing_extensions(physical_device, context.temp_allocator)) > 0 do return false
+
+	format_count, present_mode_count: u32
+	vk.GetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_count, nil)
+	vk.GetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, nil)
+	return format_count > 0 && present_mode_count > 0
+}
+
+// Named explicitly rather than discovered by reflection over the REQUIRED_*
+// structs. The list is eleven entries, it is known at compile time, and
+// spelling it out is what makes the rejection message worth reading.
+@(private)
+device_missing_features :: proc(physical_device: vk.PhysicalDevice, allocator := context.allocator) -> []string {
+	vk_13: vk.PhysicalDeviceVulkan13Features = {
 		sType = .PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
 	}
-	vk_12_features: vk.PhysicalDeviceVulkan12Features = {
+	vk_12: vk.PhysicalDeviceVulkan12Features = {
 		sType = .PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
-		pNext = &vk_13_features,
+		pNext = &vk_13,
 	}
-	vk_11_features: vk.PhysicalDeviceVulkan11Features = {
+	vk_11: vk.PhysicalDeviceVulkan11Features = {
 		sType = .PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
-		pNext = &vk_12_features,
+		pNext = &vk_12,
 	}
 	features: vk.PhysicalDeviceFeatures2 = {
 		sType = .PHYSICAL_DEVICE_FEATURES_2,
-		pNext = &vk_11_features,
+		pNext = &vk_11,
 	}
 	vk.GetPhysicalDeviceFeatures2(physical_device, &features)
-	supports_features :=
-		supports_required_features(REQUIRED_VULKAN_FEATURES, features) &&
-		supports_required_features(REQUIRED_VULKAN_1_1_FEATURES, vk_11_features) &&
-		supports_required_features(REQUIRED_VULKAN_1_2_FEATURES, vk_12_features) &&
-		supports_required_features(REQUIRED_VULKAN_1_3_FEATURES, vk_13_features)
 
-	supports_extension := check_device_extension_support(physical_device)
-	swapchain_adequate := false
-	if supports_extension {
-		format_count: u32
-		vk.GetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_count, nil)
-		present_mode_count: u32
-		vk.GetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, nil)
-		swapchain_adequate = format_count > 0 && present_mode_count > 0
+	missing := make([dynamic]string, 0, 12, allocator)
+	need :: proc(missing: ^[dynamic]string, name: string, present: b32) {
+		if !present do append(missing, name)
 	}
 
-	return swapchain_adequate && supports_extension && supports_features, properties.deviceType == .DISCRETE_GPU
+	need(&missing, "shaderDrawParameters", vk_11.shaderDrawParameters)
+
+	need(&missing, "bufferDeviceAddress", vk_12.bufferDeviceAddress)
+	need(&missing, "descriptorIndexing", vk_12.descriptorIndexing)
+	need(&missing, "runtimeDescriptorArray", vk_12.runtimeDescriptorArray)
+	need(&missing, "descriptorBindingPartiallyBound", vk_12.descriptorBindingPartiallyBound)
+	need(&missing, "descriptorBindingSampledImageUpdateAfterBind", vk_12.descriptorBindingSampledImageUpdateAfterBind)
+	need(&missing, "shaderSampledImageArrayNonUniformIndexing", vk_12.shaderSampledImageArrayNonUniformIndexing)
+	need(&missing, "scalarBlockLayout", vk_12.scalarBlockLayout)
+
+	need(&missing, "synchronization2", vk_13.synchronization2)
+	need(&missing, "dynamicRendering", vk_13.dynamicRendering)
+
+	return missing[:]
 }
 
 @(private)
-supports_required_features :: proc(required: $T, test: T) -> bool {
-	required := required
-	test := test
+device_missing_extensions :: proc(physical_device: vk.PhysicalDevice, allocator := context.allocator) -> []string {
+	ext_n: u32 = 0
+	vk.EnumerateDeviceExtensionProperties(physical_device, nil, &ext_n, nil)
 
-	id := typeid_of(T)
-	names := reflect.struct_field_names(id)
-	types := reflect.struct_field_types(id)
-	offsets := reflect.struct_field_offsets(id)
+	available := make([]vk.ExtensionProperties, ext_n, context.temp_allocator)
+	vk.EnumerateDeviceExtensionProperties(physical_device, nil, &ext_n, raw_data(available))
 
-	builder: strings.Builder
-	strings.builder_init(&builder)
-	defer strings.builder_destroy(&builder)
-
-	strings.write_string(&builder, " - ")
-	reflect.write_type(&builder, type_info_of(T))
-	strings.write_string(&builder, "\n")
-
-	supports_all_flags := true
-
-	for i in 0 ..< len(offsets) {
-		if reflect.type_kind(types[i].id) == .Boolean {
-			offset := offsets[i]
-
-			required_value := (cast(^b32)(uintptr(&required) + offset))^
-			test_value := (cast(^b32)(uintptr(&test) + offset))^
-
-			if required_value {
-				strings.write_string(&builder, "  + ")
-				strings.write_string(&builder, names[i])
-
-				if !test_value {
-					strings.write_string(&builder, " \xE2\x9D\x8C\n")
-					supports_all_flags = false
-				} else {
-					strings.write_string(&builder, " \xE2\x9C\x94\n")
-				}
-			}
-		}
-	}
-	if !supports_all_flags {
-		log.warnf("device is missing required features:\n%s", strings.to_string(builder))
-	}
-
-	return supports_all_flags
-}
-
-@(private)
-check_device_extension_support :: proc(device: vk.PhysicalDevice) -> bool {
-	exts_n: u32 = 0
-	vk.EnumerateDeviceExtensionProperties(device, nil, &exts_n, nil)
-
-	avail_exts := make([]vk.ExtensionProperties, exts_n)
-	defer delete(avail_exts)
-	vk.EnumerateDeviceExtensionProperties(device, nil, &exts_n, raw_data(avail_exts))
-
-	for &expected_ext in DEVICE_EXTENSIONS {
+	missing := make([dynamic]string, 0, len(DEVICE_EXTENSIONS), allocator)
+	for expected in DEVICE_EXTENSIONS {
 		found := false
-		for &avail in avail_exts {
-			if strings.compare(string(cstring(&avail.extensionName[0])), string(expected_ext)) == 0 {
+		for &have in available {
+			if string(cstring(&have.extensionName[0])) == string(expected) {
 				found = true
 				break
 			}
 		}
-		if !found {
-			log.warn("extension not available: ", expected_ext)
-		}
-		found or_return
+		if !found do append(&missing, string(expected))
 	}
-
-	return true
+	return missing[:]
 }
 
+// Only built when we are about to die, so the cost does not matter and the
+// detail does.
+@(private)
+device_rejection_report :: proc(devices: []vk.PhysicalDevice, surface: vk.SurfaceKHR) -> string {
+	builder := strings.builder_make(context.temp_allocator)
+
+	for physical_device in devices {
+		props: vk.PhysicalDeviceProperties
+		vk.GetPhysicalDeviceProperties(physical_device, &props)
+		strings.write_string(&builder, "  ")
+		strings.write_string(&builder, string(cstring(&props.deviceName[0])))
+		strings.write_string(&builder, "\n")
+
+		for name in device_missing_features(physical_device, context.temp_allocator) {
+			strings.write_string(&builder, "    missing feature:   ")
+			strings.write_string(&builder, name)
+			strings.write_string(&builder, "\n")
+		}
+		for name in device_missing_extensions(physical_device, context.temp_allocator) {
+			strings.write_string(&builder, "    missing extension: ")
+			strings.write_string(&builder, name)
+			strings.write_string(&builder, "\n")
+		}
+	}
+
+	return strings.to_string(builder)
+}

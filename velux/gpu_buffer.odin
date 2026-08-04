@@ -1,5 +1,6 @@
 package velux
 
+import "base:runtime"
 import "core:mem"
 
 import vma "third_party:odin-vma"
@@ -27,9 +28,9 @@ create_gpu_buffer :: proc(
 	$T: typeid,
 	#any_int size: vk.DeviceSize = 1,
 	kind: GPU_Buffer_Kind = .Storage,
+	loc := #caller_location,
 ) -> (
 	buffer: GPU_Buffer(T),
-	err: GPU_Error,
 ) {
 	device := &g_engine.gpu
 	context.logger = device.logger
@@ -48,15 +49,22 @@ create_gpu_buffer :: proc(
 		flags = vma_create_flags,
 	}
 
-	vk_check(
-		vma.CreateBuffer(device.vma_allocator, &buffer_info, &allocation_info, &buffer.handle, &buffer.allocation, &buffer.info),
-	) or_return
+	if result := vma.CreateBuffer(
+		device.vma_allocator,
+		&buffer_info,
+		&allocation_info,
+		&buffer.handle,
+		&buffer.allocation,
+		&buffer.info,
+	); result != .SUCCESS {
+		fatal("vmaCreateBuffer failed: %v (%v bytes, %v)", result, alloc_size, kind, loc = loc)
+	}
 
 	if .SHADER_DEVICE_ADDRESS in vk_usage_flags {
 		buffer.ptr.address = get_buffer_device_address(device.device, buffer)
 	}
 
-	return buffer, .None
+	return buffer
 }
 
 destroy_gpu_buffer :: proc(buffer: ^GPU_Buffer($T)) {
@@ -87,90 +95,81 @@ vk_vma_buffer_flags :: proc(kind: GPU_Buffer_Kind) -> (vk.BufferUsageFlags, vma.
 	unreachable()
 }
 
+// Overrunning a mapped buffer corrupts whatever VMA put next to it, which
+// surfaces as a wrong pixel somewhere else entirely. Die here instead.
+@(private)
+check_buffer_bounds :: proc(info: vma.AllocationInfo, size, offset: vk.DeviceSize, loc: runtime.Source_Code_Location) {
+	if info.size < size + offset {
+		fatal("buffer write of %v bytes at offset %v overruns a %v byte buffer", size, offset, info.size, loc = loc)
+	}
+}
+
+@(private)
+check_buffer_mapped :: proc(info: vma.AllocationInfo, size, offset: vk.DeviceSize, loc: runtime.Source_Code_Location) {
+	check_buffer_bounds(info, size, offset, loc)
+	if info.pMappedData == nil {
+		fatal("write to an unmapped buffer; only .Staging buffers carry a host mapping", loc = loc)
+	}
+}
+
 write_buffer :: proc(buffer: ^GPU_Buffer($T), in_data: ^$U, offset: vk.DeviceSize = 0, loc := #caller_location) {
-	size := size_of(U)
-	assert(
-		buffer.info.size >= cast(vk.DeviceSize)(cast(u64)size + cast(u64)offset),
-		"The size of the data and offset is larger than the buffer",
-		loc,
-	)
+	size := cast(vk.DeviceSize)size_of(U)
+	check_buffer_mapped(buffer.info, size, offset, loc)
 
 	data := cast([^]u8)buffer.info.pMappedData
-	assert(data != nil, "buffer is not mapped.", loc)
-	mem.copy(data[offset:], in_data, size)
+	mem.copy(data[offset:], in_data, int(size))
 }
 
 write_buffer_slice :: proc(buffer: ^GPU_Buffer($T), in_data: []$U, offset: vk.DeviceSize = 0, loc := #caller_location) {
-	size := size_of(U) * len(in_data)
-	assert(
-		buffer.info.size >= cast(vk.DeviceSize)(cast(u64)size + cast(u64)offset),
-		"The size of the data and offset is larger than the buffer",
-		loc,
-	)
+	size := cast(vk.DeviceSize)(size_of(U) * len(in_data))
+	check_buffer_mapped(buffer.info, size, offset, loc)
+	if len(in_data) == 0 do return
 
 	data := cast([^]u8)buffer.info.pMappedData
-	assert(data != nil, "buffer is not mapped.", loc)
-	assert(raw_data(in_data) != nil)
-
-	mem.copy(data[offset:], raw_data(in_data), size)
+	mem.copy(data[offset:], raw_data(in_data), int(size))
 }
 
-@(require_results)
+// Load-time upload: allocates a throwaway staging buffer and leaves it for
+// immediate_transfer_end to reap. Do not call this per frame.
 write_staging_buffer :: proc(
 	cmd: vk.CommandBuffer,
 	buffer: ^GPU_Buffer($T),
 	in_data: ^$U,
 	offset: vk.DeviceSize = 0,
 	loc := #caller_location,
-) -> (
-	err: GPU_Error = .None,
 ) {
 	device := &g_engine.gpu
 	context.logger = device.logger
 
-	size := size_of(U)
-	assert(
-		buffer.info.size >= cast(vk.DeviceSize)(cast(u64)size + cast(u64)offset),
-		"The size of the data and offset is larger than the buffer",
-		loc,
-	)
+	size := cast(vk.DeviceSize)size_of(U)
+	check_buffer_bounds(buffer.info, size, offset, loc)
 
-	staging := create_gpu_buffer(u8, cast(vk.DeviceSize)size, .Staging) or_return
-	write_buffer(&staging, in_data)
-	append(&device.imm_transfer_ctx.staging_buffers, staging)
+	staging := create_gpu_buffer(u8, size, .Staging, loc)
+	write_buffer(&staging, in_data, 0, loc)
+	append(&device.transfer.staging_buffers, staging)
 
-	region := init_buffer_copy2(cast(vk.DeviceSize)size, offset)
+	region := init_buffer_copy2(size, offset)
 	cmd_copy_buffer2(cmd, staging.handle, buffer.handle, &region)
-
-	return
 }
 
-@(require_results)
 write_staging_buffer_slice :: proc(
 	cmd: vk.CommandBuffer,
 	buffer: ^GPU_Buffer($T),
 	in_data: []$U,
 	offset: vk.DeviceSize = 0,
 	loc := #caller_location,
-) -> (
-	err: GPU_Error = .None,
 ) {
 	device := &g_engine.gpu
 	context.logger = device.logger
 
-	size := size_of(U) * len(in_data)
-	assert(
-		buffer.info.size >= cast(vk.DeviceSize)(cast(u64)size + cast(u64)offset),
-		"The size of the data and offset is larger than the buffer",
-		loc,
-	)
+	size := cast(vk.DeviceSize)(size_of(U) * len(in_data))
+	check_buffer_bounds(buffer.info, size, offset, loc)
+	if len(in_data) == 0 do return
 
-	staging := create_gpu_buffer(u8, cast(vk.DeviceSize)size, .Staging) or_return
-	write_buffer_slice(&staging, in_data)
-	append(&device.imm_transfer_ctx.staging_buffers, staging)
+	staging := create_gpu_buffer(u8, size, .Staging, loc)
+	write_buffer_slice(&staging, in_data, 0, loc)
+	append(&device.transfer.staging_buffers, staging)
 
-	region := init_buffer_copy2(cast(vk.DeviceSize)size, offset)
+	region := init_buffer_copy2(size, offset)
 	cmd_copy_buffer2(cmd, staging.handle, buffer.handle, &region)
-
-	return
 }

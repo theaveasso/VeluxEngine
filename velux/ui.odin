@@ -8,11 +8,6 @@ import imgui_vk "third_party:odin-imgui/imgui_impl_vulkan"
 
 UI_Context :: imgui.Context
 
-UI_Error :: enum {
-	None,
-	ImGui_Call_Failed,
-}
-
 @(private)
 ui_new_frame :: proc() {
 	if !ui_ready() do return
@@ -47,13 +42,15 @@ ui_wants_keyboard :: proc() -> bool {
 	return imgui.GetIO().WantCaptureKeyboard
 }
 
-@(private, require_results)
-init_ui :: proc(engine: ^Engine) -> (err: UI_Error) {
+@(private)
+init_ui :: proc(engine: ^Engine) {
 	engine.ui_context = imgui.CreateContext()
-	if !imgui_glfw.InitForVulkan(engine.window.handle, true) do return .ImGui_Call_Failed
+	if !imgui_glfw.InitForVulkan(engine.window.handle, true) do fatal("ImGui_ImplGlfw_InitForVulkan failed")
 
 	device := &engine.gpu
-	if !imgui_vk.LoadFunctions(vk.API_VERSION_1_4, imgui_loader, rawptr(device.instance)) do return .ImGui_Call_Failed
+	if !imgui_vk.LoadFunctions(vk.API_VERSION_1_4, imgui_loader, rawptr(device.instance)) {
+		fatal("ImGui_ImplVulkan_LoadFunctions failed")
+	}
 
 	format := device.swapchain.surface_format.format
 	info: imgui_vk.InitInfo = {
@@ -75,9 +72,7 @@ init_ui :: proc(engine: ^Engine) -> (err: UI_Error) {
 			},
 		},
 	}
-	if !imgui_vk.Init(&info) do return .ImGui_Call_Failed
-
-	return
+	if !imgui_vk.Init(&info) do fatal("ImGui_ImplVulkan_Init failed")
 }
 
 @(private)

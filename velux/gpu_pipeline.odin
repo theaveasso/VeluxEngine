@@ -44,18 +44,15 @@ GPU_Pipeline :: struct {
 	info:         GPU_Pipeline_Info,
 }
 
+// Returns an error rather than dying: a shader edited during hot reload can
+// legitimately produce a pipeline the driver rejects, and the caller keeps
+// running on the last good one.
 @(require_results)
-rebuild_gpu_pipeline :: proc(
-	shader: vk.ShaderModule,
-	create_info: GPU_Pipeline_Info,
-) -> (
-	pipeline: GPU_Pipeline,
-	err: GPU_Error,
-) {
+rebuild_gpu_pipeline :: proc(shader: vk.ShaderModule, create_info: GPU_Pipeline_Info) -> (pipeline: GPU_Pipeline, err: Error) {
 	device := &g_engine.gpu
 	context.logger = device.logger
 
-	layout := create_pipeline_layout(device, create_info.push_constant_size) or_return
+	layout := create_pipeline_layout(device, create_info.push_constant_size)
 	defer if err != .None do vk.DestroyPipelineLayout(device.device, layout, nil)
 
 	pipeline_builder := create_pipeline_builder()
@@ -92,6 +89,8 @@ rebuild_gpu_pipeline :: proc(
 
 destroy_gpu_pipeline :: proc(pipeline: ^GPU_Pipeline) {
 	device := &g_engine.gpu
+	if pipeline.handle == 0 do return
+
 	delete(pipeline.info.vertex_entry)
 	delete(pipeline.info.fragment_entry)
 	vk.DestroyPipelineLayout(device.device, pipeline.layout, nil)
@@ -99,36 +98,33 @@ destroy_gpu_pipeline :: proc(pipeline: ^GPU_Pipeline) {
 	pipeline^ = {}
 }
 
-@(private, require_results)
+@(private)
 create_pipeline_layout :: proc(
 	device: ^GPU_Device,
 	push_constant_size: u32,
 	stage_flags: vk.ShaderStageFlags = {.VERTEX, .FRAGMENT},
 ) -> (
 	layout: vk.PipelineLayout,
-	err: GPU_Error,
 ) {
-
 	layout_info: vk.PipelineLayoutCreateInfo = {
-		sType = .PIPELINE_LAYOUT_CREATE_INFO,
+		sType          = .PIPELINE_LAYOUT_CREATE_INFO,
+		setLayoutCount = 1,
+		pSetLayouts    = &device.bindless.layout,
 	}
 
 	range: vk.PushConstantRange
-
 	if push_constant_size != 0 {
-		range.offset = 0
-		range.size = push_constant_size
-		range.stageFlags = stage_flags
-
+		range = {
+			offset     = 0,
+			size       = push_constant_size,
+			stageFlags = stage_flags,
+		}
 		layout_info.pushConstantRangeCount = 1
 		layout_info.pPushConstantRanges = &range
 	}
 
-	layout_info.setLayoutCount = 1
-	layout_info.pSetLayouts = &device.bindless.layout
-
-	vk_check(vk.CreatePipelineLayout(device.device, &layout_info, nil, &layout), .Vulkan_Call_Failed) or_return
-	return layout, .None
+	vk_assert(vk.CreatePipelineLayout(device.device, &layout_info, nil, &layout), "vkCreatePipelineLayout")
+	return layout
 }
 
 @(require_results)
@@ -137,36 +133,33 @@ create_gpu_shader :: proc(
 	allocator: runtime.Allocator,
 	loc := #caller_location,
 ) -> (
-	vk.ShaderModule,
-	GPU_Error,
+	module: vk.ShaderModule,
+	err: Error,
 ) {
 	device := &g_engine.gpu
 	context.logger = device.logger
 
-	buffer, err := os.read_entire_file(file_name, allocator)
-	if err != nil {
-		log.errorf("read_entire_file '%v' failed: %v", file_name, err)
-		return 0, .File_Read_Failed
+	buffer, read_err := os.read_entire_file(file_name, allocator)
+	if read_err != nil {
+		log.errorf("cannot read '%v': %v", file_name, read_err)
+		return 0, .Asset_Not_Found
 	}
 	defer delete(buffer, allocator)
 
-	return load_shader_module_from_bytes(device, buffer)
-}
-
-@(private, require_results)
-load_shader_module_from_bytes :: proc(device: ^GPU_Device, bytes: []u8) -> (vk.ShaderModule, GPU_Error) {
-	if len(bytes) % 4 != 0 do return 0, .Invalid_Handle
+	if len(buffer) % 4 != 0 {
+		log.errorf("'%v' is %v bytes, not a multiple of 4, so it is not SPIR-V", file_name, len(buffer))
+		return 0, .Shader_Invalid
+	}
 
 	shader_info: vk.ShaderModuleCreateInfo = {
 		sType    = .SHADER_MODULE_CREATE_INFO,
-		codeSize = len(bytes),
-		pCode    = raw_data(slice.reinterpret([]u32, bytes)),
+		codeSize = len(buffer),
+		pCode    = raw_data(slice.reinterpret([]u32, buffer)),
 	}
 
-	module: vk.ShaderModule
-	result := vk.CreateShaderModule(device.device, &shader_info, nil, &module)
-	if result != .SUCCESS {
-		return 0, .Vulkan_Call_Failed
+	if result := vk.CreateShaderModule(device.device, &shader_info, nil, &module); result != .SUCCESS {
+		log.errorf("vkCreateShaderModule rejected '%v': %v", file_name, result)
+		return 0, .Shader_Invalid
 	}
 
 	return module, .None

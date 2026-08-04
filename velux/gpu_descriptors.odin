@@ -10,15 +10,12 @@ Bindless :: struct {
 	next_index:      u32,
 }
 
-@(private, require_results)
-create_bindless :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
-	defer if err != .None do destroy_bindless(device)
-
-	create_bindless_pool(device) or_return
-	create_bindless_layout(device) or_return
-	allocate_bindless_set(device) or_return
-	device.bindless.default_sampler = create_sampler(device, .NEAREST, .REPEAT) or_return
-	return
+@(private)
+create_bindless :: proc(device: ^GPU_Device) {
+	create_bindless_pool(device)
+	create_bindless_layout(device)
+	allocate_bindless_set(device)
+	device.bindless.default_sampler = create_sampler(.NEAREST, .REPEAT)
 }
 
 @(private)
@@ -29,9 +26,11 @@ destroy_bindless :: proc(device: ^GPU_Device) {
 }
 
 @(private)
-register_bindless :: proc(device: ^GPU_Device, view: vk.ImageView) -> u32 {
+register_bindless :: proc(device: ^GPU_Device, view: vk.ImageView, loc := #caller_location) -> u32 {
 	index := device.bindless.next_index
-	assert(index < MAX_TEXTURES, "bindless texture array is full")
+	if index >= MAX_TEXTURES {
+		fatal("bindless table full: %d textures registered, MAX_TEXTURES is %d", index, MAX_TEXTURES, loc = loc)
+	}
 
 	image_info: vk.DescriptorImageInfo = {
 		sampler     = device.bindless.default_sampler,
@@ -41,7 +40,6 @@ register_bindless :: proc(device: ^GPU_Device, view: vk.ImageView) -> u32 {
 
 	write: vk.WriteDescriptorSet = {
 		sType           = .WRITE_DESCRIPTOR_SET,
-		pNext           = nil,
 		dstSet          = device.bindless.set,
 		dstBinding      = 0,
 		dstArrayElement = index,
@@ -55,22 +53,20 @@ register_bindless :: proc(device: ^GPU_Device, view: vk.ImageView) -> u32 {
 	return index
 }
 
-@(private, require_results)
-create_bindless_layout :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
+@(private)
+create_bindless_layout :: proc(device: ^GPU_Device) {
 	binding_flags: vk.DescriptorBindingFlags = {.UPDATE_AFTER_BIND, .PARTIALLY_BOUND}
 	flags_info: vk.DescriptorSetLayoutBindingFlagsCreateInfo = {
 		sType         = .DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
-		pNext         = nil,
 		bindingCount  = 1,
 		pBindingFlags = &binding_flags,
 	}
 
 	bindings: vk.DescriptorSetLayoutBinding = {
-		binding            = 0,
-		descriptorType     = .COMBINED_IMAGE_SAMPLER,
-		stageFlags         = {.VERTEX, .FRAGMENT},
-		descriptorCount    = MAX_TEXTURES,
-		pImmutableSamplers = nil,
+		binding         = 0,
+		descriptorType  = .COMBINED_IMAGE_SAMPLER,
+		stageFlags      = {.VERTEX, .FRAGMENT},
+		descriptorCount = MAX_TEXTURES,
 	}
 
 	layout_info: vk.DescriptorSetLayoutCreateInfo = {
@@ -81,12 +77,11 @@ create_bindless_layout :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) 
 		pBindings    = &bindings,
 	}
 
-	vk_check(vk.CreateDescriptorSetLayout(device.device, &layout_info, nil, &device.bindless.layout)) or_return
-	return
+	vk_assert(vk.CreateDescriptorSetLayout(device.device, &layout_info, nil, &device.bindless.layout), "vkCreateDescriptorSetLayout")
 }
 
-@(private, require_results)
-create_bindless_pool :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
+@(private)
+create_bindless_pool :: proc(device: ^GPU_Device) {
 	pool_size: vk.DescriptorPoolSize = {
 		type            = .COMBINED_IMAGE_SAMPLER,
 		descriptorCount = MAX_TEXTURES,
@@ -94,19 +89,17 @@ create_bindless_pool :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
 
 	pool_info: vk.DescriptorPoolCreateInfo = {
 		sType         = .DESCRIPTOR_POOL_CREATE_INFO,
-		pNext         = nil,
 		flags         = {.UPDATE_AFTER_BIND},
 		maxSets       = 1,
 		poolSizeCount = 1,
 		pPoolSizes    = &pool_size,
 	}
 
-	vk_check(vk.CreateDescriptorPool(device.device, &pool_info, nil, &device.bindless.pool)) or_return
-	return
+	vk_assert(vk.CreateDescriptorPool(device.device, &pool_info, nil, &device.bindless.pool), "vkCreateDescriptorPool")
 }
 
-@(private, require_results)
-allocate_bindless_set :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
+@(private)
+allocate_bindless_set :: proc(device: ^GPU_Device) {
 	alloc_info: vk.DescriptorSetAllocateInfo = {
 		sType              = .DESCRIPTOR_SET_ALLOCATE_INFO,
 		descriptorPool     = device.bindless.pool,
@@ -114,6 +107,5 @@ allocate_bindless_set :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
 		pSetLayouts        = &device.bindless.layout,
 	}
 
-	vk_check(vk.AllocateDescriptorSets(device.device, &alloc_info, &device.bindless.set)) or_return
-	return
+	vk_assert(vk.AllocateDescriptorSets(device.device, &alloc_info, &device.bindless.set), "vkAllocateDescriptorSets")
 }

@@ -2,19 +2,16 @@ package velux
 
 import vk "vendor:vulkan"
 
-@(private, require_results)
-create_per_image_semaphores :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
-	defer if err != .None do destroy_per_image_semaphores(device)
-
+@(private)
+create_per_image_semaphores :: proc(device: ^GPU_Device) {
 	semaphore_info: vk.SemaphoreCreateInfo = {
 		sType = .SEMAPHORE_CREATE_INFO,
 	}
 
 	device.render_finished_semaphores = make([]vk.Semaphore, len(device.swapchain.images))
 	for &semaphore in device.render_finished_semaphores {
-		vk_check(vk.CreateSemaphore(device.device, &semaphore_info, nil, &semaphore), .Vulkan_Call_Failed) or_return
+		vk_assert(vk.CreateSemaphore(device.device, &semaphore_info, nil, &semaphore), "vkCreateSemaphore")
 	}
-	return
 }
 
 @(private)
@@ -26,57 +23,44 @@ destroy_per_image_semaphores :: proc(device: ^GPU_Device) {
 	device.render_finished_semaphores = nil
 }
 
-@(private, require_results)
-create_command_pool :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
+@(private)
+create_command_pool :: proc(device: ^GPU_Device) {
 	pool_info: vk.CommandPoolCreateInfo = {
 		sType            = .COMMAND_POOL_CREATE_INFO,
 		flags            = {.RESET_COMMAND_BUFFER},
 		queueFamilyIndex = device.graphics_family,
 	}
 
-	vk_check(vk.CreateCommandPool(device.device, &pool_info, nil, &device.command_pool), .Vulkan_Call_Failed) or_return
-
-	return
+	vk_assert(vk.CreateCommandPool(device.device, &pool_info, nil, &device.command_pool), "vkCreateCommandPool")
 }
 
-@(private, require_results)
-allocate_command_buffers :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
+@(private)
+allocate_command_buffers :: proc(device: ^GPU_Device) {
 	allocate_info: vk.CommandBufferAllocateInfo = {
 		sType              = .COMMAND_BUFFER_ALLOCATE_INFO,
-		pNext              = nil,
 		commandPool        = device.command_pool,
 		commandBufferCount = 1,
 		level              = .PRIMARY,
 	}
 	for &frame in device.frames {
-		vk_check(
-			vk.AllocateCommandBuffers(device.device, &allocate_info, &frame.command_buffer),
-			.Command_Buffer_Allocation_Failed,
-		) or_return
-
+		vk_assert(vk.AllocateCommandBuffers(device.device, &allocate_info, &frame.command_buffer), "vkAllocateCommandBuffers")
 	}
-	return
 }
 
-@(private, require_results)
-create_sync_objects :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
-	defer if err != .None do destroy_sync_objects(device)
-
+@(private)
+create_sync_objects :: proc(device: ^GPU_Device) {
 	semaphore_info: vk.SemaphoreCreateInfo = {
 		sType = .SEMAPHORE_CREATE_INFO,
 	}
-
-	for &frame in device.frames {
-		vk_check(vk.CreateSemaphore(device.device, &semaphore_info, nil, &frame.present_complete), .Vulkan_Call_Failed) or_return
-
-		fence_info: vk.FenceCreateInfo = {
-			sType = .FENCE_CREATE_INFO,
-			flags = {.SIGNALED},
-		}
-		vk_check(vk.CreateFence(device.device, &fence_info, nil, &frame.in_flight_fence), .Vulkan_Call_Failed) or_return
+	fence_info: vk.FenceCreateInfo = {
+		sType = .FENCE_CREATE_INFO,
+		flags = {.SIGNALED},
 	}
 
-	return
+	for &frame in device.frames {
+		vk_assert(vk.CreateSemaphore(device.device, &semaphore_info, nil, &frame.present_complete), "vkCreateSemaphore")
+		vk_assert(vk.CreateFence(device.device, &fence_info, nil, &frame.in_flight_fence), "vkCreateFence")
+	}
 }
 
 @(private)
@@ -86,4 +70,3 @@ destroy_sync_objects :: proc(device: ^GPU_Device) {
 		vk.DestroyFence(device.device, frame.in_flight_fence, nil)
 	}
 }
-

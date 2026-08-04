@@ -18,10 +18,9 @@ Profiler :: struct {
 	period_ns:    f32,
 }
 
-@(private, require_results)
-create_profiler :: proc(device: ^GPU_Device) -> (err: GPU_Error) {
+@(private)
+create_profiler :: proc(device: ^GPU_Device) {
 	if !device.enable_profiler do return
-	defer if err != .None do destroy_profiler(device)
 
 	info: vk.QueryPoolCreateInfo = {
 		sType      = .QUERY_POOL_CREATE_INFO,
@@ -30,10 +29,9 @@ create_profiler :: proc(device: ^GPU_Device) -> (err: GPU_Error) {
 		queryCount = MAX_ZONES * 2,
 	}
 	for &pool in device.profiler.pools {
-		vk_check(vk.CreateQueryPool(device.device, &info, nil, &pool)) or_return
+		vk_assert(vk.CreateQueryPool(device.device, &info, nil, &pool), "vkCreateQueryPool")
 	}
 	device.profiler.period_ns = device.timestamp_period
-	return
 }
 
 @(private)
@@ -50,7 +48,9 @@ prof_zone_begin :: proc(frame: Frame, name: string, loc := #caller_location) -> 
 	if !device.enable_profiler do return 0
 
 	slot := frame.frame_index
-	assert(device.profiler.zone_count[slot] < MAX_ZONES, "profiler zone count exceeded MAX_ZONES", loc)
+	if device.profiler.zone_count[slot] >= MAX_ZONES {
+		fatal("more than MAX_ZONES (%d) profiler zones in one frame", MAX_ZONES, loc = loc)
+	}
 	zone_index = device.profiler.zone_count[slot]
 	device.profiler.zone_names[slot][zone_index] = name
 
@@ -64,13 +64,13 @@ prof_zone_end :: proc(frame: Frame, loc := #caller_location) {
 	if !device.enable_profiler do return
 
 	slot := frame.frame_index
-	assert(device.profiler.zone_count[slot] > 0, "prof_zone_end without a matching prof_zone_begin", loc)
+	if device.profiler.zone_count[slot] == 0 do fatal("prof_zone_end without a matching prof_zone_begin", loc = loc)
 	zone_index := device.profiler.zone_count[slot] - 1
 	vk.CmdWriteTimestamp2(frame.cmd, {.BOTTOM_OF_PIPE}, device.profiler.pools[slot], zone_index * 2 + 1)
 }
 
-@(private, require_results)
-readback_profiler :: proc(device: ^GPU_Device, slot: u32) -> (err: GPU_Error = .None) {
+@(private)
+readback_profiler :: proc(device: ^GPU_Device, slot: u32) {
 	if !device.enable_profiler do return
 
 	zone_count := device.profiler.zone_count[slot]
@@ -82,7 +82,7 @@ readback_profiler :: proc(device: ^GPU_Device, slot: u32) -> (err: GPU_Error = .
 	ticks: [MAX_ZONES * 2]u64
 	query_count := zone_count * 2
 
-	vk_check(
+	vk_assert(
 		vk.GetQueryPoolResults(
 			device.device,
 			device.profiler.pools[slot],
@@ -93,7 +93,8 @@ readback_profiler :: proc(device: ^GPU_Device, slot: u32) -> (err: GPU_Error = .
 			size_of(u64),
 			{._64, .WAIT},
 		),
-	) or_return
+		"vkGetQueryPoolResults",
+	)
 
 	for zone in 0 ..< zone_count {
 		begin_tick := ticks[zone * 2]
@@ -106,7 +107,6 @@ readback_profiler :: proc(device: ^GPU_Device, slot: u32) -> (err: GPU_Error = .
 		}
 	}
 	device.profiler.result_count = zone_count
-	return
 }
 
 @(private)

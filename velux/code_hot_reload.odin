@@ -51,23 +51,20 @@ run_hot_reload :: proc(game_dir: string, work_dir := "", allocator := context.al
 	source_err: os.Error
 	host.source_dir, source_err = filepath.abs(game_dir, allocator)
 	if source_err != nil {
-		log.errorf("cannot resolve %s: %v", game_dir, source_err)
-		return Platform_Error.Init_Failed
+		fatal("cannot resolve %s: %v", game_dir, source_err)
 	}
 	defer delete(host.source_dir, allocator)
 
 	run_dir := work_dir == "" ? game_dir : work_dir
 	host.work_dir, _ = filepath.abs(run_dir, allocator)
 	if host.work_dir == "" {
-		log.errorf("cannot resolve %s", run_dir)
-		return Platform_Error.Init_Failed
+		fatal("cannot resolve %s", run_dir)
 	}
 	defer delete(host.work_dir, allocator)
 
 	launch_dir, launch_err := os.get_working_directory(allocator)
 	if launch_err != nil {
-		log.errorf("cannot read working directory: %v", launch_err)
-		return Platform_Error.Init_Failed
+		fatal("cannot read working directory: %v", launch_err)
 	}
 	defer delete(launch_dir, allocator)
 
@@ -81,41 +78,36 @@ run_hot_reload :: proc(game_dir: string, work_dir := "", allocator := context.al
 	build_output, build_ok := build_game_dll(&host, dll_path, allocator)
 	defer delete(build_output, allocator)
 	if build_output != "" do log.info(build_output)
-	if !build_ok do return Platform_Error.Dll_Build_Failed
+	if !build_ok do return .Game_Build_Failed
 
 	load_ok: bool
 	host.app, host.lib, load_ok = load_game_dll(dll_path)
 	if !load_ok {
 		log.errorf("cannot load %s", dll_path)
-		return Platform_Error.Dll_Load_Failed
+		return .Game_Load_Failed
 	}
 	defer unload_game_dll(host.lib)
 
 	if host.app.engine_hash != type_signature(Engine) {
-		log.error("engine layout changed - rebuild velux_hot_reload")
-		return Platform_Error.Init_Failed
+		fatal("engine layout changed - rebuild velux_hot_reload")
 	}
 
-	engine := create(host.app.config, allocator) or_return
+	engine := create(host.app.config, allocator)
 	defer destroy(engine)
 
 	if wd_err := os.set_working_directory(host.work_dir); wd_err != nil {
-		log.errorf("cannot enter %s: %v", host.work_dir, wd_err)
-		return Platform_Error.Init_Failed
+		fatal("cannot enter %s: %v", host.work_dir, wd_err)
 	}
 
 	host.app.attach(engine)
 
 	alloc_err: mem.Allocator_Error
 	host.memory, alloc_err = mem.alloc(host.app.state_size, host.app.state_align, allocator)
-	if alloc_err != nil {
-		log.errorf("game state alloc failed: %v", alloc_err)
-		return .Allocation_Failed
-	}
+	if alloc_err != nil do fatal("cannot allocate %v bytes of game state: %v", host.app.state_size, alloc_err)
 	defer free(host.memory, allocator)
 
 	if host.app.init != nil {
-		if init_err := host.app.init(host.memory); init_err != nil {
+		if init_err := host.app.init(host.memory); init_err != .None {
 			log.errorf("game init failed: %v", init_err)
 			return init_err
 		}
@@ -244,7 +236,7 @@ reload_game_code :: proc(host: ^Game_Host, allocator := context.allocator) {
 		return
 	}
 	if host.app.init != nil {
-		if init_err := host.app.init(host.memory); init_err != nil {
+		if init_err := host.app.init(host.memory); init_err != .None {
 			log.errorf("hot reload: game init failed: %v", init_err)
 		}
 	}

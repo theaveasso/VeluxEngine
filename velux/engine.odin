@@ -4,9 +4,6 @@ import "core:log"
 import "core:strings"
 import "core:time"
 
-
-import vox "_vox"
-
 MAX_DELTA :: 0.1
 
 Config :: struct {
@@ -39,29 +36,23 @@ Engine :: struct {
 	last_time:          f64,
 }
 
-Error :: union #shared_nil {
-	Audio_Error,
-	GPU_Error,
-	Platform_Error,
-	Shader_Error,
-	UI_Error,
-	vox.Error,
-}
-
+// The one piece of mutable package state in velux. Everything shared lives in
+// Engine, reached through this, so the copy of velux compiled into a hot
+// reloaded game DLL needs exactly one pointer re-pointed -- see attach.odin.
+// Adding another package-level var here would need its own line in attach and
+// would silently diverge across the two copies until someone noticed.
 @(private = "package")
 g_engine: ^Engine
 
+// Startup has no recoverable failures: no window, no GPU, no run. Each one
+// dies where it happened with what was missing, so there is nothing to unwind
+// and no partially-built engine to leak.
 @(require_results)
-create :: proc(config: Config, allocator := context.allocator) -> (engine: ^Engine, err: Error) {
-	engine = new(Engine, allocator)
+create :: proc(config: Config, allocator := context.allocator) -> ^Engine {
+	engine := new(Engine, allocator)
 	g_engine = engine
-	if err = init(engine, config); err != nil {
-		g_engine = nil
-		free(engine)
-		return nil, err
-	}
-
-	return engine, nil
+	init(engine, config)
+	return engine
 }
 
 destroy :: proc(engine: ^Engine) {
@@ -72,8 +63,8 @@ destroy :: proc(engine: ^Engine) {
 	free(engine)
 }
 
-@(private, require_results)
-init :: proc(engine: ^Engine, config: Config) -> Error {
+@(private)
+init :: proc(engine: ^Engine, config: Config) {
 	config := config
 	if config.app_name == nil do config.app_name = "VeluxEngine"
 	if config.width == 0 do config.width = 1280
@@ -89,8 +80,8 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 		if !config.disable_profiler do config.enable_profiler = true
 	}
 
-	init_platform() or_return
-	create_window(&engine.window, config.width, config.height, config.app_name) or_return
+	init_platform()
+	create_window(&engine.window, config.width, config.height, config.app_name)
 	input_init(engine)
 
 	init_gpu(
@@ -102,16 +93,16 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 			enable_log = config.enable_log,
 			enable_profiler = config.enable_profiler,
 		},
-	) or_return
+	)
 
-	init_ui(engine) or_return
+	init_ui(engine)
 
-	if audio_err := init_audio(&engine.audio); audio_err != nil {
+	// The only subsystem allowed to be absent.
+	if audio_err := init_audio(&engine.audio); audio_err != .None {
 		log.warnf("audio unavailable, continuing without sound: %v", audio_err)
 	}
 
 	engine.last_time = now()
-	return nil
 }
 
 @(require_results)

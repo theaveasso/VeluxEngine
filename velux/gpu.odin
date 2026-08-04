@@ -29,10 +29,8 @@ create_gpu_image :: proc(
 	flags: vk.ImageCreateFlags = {},
 	alloc_flags: vma.AllocationCreateFlags = {},
 	usage: vma.MemoryUsage = .AUTO,
-) -> (
-	GPU_Image,
-	GPU_Error,
-) {
+	loc := #caller_location,
+) -> GPU_Image {
 	info := image_create_info(
 		format,
 		extent,
@@ -46,9 +44,12 @@ create_gpu_image :: proc(
 		alloc_flags,
 		usage,
 	)
-	return create_image(info)
+	return create_image(info, loc)
 }
 
+// Errors here are all recoverable and all about the shader: the file is
+// missing, slangc rejected it, or the driver would not take the result. In
+// every case the caller's previous pipeline is untouched.
 @(require_results)
 create_gpu_pipeline :: proc(
 	pipeline: ^GPU_Pipeline,
@@ -91,5 +92,5 @@ create_gpu_pipeline :: proc(
 	pipeline^ = rebuild_gpu_pipeline(shader, info) or_return
 
 	when ODIN_DEBUG do watch_shader(pipeline, slang_path, spv_path) or_return
-	return nil
+	return .None
 }

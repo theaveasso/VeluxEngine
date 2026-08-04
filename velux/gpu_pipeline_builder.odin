@@ -145,7 +145,7 @@ pipeline_builder_set_layout :: proc(builder: ^Pipeline_Builder, layout: vk.Pipel
 }
 
 @(private, require_results)
-pipeline_builder_build_pipeline :: proc(device: vk.Device, builder: ^Pipeline_Builder, loc := #caller_location) -> (vk.Pipeline, GPU_Error) {
+pipeline_builder_build_pipeline :: proc(device: vk.Device, builder: ^Pipeline_Builder, loc := #caller_location) -> (vk.Pipeline, Error) {
 	viewport_state: vk.PipelineViewportStateCreateInfo = {
 		sType         = .PIPELINE_VIEWPORT_STATE_CREATE_INFO,
 		viewportCount = 1,
@@ -190,8 +190,8 @@ pipeline_builder_build_pipeline :: proc(device: vk.Device, builder: ^Pipeline_Bu
 	pipeline: vk.Pipeline
 	result := vk.CreateGraphicsPipelines(device, 0, 1, &pipeline_info, nil, &pipeline)
 	if result != .SUCCESS {
-		log.errorf("vulkan call failed :%v (%v)", result, loc)
-		return 0, .Vulkan_Call_Failed
+		log.errorf("vkCreateGraphicsPipelines failed: %v (%v)", result, loc)
+		return 0, .Shader_Invalid
 	}
 
 	return pipeline, .None

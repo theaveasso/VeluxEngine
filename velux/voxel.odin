@@ -1,5 +1,7 @@
 package velux
 
+import "core:log"
+
 import vox "_vox"
 
 VOXEL_EMPTY :: Voxel(0)
@@ -29,24 +31,41 @@ Level :: struct {
 	markers: []Marker,
 }
 
+@(private)
+error_from_vox :: proc(err: vox.Error) -> Error {
+	switch err {
+	case .None:
+		return .None
+	case .File_Not_Found:
+		return .Asset_Not_Found
+	case .Bad_Magic, .Truncated, .No_Models:
+		return .Asset_Malformed
+	}
+	return .Asset_Malformed
+}
+
 @(require_results)
 load_level :: proc(file_name: string, reserved_from: u8) -> (level: Level, err: Error) {
-	model := vox.load(file_name) or_return
+	model, vox_err := vox.load(file_name)
+	if vox_err != .None {
+		log.errorf("cannot load '%v': %v", file_name, vox_err)
+		return {}, error_from_vox(vox_err)
+	}
 	defer vox.destroy(&model)
 
 	level.world.grid, level.markers = grid_from_vox(model, reserved_from)
 
 	packed_words := (len(level.world.grid.voxels) + 3) / 4
-	level.world.buffer = create_gpu_buffer(u32, PALETTE_SLOTS + packed_words) or_return
+	level.world.buffer = create_gpu_buffer(u32, PALETTE_SLOTS + packed_words)
 
 	palette := vox.pack_palete(model)
 	voxels := pack_voxels(&level.world.grid, context.temp_allocator)
 
-	cmd := immediate_transfer_begin() or_return
-	write_staging_buffer_slice(cmd, &level.world.buffer, palette[:]) or_return
-	write_staging_buffer_slice(cmd, &level.world.buffer, voxels, PALETTE_BYTES) or_return
-	immediate_transfer_end() or_return
-	return
+	cmd := immediate_transfer_begin()
+	write_staging_buffer_slice(cmd, &level.world.buffer, palette[:])
+	write_staging_buffer_slice(cmd, &level.world.buffer, voxels, PALETTE_BYTES)
+	immediate_transfer_end()
+	return level, .None
 }
 
 unload_level :: proc(level: ^Level) {

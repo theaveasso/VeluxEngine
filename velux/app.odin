@@ -45,22 +45,15 @@ run :: proc(app: App, allocator := context.allocator) -> Error {
 	if owns_logger do context.logger = log.create_console_logger()
 	defer if owns_logger do log.destroy_console_logger(context.logger)
 
-	engine, create_err := create(app.config, allocator)
-	if create_err != nil {
-		log.errorf("engine create failed: %v", create_err)
-		return create_err
-	}
+	engine := create(app.config, allocator)
 	defer destroy(engine)
 
 	game, alloc_err := mem.alloc(app.state_size, app.state_align, allocator)
-	if alloc_err != nil {
-		log.errorf("game state alloc failed: %v", alloc_err)
-		return Platform_Error.Allocation_Failed
-	}
+	if alloc_err != nil do fatal("cannot allocate %v bytes of game state: %v", app.state_size, alloc_err)
 	defer free(game, allocator)
 
 	if app.init != nil {
-		if init_err := app.init(game); init_err != nil {
+		if init_err := app.init(game); init_err != .None {
 			log.errorf("game init failed: %v", init_err)
 			return init_err
 		}
@@ -71,7 +64,7 @@ run :: proc(app: App, allocator := context.allocator) -> Error {
 	}
 
 	for running() do app_frame(&app, game)
-	return nil
+	return .None
 }
 
 quit :: proc() {
@@ -86,14 +79,14 @@ app_frame :: proc(app: ^App, game: rawptr, replay: ^Replay = nil) {
 		replay_apply(replay, game, app.state_size)
 	}
 	if app.update != nil {
-		if update_err := app.update(game); update_err != nil {
+		if update_err := app.update(game); update_err != .None {
 			log.errorf("update: %v", update_err)
 		}
 	}
 	if replay != nil do replay_unapply(replay)
 
 	frame, begin_frame_err := begin_frame()
-	if begin_frame_err != nil {
+	if begin_frame_err != .None {
 		ui_end_frame()
 		return
 	}
@@ -106,7 +99,5 @@ app_frame :: proc(app: ^App, game: rawptr, replay: ^Replay = nil) {
 	prof_zone_end(frame)
 	cmd_end_rendering(frame)
 
-	if end_frame_err := end_frame(frame); end_frame_err != nil {
-		log.errorf("end frame: %v", end_frame_err)
-	}
+	end_frame(frame)
 }

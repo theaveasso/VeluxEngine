@@ -9,76 +9,71 @@ Transfer_Context :: struct {
 	staging_buffers: [dynamic]GPU_Buffer(u8),
 }
 
-@(private, require_results)
-create_immediate_transfer_context :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
-	defer if err != .None do destroy_immediate_transfer_context(device)
-
+@(private)
+create_transfer_context :: proc(device: ^GPU_Device) {
 	pool_info: vk.CommandPoolCreateInfo = {
 		sType            = .COMMAND_POOL_CREATE_INFO,
 		flags            = {.TRANSIENT, .RESET_COMMAND_BUFFER},
 		queueFamilyIndex = device.graphics_family,
 	}
-	vk_check(vk.CreateCommandPool(device.device, &pool_info, nil, &device.imm_transfer_ctx.command_pool)) or_return
+	vk_assert(vk.CreateCommandPool(device.device, &pool_info, nil, &device.transfer.command_pool), "vkCreateCommandPool")
 
 	buffer_info: vk.CommandBufferAllocateInfo = {
 		sType              = .COMMAND_BUFFER_ALLOCATE_INFO,
-		commandPool        = device.imm_transfer_ctx.command_pool,
+		commandPool        = device.transfer.command_pool,
 		commandBufferCount = 1,
 		level              = .PRIMARY,
 	}
-	vk_check(vk.AllocateCommandBuffers(device.device, &buffer_info, &device.imm_transfer_ctx.command_buffer)) or_return
+	vk_assert(vk.AllocateCommandBuffers(device.device, &buffer_info, &device.transfer.command_buffer), "vkAllocateCommandBuffers")
 
 	fence_info: vk.FenceCreateInfo = {
 		sType = .FENCE_CREATE_INFO,
 	}
-	vk_check(vk.CreateFence(device.device, &fence_info, nil, &device.imm_transfer_ctx.fence)) or_return
-
-	return
+	vk_assert(vk.CreateFence(device.device, &fence_info, nil, &device.transfer.fence), "vkCreateFence")
 }
 
 @(private)
-destroy_immediate_transfer_context :: proc(device: ^GPU_Device) {
-	vk.DestroyCommandPool(device.device, device.imm_transfer_ctx.command_pool, nil)
-	vk.DestroyFence(device.device, device.imm_transfer_ctx.fence, nil)
-	destroy_immediate_staging_buffers(device)
-	delete(device.imm_transfer_ctx.staging_buffers)
+destroy_transfer_context :: proc(device: ^GPU_Device) {
+	vk.DestroyCommandPool(device.device, device.transfer.command_pool, nil)
+	vk.DestroyFence(device.device, device.transfer.fence, nil)
+	destroy_staging_buffers(device)
+	delete(device.transfer.staging_buffers)
 }
 
-@(require_results)
-immediate_transfer_begin :: proc() -> (cmd: vk.CommandBuffer, err: GPU_Error) {
+// Blocking. Correct for load-time uploads, ruinous per frame -- see the
+// per-frame ring in gpu_upload.odin for anything that runs every tick.
+immediate_transfer_begin :: proc() -> vk.CommandBuffer {
 	device := &g_engine.gpu
 	context.logger = device.logger
 
-	vk_check(vk.ResetFences(device.device, 1, &device.imm_transfer_ctx.fence)) or_return
-	vk_check(vk.ResetCommandBuffer(device.imm_transfer_ctx.command_buffer, {})) or_return
+	vk_assert(vk.ResetFences(device.device, 1, &device.transfer.fence), "vkResetFences")
+	vk_assert(vk.ResetCommandBuffer(device.transfer.command_buffer, {}), "vkResetCommandBuffer")
 
 	cmd_begin_info := init_command_buffer_begin_info({.ONE_TIME_SUBMIT})
-	vk_check(vk.BeginCommandBuffer(device.imm_transfer_ctx.command_buffer, &cmd_begin_info)) or_return
+	vk_assert(vk.BeginCommandBuffer(device.transfer.command_buffer, &cmd_begin_info), "vkBeginCommandBuffer")
 
-	return device.imm_transfer_ctx.command_buffer, .None
+	return device.transfer.command_buffer
 }
 
-@(require_results)
-immediate_transfer_end :: proc() -> (err: GPU_Error = .None) {
+immediate_transfer_end :: proc() {
 	device := &g_engine.gpu
-	defer {
-		destroy_immediate_staging_buffers(device)
-		clear(&device.imm_transfer_ctx.staging_buffers)
-	}
 	context.logger = device.logger
+	defer {
+		destroy_staging_buffers(device)
+		clear(&device.transfer.staging_buffers)
+	}
 
-	vk_check(vk.EndCommandBuffer(device.imm_transfer_ctx.command_buffer)) or_return
+	vk_assert(vk.EndCommandBuffer(device.transfer.command_buffer), "vkEndCommandBuffer")
 
-	cmd_info := init_command_buffer_submit_info(device.imm_transfer_ctx.command_buffer)
+	cmd_info := init_command_buffer_submit_info(device.transfer.command_buffer)
 	submit_info := init_submit_info(nil, &cmd_info, nil)
-	vk_check(vk.QueueSubmit2(device.graphics_queue, 1, &submit_info, device.imm_transfer_ctx.fence)) or_return
-	vk_check(vk.WaitForFences(device.device, 1, &device.imm_transfer_ctx.fence, true, max(u64))) or_return
-	return
+	vk_assert(vk.QueueSubmit2(device.graphics_queue, 1, &submit_info, device.transfer.fence), "vkQueueSubmit2")
+	vk_assert(vk.WaitForFences(device.device, 1, &device.transfer.fence, true, max(u64)), "vkWaitForFences")
 }
 
 @(private)
-destroy_immediate_staging_buffers :: proc(device: ^GPU_Device) {
-	for &staging in device.imm_transfer_ctx.staging_buffers {
+destroy_staging_buffers :: proc(device: ^GPU_Device) {
+	for &staging in device.transfer.staging_buffers {
 		destroy_gpu_buffer(&staging)
 	}
 }

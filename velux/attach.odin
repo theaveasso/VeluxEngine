@@ -11,6 +11,12 @@ import vk "vendor:vulkan"
 // The velux half stays one assignment only while g_engine remains the only
 // mutable package-level variable (see engine.odin). The proc tables belong to
 // vendor packages, so each copy must load its own.
+//
+// Reached only as App.attach, which make_app fills in so the host ends up with
+// a pointer into the DLL's copy rather than its own. Not for games to call:
+// doing so from a compiled-in game would repoint the one copy at itself, and
+// from a DLL would fight the host.
+@(private)
 attach :: proc(engine: ^Engine) {
 	g_engine = engine
 

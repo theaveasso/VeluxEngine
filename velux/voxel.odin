@@ -31,9 +31,8 @@ Level :: struct {
 	markers: []Marker,
 }
 
-// Everything a .vox file yields, before any of it has touched a GPU. Parsing
-// and grid construction are pure CPU work and are testable without a device;
-// only upload_level needs Vulkan.
+// Everything a .vox file yields before any of it touches a GPU, so the parser
+// is testable without a device.
 Level_Data :: struct {
 	grid:    Voxel_Grid,
 	markers: []Marker,
@@ -53,7 +52,6 @@ error_from_vox :: proc(err: vox.Error) -> Error {
 	return .Asset_Malformed
 }
 
-// CPU only. No device, no allocation on the GPU, nothing to wait for.
 @(require_results)
 load_level_data :: proc(
 	file_name: string,
@@ -81,9 +79,7 @@ destroy_level_data :: proc(data: ^Level_Data) {
 	data^ = {}
 }
 
-// The GPU half, on its own so it can be called at a moment of your choosing
-// rather than being welded to file IO. Blocking, and meant to be: this is
-// load-time work.
+// Blocking, and meant to be: this is load-time work.
 @(require_results)
 upload_level :: proc(data: ^Level_Data) -> (world: Voxel_World) {
 	packed_words := (len(data.grid.voxels) + 3) / 4
@@ -99,8 +95,6 @@ upload_level :: proc(data: ^Level_Data) -> (world: Voxel_World) {
 	return world
 }
 
-// Convenience over the two halves above, for callers that want a level in one
-// line and do not care when the upload happens.
 @(require_results)
 load_level :: proc(file_name: string, reserved_from: u8) -> (level: Level, err: Error) {
 	data := load_level_data(file_name, reserved_from) or_return

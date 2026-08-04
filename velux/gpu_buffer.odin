@@ -95,8 +95,8 @@ vk_vma_buffer_flags :: proc(kind: GPU_Buffer_Kind) -> (vk.BufferUsageFlags, vma.
 	unreachable()
 }
 
-// Overrunning a mapped buffer corrupts whatever VMA put next to it, which
-// surfaces as a wrong pixel somewhere else entirely. Die here instead.
+// Overrunning corrupts whatever VMA put next to it, which surfaces as a wrong
+// pixel somewhere else entirely. Die here instead.
 @(private)
 check_buffer_bounds :: proc(info: vma.AllocationInfo, size, offset: vk.DeviceSize, loc: runtime.Source_Code_Location) {
 	if info.size < size + offset {
@@ -129,8 +129,8 @@ write_buffer_slice :: proc(buffer: ^GPU_Buffer($T), in_data: []$U, offset: vk.De
 	mem.copy(data[offset:], raw_data(in_data), int(size))
 }
 
-// Load-time upload: allocates a throwaway staging buffer and leaves it for
-// immediate_transfer_end to reap. Do not call this per frame.
+// Load-time only: allocates a throwaway staging buffer for
+// immediate_transfer_end to reap. Per frame, use frame_upload_slice.
 write_staging_buffer :: proc(
 	cmd: vk.CommandBuffer,
 	buffer: ^GPU_Buffer($T),

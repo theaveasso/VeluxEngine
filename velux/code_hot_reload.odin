@@ -31,10 +31,9 @@ Reloader :: struct {
 	output_dir:        string,
 	generation:        int,
 	last_build:        string,
-	// Shared libraries are never unloaded while the process lives: code from a
-	// previous generation can still be on the stack or referenced by a
-	// function pointer the game handed us. This grows by one per reload, by
-	// design, and is bounded by how long a session lasts.
+	// Never unloaded while the process lives: old code can still be on the
+	// stack or behind a function pointer the game handed us. Grows by one per
+	// reload, by design.
 	retired:           [dynamic]dynlib.Library,
 	auto_reload:       bool,
 	last_source_check: time.Time,
@@ -101,9 +100,6 @@ run_hot_reload :: proc(game_dir: string, work_dir := "", allocator := context.al
 		fatal("cannot enter %s: %v", reload.work_dir, wd_err)
 	}
 
-	// The DLL carries its own statically compiled copy of velux. This points
-	// that copy's g_engine at ours and reloads the vendor proc tables it also
-	// has its own copies of. See attach.odin.
 	host.app.attach(engine)
 
 	reload.newest_source = newest_odin_write(reload.source_dir)
@@ -111,18 +107,11 @@ run_hot_reload :: proc(game_dir: string, work_dir := "", allocator := context.al
 	return host_run(&host, allocator)
 }
 
-// The host executable and the game DLL each compile their own copy of velux
-// from this source tree, so their type layouts agree by construction -- unless
-// this binary predates a source edit, in which case the game will be built
-// against a different Engine than the one it is handed, and every field read
-// through it is garbage.
-//
-// That is a build staleness problem, so it is reported as one. The FNV hash
-// over Engine's Type_Info that used to guard this detected the same condition
-// and called it "engine layout changed", which sends you to look at your
-// structs instead of at your build. mtime over the source is conservative --
-// it also fires on a comment edit -- and the cost of a false positive is one
-// rebuild of a dev-only tool.
+// Host and game DLL compile their own copy of velux from this tree, so their
+// layouts agree by construction unless this binary predates a source edit --
+// in which case the game is built against a different Engine than the one it
+// is handed, and every field read through it is garbage. Conservative: also
+// fires on a comment edit, which costs one rebuild.
 @(private)
 require_host_matches_source :: proc() {
 	exe_path, exe_err := os.get_executable_path(context.temp_allocator)
@@ -179,7 +168,7 @@ poll_code_reload :: proc(host: ^Game_Host, allocator := context.allocator) {
 		return
 	}
 
-	// Wait for the editor to stop writing before shelling out to the compiler.
+	// Let the editor finish writing before shelling out to the compiler.
 	if !reload.change_pending do return
 	if time.duration_milliseconds(time.diff(reload.change_seen_at, now)) < SOURCE_SETTLE_MS do return
 	reload.change_pending = false
@@ -223,8 +212,8 @@ reload_game_code :: proc(host: ^Game_Host, allocator := context.allocator) {
 	wait_for_idle()
 	new_app.attach(g_engine)
 
-	// Same struct, new code: keep the state and the player keeps their
-	// position. Different struct: the old bytes mean something else now.
+	// Same struct, new code: keep the state. Different struct: the old bytes
+	// mean something else now.
 	hard := new_app.state_hash != host.app.state_hash
 	if hard {
 		replay_discard(&host.replay, "game layout changed", allocator)

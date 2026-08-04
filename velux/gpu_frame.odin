@@ -16,8 +16,6 @@ Frame :: struct {
 	frame_index:       u32,
 }
 
-// The only failure a caller can answer is Swapchain_Out_Of_Date: the window
-// changed size, this frame is gone, the next one will be fine.
 @(private)
 begin_frame :: proc() -> (frame: Frame, err: Error) {
 	device := &g_engine.gpu
@@ -45,8 +43,7 @@ begin_frame :: proc() -> (frame: Frame, err: Error) {
 		fatal("vkAcquireNextImageKHR failed: %v", acquire_result)
 	}
 
-	// The fence above is the proof that the GPU has finished reading whatever
-	// this slot's upload ring held last time it was used.
+	// The fence above proves the GPU is done with this slot's upload ring.
 	reset_upload_slot(device, device.current_frame)
 
 	vk_assert(vk.ResetFences(device.device, 1, &frame_data.in_flight_fence), "vkResetFences")

@@ -45,8 +45,7 @@ GPU_Pipeline :: struct {
 }
 
 // Returns an error rather than dying: a shader edited during hot reload can
-// legitimately produce a pipeline the driver rejects, and the caller keeps
-// running on the last good one.
+// produce a pipeline the driver rejects, and the caller keeps the last good one.
 @(require_results)
 rebuild_gpu_pipeline :: proc(shader: vk.ShaderModule, create_info: GPU_Pipeline_Info) -> (pipeline: GPU_Pipeline, err: Error) {
 	device := &g_engine.gpu

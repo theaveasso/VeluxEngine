@@ -7,14 +7,11 @@ Bindless :: struct {
 	layout:           vk.DescriptorSetLayout,
 	set:              vk.DescriptorSet,
 	default_sampler:  vk.Sampler,
-	// Slots below next_index that have been given back. Reused before the
-	// table grows.
+	// Reused before the table grows.
 	free:             [dynamic]u32,
 	next_index:       u32,
-	// A 1x1 magenta texture every released slot points at. Without it, a freed
-	// slot keeps a COMBINED_IMAGE_SAMPLER aimed at a destroyed VkImageView,
-	// and a shader that reads a stale index samples freed memory instead of
-	// showing you an obviously wrong colour.
+	// Released slots point here, so a shader reading a stale index samples an
+	// obvious wrong colour instead of a destroyed VkImageView.
 	placeholder:      GPU_Image,
 	placeholder_view: vk.ImageView,
 }
@@ -30,8 +27,8 @@ create_bindless :: proc(device: ^GPU_Device) {
 
 @(private)
 destroy_bindless :: proc(device: ^GPU_Device) {
-	// Skip the release path: the slot is about to stop existing, and pointing
-	// it at the placeholder's own view while destroying that view is circular.
+	// Skip the release path: pointing the slot at the placeholder's own view
+	// while destroying that view is circular.
 	device.bindless.placeholder.bindless_index = NO_BINDLESS_INDEX
 	destroy_gpu_image(&device.bindless.placeholder)
 
@@ -87,9 +84,8 @@ register_bindless :: proc(device: ^GPU_Device, view: vk.ImageView, loc := #calle
 	return index
 }
 
-// The caller must already have ensured the GPU is not still reading this slot
-// -- destroy_gpu_image has the same requirement for the image itself, so in
-// practice this means unloading between frames or after wait_for_idle.
+// Caller must ensure the GPU is not still reading this slot; destroy_gpu_image
+// has the same requirement for the image itself.
 @(private)
 release_bindless :: proc(device: ^GPU_Device, index: u32) {
 	if index == NO_BINDLESS_INDEX do return

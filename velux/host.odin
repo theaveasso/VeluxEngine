@@ -4,14 +4,8 @@ import "base:runtime"
 import "core:log"
 import "core:mem"
 
-// Everything a running game needs, whether it was compiled into this binary or
-// loaded from a shared library. `reload` is nil in the compiled-in case, and
-// that is the entire difference between the two entry points.
-//
-// There used to be two copies of this loop -- run() and run_hot_reload() --
-// which agreed on logger ownership, engine creation, state allocation, init,
-// teardown order and frame structure, by being typed out twice. Only one of
-// them had replay.
+// `reload` is nil for a game compiled into this binary, and that is the entire
+// difference between the two entry points.
 @(private)
 Game_Host :: struct {
 	app:    App,
@@ -21,11 +15,8 @@ Game_Host :: struct {
 }
 
 // Odin's default context.logger is not nil -- it is runtime.default_logger_proc,
-// which is an empty body. Testing `procedure == nil` therefore never fired, so
-// velux installed no console logger and threw away every log call it ever made,
-// including every Vulkan validation message arriving through debug_callback.
-// That is why the old error paths, which all terminated in a log.errorf, could
-// not be seen to terminate anywhere.
+// an empty body -- so `procedure == nil` never fires and every log call is
+// silently discarded.
 @(private, require_results)
 needs_console_logger :: proc() -> bool {
 	return context.logger.procedure == nil || context.logger.procedure == runtime.default_logger_proc
@@ -69,8 +60,6 @@ host_run :: proc(host: ^Game_Host, allocator: runtime.Allocator) -> (err: Error)
 	return .None
 }
 
-// Was the body of `running()`, which did all of this from a loop condition
-// named as though it only answered a question.
 @(private)
 frame_begin :: proc(engine: ^Engine) {
 	free_all(context.temp_allocator)

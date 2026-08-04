@@ -36,17 +36,14 @@ Engine :: struct {
 	last_time:          f64,
 }
 
-// The one piece of mutable package state in velux. Everything shared lives in
-// Engine, reached through this, so the copy of velux compiled into a hot
-// reloaded game DLL needs exactly one pointer re-pointed -- see attach.odin.
-// Adding another package-level var here would need its own line in attach and
-// would silently diverge across the two copies until someone noticed.
+// The only mutable package-level variable in velux; everything shared lives in
+// Engine, reached through it. A second one would need its own line in attach.odin
+// and would silently diverge between the host and a hot reloaded DLL.
 @(private = "package")
 g_engine: ^Engine
 
-// Startup has no recoverable failures: no window, no GPU, no run. Each one
-// dies where it happened with what was missing, so there is nothing to unwind
-// and no partially-built engine to leak.
+// Startup has no recoverable failures, so there is nothing to unwind and no
+// partially-built engine to leak.
 @(require_results)
 create :: proc(config: Config, allocator := context.allocator) -> ^Engine {
 	engine := new(Engine, allocator)
@@ -72,8 +69,7 @@ init :: proc(engine: ^Engine, config: Config) {
 	if config.shader_include_dir == "" do config.shader_include_dir = DEFAULT_SHADER_INCLUDE_DIR
 	engine.shader_include_dir, _ = strings.clone(config.shader_include_dir)
 
-	// Debug builds opt in by default; a caller that explicitly sets these off
-	// gets them off. `|| ODIN_DEBUG` made the flags unusable in a debug build.
+	// Debug builds opt in unless the caller explicitly opts out.
 	when ODIN_DEBUG {
 		if !config.disable_validation do config.enable_validation = true
 		if !config.disable_log do config.enable_log = true

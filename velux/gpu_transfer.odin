@@ -40,8 +40,7 @@ destroy_transfer_context :: proc(device: ^GPU_Device) {
 	delete(device.transfer.staging_buffers)
 }
 
-// Blocking. Correct for load-time uploads, ruinous per frame -- see the
-// per-frame ring in gpu_upload.odin for anything that runs every tick.
+// Blocking: correct at load time, ruinous per frame. See gpu_upload.odin.
 immediate_transfer_begin :: proc() -> vk.CommandBuffer {
 	device := &g_engine.gpu
 	context.logger = device.logger

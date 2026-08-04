@@ -64,9 +64,8 @@ wait_idle :: proc(device: ^GPU_Device) {
 	if device.device != nil do vk.DeviceWaitIdle(device.device)
 }
 
-// Nothing in here is recoverable. If the machine cannot present a Vulkan
-// surface, velux has no second plan, and the fatal at the failing call names
-// what was missing.
+// Nothing in here is recoverable; the fatal at the failing call names what was
+// missing.
 @(private)
 init_gpu :: proc(device: ^GPU_Device, config: GPU_Config) {
 	device.logger = logger_from_prefix(&device.log_state, "[gpu]: ")
@@ -193,8 +192,8 @@ create_instance :: proc(device: ^GPU_Device, config: GPU_Config) {
 		create_info.flags = {.ENUMERATE_PORTABILITY_KHR}
 	}
 
-	// Covers messages emitted by vkCreateInstance itself; the standalone
-	// messenger below takes over once the instance exists.
+	// Covers vkCreateInstance itself; the standalone messenger below takes over
+	// once the instance exists.
 	validation_features: vk.ValidationFeaturesEXT
 	debug_create_info: vk.DebugUtilsMessengerCreateInfoEXT
 	if device.enable_validation_layer {
@@ -258,8 +257,7 @@ pick_physical_device :: proc(device: ^GPU_Device) {
 	devices := make([]vk.PhysicalDevice, device_n, context.temp_allocator)
 	vk_assert(vk.EnumeratePhysicalDevices(device.instance, &device_n, raw_data(devices)), "vkEnumeratePhysicalDevices")
 
-	// One pass: take the first discrete device that qualifies, otherwise fall
-	// back to the first qualifying device of any kind.
+	// First qualifying discrete device, else first qualifying device.
 	chosen: vk.PhysicalDevice
 	for physical_device in devices {
 		if !device_is_suitable(physical_device, device.surface) do continue
@@ -384,9 +382,8 @@ device_is_suitable :: proc(physical_device: vk.PhysicalDevice, surface: vk.Surfa
 	return format_count > 0 && present_mode_count > 0
 }
 
-// Named explicitly rather than discovered by reflection over the REQUIRED_*
-// structs. The list is eleven entries, it is known at compile time, and
-// spelling it out is what makes the rejection message worth reading.
+// Spelled out rather than reflected over REQUIRED_*, so the rejection message
+// names the feature.
 @(private)
 device_missing_features :: proc(physical_device: vk.PhysicalDevice, allocator := context.allocator) -> []string {
 	vk_13: vk.PhysicalDeviceVulkan13Features = {
@@ -449,8 +446,7 @@ device_missing_extensions :: proc(physical_device: vk.PhysicalDevice, allocator 
 	return missing[:]
 }
 
-// Only built when we are about to die, so the cost does not matter and the
-// detail does.
+// Only built when we are about to die, so detail beats cost.
 @(private)
 device_rejection_report :: proc(devices: []vk.PhysicalDevice, surface: vk.SurfaceKHR) -> string {
 	builder := strings.builder_make(context.temp_allocator)

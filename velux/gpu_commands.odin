@@ -61,9 +61,8 @@ cmd_begin_rendering :: proc(frame: Frame, clear_color: Maybe([4]f32) = nil) {
 		color = {float32 = c},
 	}
 
-	// Depth follows colour: the pass that clears the frame clears depth, and a
-	// pass layered on top of it (the UI) loads what is already there instead of
-	// wiping the depth the game just wrote.
+	// Depth follows colour, so a pass layered on top (the UI) does not wipe the
+	// depth the game just wrote.
 	depth_attachment: vk.RenderingAttachmentInfo = {
 		sType = .RENDERING_ATTACHMENT_INFO,
 		pNext = nil,

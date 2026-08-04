@@ -4,24 +4,15 @@ import "core:mem"
 
 import vk "vendor:vulkan"
 
-// One persistently mapped, host-visible buffer per frame in flight, filled by
-// bumping an offset. No allocation, no submit, no fence wait.
-//
-// What this replaces: every per-frame upload used to call
-// immediate_transfer_begin / write_staging_buffer_slice / immediate_transfer_end,
-// which is vmaCreateBuffer, memcpy, vkQueueSubmit2, a blocking
-// vkWaitForFences on the GPU, and vmaDestroyBuffer -- per upload, per frame.
-// her_body_waits paid that round trip every tick to move 336 bytes.
-//
-// Safety comes from the frame fence, not from a sync of its own: begin_frame
-// has already waited on slot N's in-flight fence before resetting slot N's
-// offset, so nothing the GPU is still reading gets overwritten.
+// One persistently mapped buffer per frame in flight, filled by bumping an
+// offset. Safety comes from the frame fence rather than any sync of its own:
+// begin_frame has already waited on slot N's in-flight fence before resetting
+// slot N's offset, so nothing the GPU is still reading gets overwritten.
 Upload_Ring :: struct {
 	buffers:  [MAX_FRAMES_IN_FLIGHT]GPU_Buffer(u8),
 	used:     [MAX_FRAMES_IN_FLIGHT]vk.DeviceSize,
 	capacity: vk.DeviceSize,
-	// Set when a copy was recorded this frame, cleared by the barrier that
-	// makes it visible. Lets one barrier cover any number of uploads.
+	// Lets one barrier cover any number of uploads.
 	pending:  bool,
 }
 
@@ -43,17 +34,14 @@ destroy_upload_ring :: proc(device: ^GPU_Device) {
 	}
 }
 
-// Called by begin_frame once slot N's fence has signalled, which is the proof
-// that the GPU is done reading what was written there last time around.
 @(private)
 reset_upload_slot :: proc(device: ^GPU_Device, slot: u32) {
 	device.upload.used[slot] = 0
 }
 
-// Records a copy into the frame's command buffer, so it must be called while
-// no render pass is open: from `draw`, before cmd_begin_rendering. The data is
-// memcpy'd immediately, so the caller's slice does not need to outlive the
-// call.
+// Must be called with no render pass open -- from `draw`, before
+// cmd_begin_rendering -- because it records a copy. `in_data` is memcpy'd here
+// and need not outlive the call.
 frame_upload_slice :: proc(frame: Frame, dst: ^GPU_Buffer($T), in_data: []$U, dst_offset: vk.DeviceSize = 0, loc := #caller_location) {
 	device := &g_engine.gpu
 
@@ -98,8 +86,6 @@ suballocate_upload :: proc(
 	return offset
 }
 
-// One barrier covering every copy recorded this frame, emitted at the point
-// the frame stops uploading and starts drawing.
 @(private)
 flush_upload_barrier :: proc(cmd: vk.CommandBuffer) {
 	device := &g_engine.gpu

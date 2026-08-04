@@ -122,7 +122,7 @@ create_sampler :: proc(
 		anisotropyEnable = max_anisotropy > 1.0 ? true : false,
 		maxAnisotropy    = max_anisotropy,
 		minLod           = 0.0,
-		maxLod           = max_anisotropy,
+		maxLod           = max_lod,
 		borderColor      = border_color,
 		compareOp        = compare_op,
 		compareEnable    = compare_op != .NEVER,
@@ -130,36 +130,6 @@ create_sampler :: proc(
 
 	vk_check(vk.CreateSampler(device.device, &sampler_info, nil, &sampler)) or_return
 	return sampler, .None
-}
-
-@(require_results)
-write_staging_image :: proc(
-	cmd: vk.CommandBuffer,
-	image: ^GPU_Image,
-	in_data: []$T,
-	offset: vk.DeviceSize = 0,
-	loc := #caller_location,
-) -> (
-	err: GPU_Error = .None,
-) {
-	device := &g_engine.gpu
-	assert(image.view != 0, "image is missing a valid view", loc)
-
-	size := size_of(T) * len(in_data)
-	gpu_size := image.extent.width * image.extent.height * image.extent.depth * size_of(T)
-	assert(gpu_size >= cast(u32)size + cast(u32)offset, "size of the data and offset is larger than the buffer", loc)
-
-	staging := create_gpu_buffer(device, u8, size, .Staging) or_return
-	write_buffer_slice(&staging, in_data, offset, loc)
-	append(&device.imm_transfer_ctx.staging_buffers, staging)
-
-	aspect := vk_aspect_of_format(image.format)
-	cmd_transition_image(cmd, image.handle, aspect, .UNDEFINED, .TRANSFER_DST_OPTIMAL)
-
-	region := init_buffer_image_copy2(image.extent, init_image_subresource_layers(aspect, 0, 0, image.array_layers))
-	cmd_copy_buffer_to_image2(cmd, staging.handle, image.handle, .TRANSFER_DST_OPTIMAL, &region)
-	cmd_transition_image(cmd, image.handle, aspect, .TRANSFER_DST_OPTIMAL, .SHADER_READ_ONLY_OPTIMAL)
-	return
 }
 
 @(private, require_results)

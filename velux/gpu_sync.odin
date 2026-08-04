@@ -1,16 +1,6 @@
 package velux
 
-import "base:runtime"
-import "core:dynlib"
-import "core:fmt"
-import "core:log"
-import "core:reflect"
-import "core:strings"
-
-import vma "third_party:odin-vma"
-import glfw "vendor:glfw"
 import vk "vendor:vulkan"
-
 
 @(private, require_results)
 create_per_image_semaphores :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {

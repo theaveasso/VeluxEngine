@@ -17,6 +17,10 @@ Config :: struct {
 	enable_validation:  bool,
 	enable_profiler:    bool,
 	enable_log:         bool,
+	// Debug builds turn the three above on unless the matching opt-out is set.
+	disable_validation: bool,
+	disable_profiler:   bool,
+	disable_log:        bool,
 }
 
 Engine :: struct {
@@ -77,9 +81,13 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 	if config.shader_include_dir == "" do config.shader_include_dir = DEFAULT_SHADER_INCLUDE_DIR
 	engine.shader_include_dir, _ = strings.clone(config.shader_include_dir)
 
-	if config.enable_validation || ODIN_DEBUG do config.enable_validation = true
-	if config.enable_log || ODIN_DEBUG do config.enable_log = true
-	if config.enable_profiler || ODIN_DEBUG do config.enable_profiler = true
+	// Debug builds opt in by default; a caller that explicitly sets these off
+	// gets them off. `|| ODIN_DEBUG` made the flags unusable in a debug build.
+	when ODIN_DEBUG {
+		if !config.disable_validation do config.enable_validation = true
+		if !config.disable_log do config.enable_log = true
+		if !config.disable_profiler do config.enable_profiler = true
+	}
 
 	init_platform() or_return
 	create_window(&engine.window, config.width, config.height, config.app_name) or_return
@@ -99,7 +107,7 @@ init :: proc(engine: ^Engine, config: Config) -> Error {
 	init_ui(engine) or_return
 
 	if audio_err := init_audio(&engine.audio); audio_err != nil {
-		log.warnf("audio unavailable, continuing withou sound: %v", audio_err)
+		log.warnf("audio unavailable, continuing without sound: %v", audio_err)
 	}
 
 	engine.last_time = now()

@@ -197,39 +197,27 @@ create_instance :: proc(device: ^GPU_Device, config: GPU_Config) -> (err: GPU_Er
 	defer delete(extensions)
 
 	layers := get_required_layers(device.enable_validation_layer)
-	defer delete(layers)
 
 	create_info: vk.InstanceCreateInfo = {
 		sType                   = .INSTANCE_CREATE_INFO,
 		pApplicationInfo        = &app_info,
 		enabledExtensionCount   = cast(u32)len(extensions),
 		ppEnabledExtensionNames = raw_data(extensions),
-		enabledLayerCount       = device.enable_validation_layer ? cast(u32)len(layers) : 0,
-		ppEnabledLayerNames     = device.enable_validation_layer ? raw_data(layers) : nil,
+		enabledLayerCount       = cast(u32)len(layers),
+		ppEnabledLayerNames     = raw_data(layers),
 	}
 	
 	when ODIN_OS == .Darwin {
 		create_info.flags = {.ENUMERATE_PORTABILITY_KHR}
 	}
 
+	// Covers messages emitted by vkCreateInstance itself; the standalone messenger
+	// created in setup_debug_utils_messenger takes over once the instance exists.
 	validation_features: vk.ValidationFeaturesEXT
 	debug_create_info: vk.DebugUtilsMessengerCreateInfoEXT
-
 	if device.enable_validation_layer {
-		validation_features.sType = .VALIDATION_FEATURES_EXT
-		validation_features.enabledValidationFeatureCount = cast(u32)len(VALIDATION_FEATURES)
-		validation_features.pEnabledValidationFeatures = raw_data(VALIDATION_FEATURES)
-
-		debug_create_info.sType = .DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT
-		debug_create_info.pNext = &validation_features
-		debug_create_info.messageSeverity = {.WARNING, .ERROR, .INFO}
-		debug_create_info.messageType = {.GENERAL, .VALIDATION, .PERFORMANCE}
-		debug_create_info.pfnUserCallback = debug_callback
-		debug_create_info.pUserData = &device.logger
-
+		debug_create_info = debug_messenger_create_info(device, &validation_features)
 		create_info.pNext = &debug_create_info
-	} else {
-		create_info.pNext = nil
 	}
 
 	vk_check(vk.CreateInstance(&create_info, nil, &device.instance)) or_return
@@ -238,24 +226,34 @@ create_instance :: proc(device: ^GPU_Device, config: GPU_Config) -> (err: GPU_Er
 	return
 }
 
-@(private, require_results)
-setup_debug_utils_messenger :: proc(device: ^GPU_Device, config: GPU_Config) -> (err: GPU_Error = .None) {
-	if !config.enable_validation do return
-
-	validation_features: vk.ValidationFeaturesEXT = {
+// `features` is written through and must outlive the returned struct: it is
+// reached by pNext, not copied.
+@(private)
+debug_messenger_create_info :: proc(
+	device: ^GPU_Device,
+	features: ^vk.ValidationFeaturesEXT,
+) -> vk.DebugUtilsMessengerCreateInfoEXT {
+	features^ = {
 		sType                         = .VALIDATION_FEATURES_EXT,
 		enabledValidationFeatureCount = cast(u32)len(VALIDATION_FEATURES),
 		pEnabledValidationFeatures    = raw_data(VALIDATION_FEATURES),
 	}
-
-	debug_create_info: vk.DebugUtilsMessengerCreateInfoEXT = {
+	return {
 		sType           = .DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-		pNext           = &validation_features,
+		pNext           = features,
 		messageSeverity = {.WARNING, .ERROR, .INFO},
 		messageType     = {.GENERAL, .VALIDATION, .PERFORMANCE},
 		pfnUserCallback = debug_callback,
 		pUserData       = &device.logger,
 	}
+}
+
+@(private, require_results)
+setup_debug_utils_messenger :: proc(device: ^GPU_Device, config: GPU_Config) -> (err: GPU_Error = .None) {
+	if !config.enable_validation do return
+
+	validation_features: vk.ValidationFeaturesEXT
+	debug_create_info := debug_messenger_create_info(device, &validation_features)
 
 	vk_check(vk.CreateDebugUtilsMessengerEXT(device.instance, &debug_create_info, nil, &device.debug_messenger)) or_return
 	return
@@ -281,31 +279,25 @@ pick_physical_device :: proc(device: ^GPU_Device) -> (err: GPU_Error = .No_Suita
 	defer delete(devices)
 	vk_check(vk.EnumeratePhysicalDevices(device.instance, &device_n, raw_data(devices)), .No_Suitable_Physical_Device) or_return
 
+	// One pass: take the first discrete device that qualifies, otherwise fall back
+	// to the first qualifying device of any kind.
+	chosen: vk.PhysicalDevice
 	for physical_device in devices {
 		is_suitable, is_discrete := is_device_suitable(physical_device, device.surface)
-		if is_suitable && is_discrete {
-			device.physical_device = physical_device
-			props: vk.PhysicalDeviceProperties
-			vk.GetPhysicalDeviceProperties(device.physical_device, &props)
-			device.timestamp_period = props.limits.timestampPeriod
-			return .None
+		if !is_suitable do continue
+		if is_discrete {
+			chosen = physical_device
+			break
 		}
+		if chosen == nil do chosen = physical_device
 	}
+	if chosen == nil do return .No_Suitable_Physical_Device
 
-	if device.physical_device == nil {
-		for physical_device in devices {
-			is_suitable, _is_discrete := is_device_suitable(physical_device, device.surface)
-			if is_suitable {
-				device.physical_device = physical_device
-				props: vk.PhysicalDeviceProperties
-				vk.GetPhysicalDeviceProperties(device.physical_device, &props)
-				device.timestamp_period = props.limits.timestampPeriod
-				return .None
-			}
-		}
-	}
-
-	return
+	device.physical_device = chosen
+	props: vk.PhysicalDeviceProperties
+	vk.GetPhysicalDeviceProperties(chosen, &props)
+	device.timestamp_period = props.limits.timestampPeriod
+	return .None
 }
 
 @(private, require_results)
@@ -317,21 +309,15 @@ find_queue_families :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
 	defer delete(queue_families)
 	vk.GetPhysicalDeviceQueueFamilyProperties(device.physical_device, &queue_family_n, raw_data(queue_families))
 
-	queue_family: u32 = max(u32)
 	for &qf, i in queue_families {
 		if .GRAPHICS not_in qf.queueFlags || qf.timestampValidBits == 0 do continue
+		if !glfw.GetPhysicalDevicePresentationSupport(device.instance, device.physical_device, cast(u32)i) do continue
 
-		support_present := glfw.GetPhysicalDevicePresentationSupport(device.instance, device.physical_device, cast(u32)i)
-
-		if support_present && .GRAPHICS in qf.queueFlags {
-			queue_family = cast(u32)i
-			break
-		}
+		device.graphics_family = cast(u32)i
+		return .None
 	}
 
-	if queue_family != max(u32) do device.graphics_family = queue_family
-
-	return queue_family != max(u32) ? .None : .No_Graphics_Queue_Supported
+	return .No_Graphics_Queue_Supported
 }
 
 @(private, require_results)
@@ -405,17 +391,8 @@ get_required_extensions :: proc(enable_validation_layers: bool) -> [dynamic]cstr
 }
 
 @(private)
-get_required_layers :: proc(enable_validation_layers: bool) -> [dynamic]cstring {
-	layers: [dynamic]cstring
-	if enable_validation_layers {
-		resize(&layers, len(VALIDATION_LAYERS))
-		for layer, i in VALIDATION_LAYERS {
-			layers[i] = layer
-		}
-	} else {
-		resize(&layers, 0)
-	}
-	return layers
+get_required_layers :: proc(enable_validation_layers: bool) -> []cstring {
+	return enable_validation_layers ? VALIDATION_LAYERS : nil
 }
 
 @(private)

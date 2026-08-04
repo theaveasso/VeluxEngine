@@ -1,16 +1,9 @@
 package velux
 
-import "base:runtime"
-import "core:dynlib"
 import "core:fmt"
-import "core:log"
-import "core:reflect"
-import "core:strings"
 
-import vma "third_party:odin-vma"
 import glfw "vendor:glfw"
 import vk "vendor:vulkan"
-
 
 @(private, require_results)
 create_swapchain :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
@@ -26,15 +19,8 @@ create_swapchain :: proc(device: ^GPU_Device) -> (err: GPU_Error = .None) {
 	defer delete(formats)
 	vk.GetPhysicalDeviceSurfaceFormatsKHR(device.physical_device, device.surface, &format_n, raw_data(formats))
 
-	present_mode_n: u32 = 0
-	vk.GetPhysicalDeviceSurfacePresentModesKHR(device.physical_device, device.surface, &present_mode_n, nil)
-
-	present_modes := make([]vk.PresentModeKHR, present_mode_n)
-	defer delete(present_modes)
-	vk.GetPhysicalDeviceSurfacePresentModesKHR(device.physical_device, device.surface, &present_mode_n, raw_data(present_modes))
-
-	surface_format := choose_swapchain_surface_format(&formats)
-	present_mode := choose_swapchain_present_mode(&present_modes)
+	surface_format := choose_swapchain_surface_format(formats)
+	present_mode := choose_swapchain_present_mode()
 	extent := choose_swapchain_extent(device.window, &capabilities)
 
 	image_count := capabilities.minImageCount + 1
@@ -136,25 +122,21 @@ destroy_swapchain_resources :: proc(device: ^GPU_Device) {
 
 }
 
+// Anything but an sRGB-encoded swapchain silently wrecks every colour the engine
+// produces, so refuse to run rather than render wrong for the next hour.
 @(private)
-choose_swapchain_surface_format :: proc(formats: ^[]vk.SurfaceFormatKHR, loc := #caller_location) -> vk.SurfaceFormatKHR {
-	surface_format := formats[0]
+choose_swapchain_surface_format :: proc(formats: []vk.SurfaceFormatKHR, loc := #caller_location) -> vk.SurfaceFormatKHR {
 	for format in formats {
-		if format.format == .B8G8R8A8_SRGB && format.colorSpace == .SRGB_NONLINEAR {
-			surface_format = format
-			break
-		}
+		if format.format == .B8G8R8A8_SRGB && format.colorSpace == .SRGB_NONLINEAR do return format
 	}
-	fmt.assertf(
-		surface_format.format == .B8G8R8A8_SRGB || surface_format.colorSpace == .SRGB_NONLINEAR,
-		"swapchain is NOT sRGB (got %v)",
-		loc,
-	)
-	return surface_format
+	for format in formats {
+		if format.colorSpace == .SRGB_NONLINEAR do return format
+	}
+	fmt.panicf("surface offers no SRGB_NONLINEAR format; got %v", formats, loc = loc)
 }
 
 @(private)
-choose_swapchain_present_mode :: proc(present_modes: ^[]vk.PresentModeKHR) -> vk.PresentModeKHR {
+choose_swapchain_present_mode :: proc() -> vk.PresentModeKHR {
 	return .FIFO
 }
 

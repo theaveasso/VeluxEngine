@@ -12,7 +12,6 @@ pipeline_create_info :: proc(
 	depth_config: GPU_Depth_Config,
 	cull_mode: vk.CullModeFlags = {},
 	color_format: vk.Format = .UNDEFINED,
-	blend_mode: GPU_Blend_Mode = .None,
 	vertex_entry: cstring = DEFAULT_VERTEX_ENTRY,
 	fragment_entry: cstring = DEFAULT_FRAGMENT_ENTRY,
 ) -> GPU_Pipeline_Info {
@@ -24,7 +23,6 @@ pipeline_create_info :: proc(
 		depth_config = depth_config,
 		color_format = color_format,
 		cull_mode = cull_mode,
-		blend_mode = blend_mode,
 		vertex_entry = vertex_entry,
 		fragment_entry = fragment_entry,
 	}

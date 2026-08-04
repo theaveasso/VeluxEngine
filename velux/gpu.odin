@@ -61,7 +61,6 @@ create_gpu_pipeline :: proc(
 	depth: GPU_Depth_Config = {write_enabled = false, compare_op = .ALWAYS, format = DEFAULT_DEPTH_FORMAT},
 	cull_mode: vk.CullModeFlags = {},
 	color_format: Format = .UNDEFINED,
-	blend_mode: GPU_Blend_Mode = .None,
 	vertex_entry: cstring = DEFAULT_VERTEX_ENTRY,
 	fragment_entry: cstring = DEFAULT_FRAGMENT_ENTRY,
 ) -> Error {
@@ -85,7 +84,6 @@ create_gpu_pipeline :: proc(
 		depth,
 		cull_mode,
 		color_format == .UNDEFINED ? swapchain_format() : color_format,
-		blend_mode,
 		vertex_entry,
 		fragment_entry,
 	)

@@ -8,12 +8,6 @@ import "core:strings"
 
 import vk "vendor:vulkan"
 
-GPU_Blend_Mode :: enum {
-	None,
-	Additive,
-	Alpha,
-}
-
 Pipeline :: struct {
 	layout:      vk.PipelineLayout,
 	handle:      vk.Pipeline,
@@ -34,7 +28,6 @@ GPU_Pipeline_Info :: struct {
 	depth_config:       GPU_Depth_Config,
 	color_format:       vk.Format,
 	cull_mode:          vk.CullModeFlags,
-	blend_mode:         GPU_Blend_Mode,
 	vertex_entry:       cstring,
 	fragment_entry:     cstring,
 }
@@ -66,7 +59,7 @@ rebuild_gpu_pipeline :: proc(shader: vk.ShaderModule, create_info: GPU_Pipeline_
 	pipeline_builder_set_polygon_mode(&pipeline_builder, create_info.polygon_mode)
 	pipeline_builder_set_cull_mode(&pipeline_builder, create_info.cull_mode, create_info.front_face)
 	pipeline_builder_multisampling_none(&pipeline_builder) // TODO: support multisampling
-	pipeline_builder_disable_blending(&pipeline_builder)
+	pipeline_builder_disable_blending(&pipeline_builder) // TODO: support blending
 	pipeline_builder_set_attachment_format(&pipeline_builder, create_info.color_format)
 
 	depth_config := create_info.depth_config

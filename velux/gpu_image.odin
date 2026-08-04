@@ -95,6 +95,7 @@ destroy_gpu_image :: proc(image: ^GPU_Image) {
 	device := &g_engine.gpu
 	if image.handle == 0 do return
 
+	release_bindless(device, image.bindless_index)
 	vk.DestroyImageView(device.device, image.view, nil)
 	vma.DestroyImage(device.vma_allocator, image.handle, image.allocation)
 	image^ = {}

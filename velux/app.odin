@@ -42,9 +42,10 @@ make_app :: proc(
 // Entry point for a game compiled straight into the executable. For the
 // hot-reloading variant see run_hot_reload; both share host_run.
 run :: proc(app: App, allocator := context.allocator) -> Error {
-	owns_logger := context.logger.procedure == nil
-	if owns_logger do context.logger = log.create_console_logger()
-	defer if owns_logger do log.destroy_console_logger(context.logger)
+	owns_logger := needs_console_logger()
+	logger := owns_logger ? log.create_console_logger() : context.logger
+	context.logger = logger
+	defer if owns_logger do log.destroy_console_logger(logger)
 
 	engine := create(app.config, allocator)
 	defer destroy(engine)

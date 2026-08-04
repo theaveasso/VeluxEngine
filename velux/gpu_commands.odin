@@ -47,6 +47,8 @@ cmd_transition_images :: proc(cmd: vk.CommandBuffer, transitions: []Image_Transi
 }
 
 cmd_begin_rendering :: proc(frame: Frame, clear_color: Maybe([4]f32) = nil) {
+	flush_upload_barrier(frame.cmd)
+
 	color_attachment: vk.RenderingAttachmentInfo = {
 		sType       = .RENDERING_ATTACHMENT_INFO,
 		pNext       = nil,
@@ -59,13 +61,16 @@ cmd_begin_rendering :: proc(frame: Frame, clear_color: Maybe([4]f32) = nil) {
 		color = {float32 = c},
 	}
 
+	// Depth follows colour: the pass that clears the frame clears depth, and a
+	// pass layered on top of it (the UI) loads what is already there instead of
+	// wiping the depth the game just wrote.
 	depth_attachment: vk.RenderingAttachmentInfo = {
 		sType = .RENDERING_ATTACHMENT_INFO,
 		pNext = nil,
 		imageView = frame.depth_view,
 		imageLayout = .DEPTH_ATTACHMENT_OPTIMAL,
-		loadOp = .CLEAR,
-		storeOp = .DONT_CARE,
+		loadOp = clear_color != nil ? .CLEAR : .LOAD,
+		storeOp = .STORE,
 		clearValue = {depthStencil = {depth = 1.0}},
 	}
 

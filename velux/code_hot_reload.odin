@@ -44,9 +44,10 @@ Reloader :: struct {
 }
 
 run_hot_reload :: proc(game_dir: string, work_dir := "", allocator := context.allocator) -> (err: Error) {
-	owns_logger := context.logger.procedure == nil
-	if owns_logger do context.logger = log.create_console_logger()
-	defer if owns_logger do log.destroy_console_logger(context.logger)
+	owns_logger := needs_console_logger()
+	logger := owns_logger ? log.create_console_logger() : context.logger
+	context.logger = logger
+	defer if owns_logger do log.destroy_console_logger(logger)
 
 	require_host_matches_source()
 

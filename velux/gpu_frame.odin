@@ -45,6 +45,10 @@ begin_frame :: proc() -> (frame: Frame, err: Error) {
 		fatal("vkAcquireNextImageKHR failed: %v", acquire_result)
 	}
 
+	// The fence above is the proof that the GPU has finished reading whatever
+	// this slot's upload ring held last time it was used.
+	reset_upload_slot(device, device.current_frame)
+
 	vk_assert(vk.ResetFences(device.device, 1, &frame_data.in_flight_fence), "vkResetFences")
 	vk_assert(vk.ResetCommandBuffer(frame_data.command_buffer, {.RELEASE_RESOURCES}), "vkResetCommandBuffer")
 

@@ -20,6 +20,17 @@ Game_Host :: struct {
 	reload: ^Reloader,
 }
 
+// Odin's default context.logger is not nil -- it is runtime.default_logger_proc,
+// which is an empty body. Testing `procedure == nil` therefore never fired, so
+// velux installed no console logger and threw away every log call it ever made,
+// including every Vulkan validation message arriving through debug_callback.
+// That is why the old error paths, which all terminated in a log.errorf, could
+// not be seen to terminate anywhere.
+@(private, require_results)
+needs_console_logger :: proc() -> bool {
+	return context.logger.procedure == nil || context.logger.procedure == runtime.default_logger_proc
+}
+
 // Caller owns the engine: it must be created before this and destroyed after,
 // because the hot reload path has to attach the freshly loaded DLL to it in
 // between.

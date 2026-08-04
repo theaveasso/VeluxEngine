@@ -65,10 +65,15 @@ init_ui :: proc(engine: ^Engine) {
 		ImageCount = u32(len(device.swapchain.images)),
 		UseDynamicRendering = true,
 		PipelineInfoMain = {
+			// cmd_begin_rendering always binds a depth attachment, so the imgui
+			// pipeline has to declare the same format even though it never
+			// writes depth. Leaving this UNDEFINED made every UI draw a
+			// validation error.
 			PipelineRenderingCreateInfo = {
 				sType = .PIPELINE_RENDERING_CREATE_INFO,
 				colorAttachmentCount = 1,
 				pColorAttachmentFormats = &format,
+				depthAttachmentFormat = DEFAULT_DEPTH_FORMAT,
 			},
 		},
 	}

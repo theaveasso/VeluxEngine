@@ -35,6 +35,7 @@ GPU_Device :: struct {
 	render_finished_semaphores: []vk.Semaphore,
 	command_pool:               vk.CommandPool,
 	transfer:                   Transfer_Context,
+	upload:                     Upload_Ring,
 	bindless:                   Bindless,
 	enable_validation_layer:    bool,
 	current_frame:              u32,
@@ -86,6 +87,7 @@ init_gpu :: proc(device: ^GPU_Device, config: GPU_Config) {
 	create_command_pool(device)
 	allocate_command_buffers(device)
 	create_transfer_context(device)
+	create_upload_ring(device)
 	create_sync_objects(device)
 	create_profiler(device)
 	create_bindless(device)
@@ -99,6 +101,7 @@ destroy_gpu :: proc(device: ^GPU_Device) {
 	destroy_bindless(device)
 	destroy_profiler(device)
 	destroy_sync_objects(device)
+	destroy_upload_ring(device)
 	destroy_transfer_context(device)
 	vk.DestroyCommandPool(device.device, device.command_pool, nil)
 	destroy_per_image_semaphores(device)
@@ -120,9 +123,10 @@ debug_callback :: proc "system" (
 	user_data: rawptr,
 ) -> b32 {
 	context = runtime.default_context()
-	if user_data != nil {
-		context.logger = (cast(^log.Logger)user_data)^
-	}
+	// Assigned at procedure scope on purpose. `if x != nil { context.logger = .. }`
+	// would set the logger inside the if-body's scope and lose it on the way
+	// out, which is exactly why validation messages used to vanish.
+	context.logger = user_data != nil ? (cast(^log.Logger)user_data)^ : context.logger
 
 	level: log.Level
 	switch {

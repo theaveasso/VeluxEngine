@@ -147,13 +147,14 @@ game_update :: proc(game: ^Game) -> (err: vlx.Error) {
 	nose := game.head_position + forward * NOSE_OFFSET
 	game.tether_positions[TETHER_POINTS] = {nose.x, nose.y, nose.z, NOSE_RADIUS}
 
-	cmd := vlx.immediate_transfer_begin()
-	vlx.write_staging_buffer_slice(cmd, &game.tether_buffer, game.tether_positions[:])
-	vlx.immediate_transfer_end()
 	return
 }
 
 game_draw :: proc(game: ^Game, frame: vlx.Frame) {
+	// Before cmd_begin_rendering: this records a copy out of the frame's
+	// upload ring, and copies cannot happen inside a render pass.
+	vlx.frame_upload_slice(frame, &game.tether_buffer, game.tether_positions[:])
+
 	vlx.cmd_begin_rendering(frame, [4]f32{0.02, 0.02, 0.05, 1})
 	vlx.prof_zone_begin(frame, "raycast")
 	vlx.cmd_bind_graphics_pipeline(frame, game.pipeline)

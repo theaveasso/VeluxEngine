@@ -46,60 +46,99 @@ cmd_transition_images :: proc(cmd: vk.CommandBuffer, transitions: []Image_Transi
 	vk.CmdPipelineBarrier2(cmd, &dependency_info)
 }
 
-cmd_begin_rendering :: proc(frame: Frame, clear_color: Maybe([4]f32) = nil) {
+cmd_begin_rendering :: proc {
+	cmd_begin_rendering_swapchain,
+	cmd_begin_rendering_target,
+}
+
+cmd_end_rendering :: proc {
+	cmd_end_rendering_swapchain,
+	cmd_end_rendering_target,
+}
+
+@(private)
+cmd_begin_rendering_views :: proc(
+	frame: Frame,
+	view: vk.ImageView,
+	extent: vk.Extent2D,
+	clear_color: Maybe([4]f32) = nil,
+	depth_view: vk.ImageView = 0,
+) {
 	flush_upload_barrier(frame.cmd)
 
 	color_attachment: vk.RenderingAttachmentInfo = {
 		sType       = .RENDERING_ATTACHMENT_INFO,
 		pNext       = nil,
-		imageView   = frame.view,
+		imageView   = view,
 		imageLayout = .COLOR_ATTACHMENT_OPTIMAL,
 		loadOp      = clear_color != nil ? .CLEAR : .LOAD,
 		storeOp     = .STORE,
 	}
+
 	if c, ok := clear_color.?; ok do color_attachment.clearValue = {
 		color = {float32 = c},
 	}
 
-	// Depth follows colour, so a pass layered on top (the UI) does not wipe the
-	// depth the game just wrote.
-	depth_attachment: vk.RenderingAttachmentInfo = {
-		sType = .RENDERING_ATTACHMENT_INFO,
-		pNext = nil,
-		imageView = frame.depth_view,
-		imageLayout = .DEPTH_ATTACHMENT_OPTIMAL,
-		loadOp = clear_color != nil ? .CLEAR : .LOAD,
-		storeOp = .STORE,
-		clearValue = {depthStencil = {depth = 1.0}},
-	}
+	depth_attachment: vk.RenderingAttachmentInfo
 
 	rendering_info: vk.RenderingInfo = {
 		sType = .RENDERING_INFO,
 		pNext = nil,
-		renderArea = {extent = frame.extent},
+		renderArea = {extent = extent},
 		layerCount = 1,
 		colorAttachmentCount = 1,
 		pColorAttachments = &color_attachment,
-		pDepthAttachment = &depth_attachment,
+	}
+	if depth_view != 0 {
+		depth_attachment = {
+			sType = .RENDERING_ATTACHMENT_INFO,
+			pNext = nil,
+			imageView = depth_view,
+			imageLayout = .DEPTH_ATTACHMENT_OPTIMAL,
+			loadOp = clear_color != nil ? .CLEAR : .LOAD,
+			storeOp = .STORE,
+			clearValue = {depthStencil = {depth = 1.0}},
+		}
+		rendering_info.pDepthAttachment = &depth_attachment
 	}
 
 	vk.CmdBeginRendering(frame.cmd, &rendering_info)
 
 	viewport: vk.Viewport = {
-		width    = cast(f32)frame.extent.width,
-		height   = cast(f32)frame.extent.height,
+		width    = cast(f32)extent.width,
+		height   = cast(f32)extent.height,
 		maxDepth = 1.0,
 	}
 	scissor: vk.Rect2D = {
-		extent = frame.extent,
+		extent = extent,
 	}
 
 	vk.CmdSetViewport(frame.cmd, 0, 1, &viewport)
 	vk.CmdSetScissor(frame.cmd, 0, 1, &scissor)
 }
 
-cmd_end_rendering :: proc(frame: Frame) {
+cmd_begin_rendering_swapchain :: proc(frame: Frame, clear_color: Maybe([4]f32) = nil) {
+	cmd_begin_rendering_views(frame, frame.view, frame.extent, clear_color, frame.depth_view)
+}
+
+cmd_end_rendering_swapchain :: proc(frame: Frame) {
 	vk.CmdEndRendering(frame.cmd)
+}
+
+cmd_begin_rendering_target :: proc(frame: Frame, target: Render_Target, clear_color: [4]f32 = {0, 0, 0, 1}) {
+	cmd_transition_images(
+		frame.cmd,
+		{
+			{target.image.handle, {.COLOR}, .UNDEFINED, .COLOR_ATTACHMENT_OPTIMAL},
+			{target.depth.handle, {.DEPTH}, .UNDEFINED, .DEPTH_ATTACHMENT_OPTIMAL},
+		},
+	)
+	cmd_begin_rendering_views(frame, target.image.view, {target.extent[0], target.extent[1]}, clear_color, target.depth.view)
+}
+
+cmd_end_rendering_target :: proc(frame: Frame, target: Render_Target) {
+	vk.CmdEndRendering(frame.cmd)
+	cmd_transition_image(frame.cmd, target.image.handle, {.COLOR}, .COLOR_ATTACHMENT_OPTIMAL, .SHADER_READ_ONLY_OPTIMAL)
 }
 
 cmd_bind_pipeline :: proc {
@@ -114,12 +153,7 @@ cmd_bind_graphics_pipeline :: proc(frame: Frame, pipeline: GPU_Pipeline) {
 
 cmd_push_constants :: proc(frame: Frame, pipeline: GPU_Pipeline, data: ^$T, loc := #caller_location) {
 	if size_of(T) != int(pipeline.info.push_constant_size) {
-		fatal(
-			"push constant is %d bytes but the pipeline was built for %d",
-			size_of(T),
-			pipeline.info.push_constant_size,
-			loc = loc,
-		)
+		fatal("push constant is %d bytes but the pipeline was built for %d", size_of(T), pipeline.info.push_constant_size, loc = loc)
 	}
 	vk.CmdPushConstants(frame.cmd, pipeline.layout, pipeline.stage_flags, 0, pipeline.info.push_constant_size, data)
 }

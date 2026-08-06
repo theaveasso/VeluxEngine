@@ -162,6 +162,18 @@ cmd_bind_index_buffer :: proc(frame: Frame, buffer: vk.Buffer, offset: vk.Device
 	vk.CmdBindIndexBuffer(frame.cmd, buffer, offset, index_type)
 }
 
+cmd_set_viewport :: proc(frame: Frame, offset, size: [2]f32) {
+	viewport: vk.Viewport = {
+		x        = offset[0],
+		y        = offset[1],
+		width    = size[0],
+		height   = size[1],
+		minDepth = 0,
+		maxDepth = 1,
+	}
+	vk.CmdSetViewport(frame.cmd, 0, 1, &viewport)
+}
+
 cmd_draw :: proc(frame: Frame, vertex_count: u32, instance_count: u32 = 1, first_vertex: u32 = 0, first_instance: u32 = 0) {
 	vk.CmdDraw(frame.cmd, vertex_count, instance_count, first_vertex, first_instance)
 }

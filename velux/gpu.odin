@@ -47,9 +47,6 @@ create_gpu_image :: proc(
 	return create_image(info, loc)
 }
 
-// Errors here are all recoverable and all about the shader: the file is
-// missing, slangc rejected it, or the driver would not take the result. In
-// every case the caller's previous pipeline is untouched.
 @(require_results)
 create_gpu_pipeline :: proc(
 	pipeline: ^GPU_Pipeline,

@@ -2,7 +2,7 @@
   "file_scan_exclusions": ["**/build", "**/.git", "**/*.pdb", "**/*.log"],
   "languages": {
     "Odin": {
-      "tab_size": 4,
+      "tab_size": 2,
       "hard_tabs": true,
       "format_on_save": "off"
     }

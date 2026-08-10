@@ -15,6 +15,7 @@ clone and rename.
 | Vulkan | [LunarG SDK](https://vulkan.lunarg.com) | `brew install vulkan-headers vulkan-loader molten-vk vulkan-tools` |
 | Slang | ships with the LunarG SDK | `brew install shader-slang` |
 | Python 3 | required (builds imgui) | ships with macOS |
+| CMake | required (builds box3d) | `brew install cmake` |
 | C++ compiler | MSVC | Xcode command line tools (`xcode-select --install`) |
 
 `VULKAN_SDK` must be set. The LunarG installer sets it on Windows. On macOS `setup.sh`
@@ -31,25 +32,19 @@ cd VeluxEngine
 setup.bat       # Windows
 ```
 
-Setup initialises the nested submodules and builds the two native libraries velux links
-against: [VulkanMemoryAllocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator)
-and [Dear ImGui](https://github.com/ocornut/imgui). Windows uses the prebuilt `.lib` files
-that ship with the submodules; macOS and Linux build them from source. The imgui build
-clones dear imgui, glfw, SDL2, SDL3 and Vulkan-Headers, so the first run takes a few
-minutes. Re-running setup is cheap — it skips anything already built.
+Setup initialises the nested submodules and builds the three native libraries velux links
+against: [VulkanMemoryAllocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator),
+[Dear ImGui](https://github.com/ocornut/imgui) and [box3d](https://github.com/erincatto/box3d).
+Windows uses the prebuilt `.lib` files that ship with the vma and imgui submodules; box3d is
+compiled with CMake on every platform, and macOS and Linux build all three from source. The
+imgui build clones dear imgui, glfw, SDL2, SDL3 and Vulkan-Headers, so the first run takes a
+few minutes. Re-running setup is cheap — it skips anything already built.
 
-## Building a sample
+## Running something
 
-```sh
-./build.sh sponza      # macOS / Linux
-build.bat sponza       # Windows
-```
-
-Run the executable **from its own directory** so its relative asset paths resolve:
-
-```sh
-cd samples/sponza && ./sponza
-```
+This repository is the library on its own — there is no executable to launch here. To see
+velux render, clone [velux-starter](https://github.com/theaveasso/velux-starter) and run it;
+it pulls this repo in as a submodule.
 
 ## Using velux from your own repo
 
@@ -95,9 +90,10 @@ vlx.make_app(Game, config = {
 }, ...)
 ```
 
-It defaults to `../../velux/shaders`, which is only correct for velux's own samples.
-If a `create_gpu_pipeline` call returns `Compile_Failed` with `undefined identifier`
-errors for things like `sky_gradient`, this is the setting that is wrong.
+There is a default of `../../velux/shaders`, left over from a layout that no longer exists —
+treat it as unset and always pass your own. If a `create_gpu_pipeline` call returns
+`Compile_Failed` with `undefined identifier` errors for things like `sky_gradient`, this is
+the setting that is wrong.
 
 ### Editor support (ols)
 
@@ -117,9 +113,9 @@ Copy velux's collection setup into your repo's `ols.json`:
 ```
 velux/            the engine package  -> import vlx "vlx:velux"
 velux/shaders/    shared Slang modules
-samples/          engine samples
-game/             games built on velux
-third_party/      odin-vma, odin-imgui (submodules)
+hot_reload/       the hot reload host, built by build_hot_reload
+tests/            odin test suite
+third_party/      odin-vma, odin-imgui, box3d, box3d-odin
 ```
 
 ## Per-frame data
@@ -151,9 +147,11 @@ than travelling up as an enum.
 Velux logs through `context.logger`. If you have not installed one, `run` and
 `run_hot_reload` install a console logger for the duration.
 
-## Note on samples
+## Tests
 
-`samples/01_window`, `samples/sponza` and `game/her_body_waits` track the current App
-API and compile. Samples `02`–`05` were written against a much older engine
-(`create_glade`, `create_buffer`, a `velux` collection) and were removed; `git log` has
-them if you want the rendering techniques back.
+```sh
+odin test tests -collection:vlx=. -collection:third_party=third_party
+```
+
+In Zed this is the `test all` task, alongside `test current file` for a single file and a
+`debug tests` launch config that runs the suite under CodeLLDB.

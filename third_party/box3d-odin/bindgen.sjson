@@ -1,0 +1,22 @@
+inputs = [
+	"input"
+]
+
+output_folder = "box3d-odin"
+package_name = "box3d"
+imports_file = "imports.inc"
+
+remove_type_prefix = "b3"
+remove_function_prefix = "b3"
+remove_macro_prefix = "B3_"
+required_prefix = "b3"
+
+type_overrides = {
+	"b3Vec3" = "[3]f32"
+	"b3Quat" = "quaternion128"
+}
+
+remove_macros = [
+	"B3_API"
+	"B3_INLINE"
+]

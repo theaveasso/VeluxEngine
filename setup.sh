@@ -61,6 +61,21 @@ else
 	(cd "$IMGUI_DIR" && python3 build.py)
 fi
 
+BOX3D_DIR="$ROOT/third_party/box3d"
+BOX3D_LIB="$ROOT/third_party/box3d-odin/external/box3d_${OS}_${ARCH}.a"
+if [ -f "$BOX3D_LIB" ]; then
+	echo "==> box3d already built ($(basename "$BOX3D_LIB"))"
+else
+	need cmake "https://cmake.org"
+	echo "==> building box3d -> $(basename "$BOX3D_LIB")"
+	cmake -S "$BOX3D_DIR" -B "$BOX3D_DIR/build" \
+		-DBOX3D_SAMPLES=OFF -DBOX3D_UNIT_TESTS=OFF -DBOX3D_BENCHMARKS=OFF \
+		-DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release
+	cmake --build "$BOX3D_DIR/build" --config Release
+	mkdir -p "$(dirname "$BOX3D_LIB")"
+	cp "$BOX3D_DIR/build/src/libbox3d.a" "$BOX3D_LIB"
+fi
+
 echo
 echo "setup complete."
 echo "  build a sample:  ./build.sh 05_voxel_raycast"

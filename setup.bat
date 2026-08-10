@@ -36,6 +36,18 @@ if exist "%IMGUI_LIB%" (
   popd
 )
 
+set "BOX3D_LIB=%ROOT%\third_party\box3d-odin\external\box3d_windows_x64.lib"
+if exist "%BOX3D_LIB%" (
+  echo ==^> box3d already built
+) else (
+  where cmake >nul 2>&1 || ( echo error: cmake not found in PATH - https://cmake.org & goto :err )
+  echo ==^> building box3d -^> box3d_windows_x64.lib
+  cmake -S "%ROOT%\third_party\box3d" -B "%ROOT%\third_party\box3d\build" -DBOX3D_SAMPLES=OFF -DBOX3D_UNIT_TESTS=OFF -DBOX3D_BENCHMARKS=OFF -DBUILD_SHARED_LIBS=OFF || goto :err
+  cmake --build "%ROOT%\third_party\box3d\build" --config Release || goto :err
+  if not exist "%ROOT%\third_party\box3d-odin\external" mkdir "%ROOT%\third_party\box3d-odin\external"
+  copy /y "%ROOT%\third_party\box3d\build\src\Release\box3d.lib" "%BOX3D_LIB%" >nul || goto :err
+)
+
 echo.
 echo setup complete.
 echo   build a sample:  build.bat 05_voxel_raycast

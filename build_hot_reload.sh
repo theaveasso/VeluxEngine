@@ -21,4 +21,4 @@ fi
 
 echo
 echo "Built build/velux_hot_reload"
-echo "Run from the repo root:  ./build/velux_hot_reload game/her_body_waits"
+echo "Run from the repo root:  ./build/velux_hot_reload <source_dir>"

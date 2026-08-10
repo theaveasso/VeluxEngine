@@ -1,0 +1,72 @@
+[
+  {
+    "label": "check",
+    "command": "odin check velux -no-entry-point -collection:vlx=. -collection:third_party=third_party",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "save": "all"
+  },
+  {
+    "label": "test all",
+    "command": "odin test tests -collection:vlx=. -collection:third_party=third_party",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "save": "all"
+  },
+  {
+    "label": "test current file",
+    "command": "odin test $ZED_RELATIVE_FILE -file -collection:vlx=. -collection:third_party=third_party",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "save": "all"
+  },
+  {
+    "label": "build tests (win)",
+    "command": "odin build tests -build-mode:test -debug -collection:vlx=. -collection:third_party=third_party -out:build\\velux_tests.exe",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "save": "all"
+  },
+  {
+    "label": "build tests (unix)",
+    "command": "odin build tests -build-mode:test -debug -collection:vlx=. -collection:third_party=third_party -out:build/velux_tests",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "save": "all"
+  },
+  {
+    "label": "raddbg tests (win)",
+    "command": "raddbg build\\velux_tests.exe",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "save": "all"
+  },
+  {
+    "label": "build hot reload host (win)",
+    "command": "cmd /c \".\\build_hot_reload.bat\"",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "save": "all"
+  },
+  {
+    "label": "build hot reload host (unix)",
+    "command": "./build_hot_reload.sh",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "save": "all"
+  },
+  {
+    "label": "setup (win)",
+    "command": "cmd /c \".\\setup.bat\"",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "save": "all"
+  },
+  {
+    "label": "setup (unix)",
+    "command": "./setup.sh",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "save": "all"
+  }
+]

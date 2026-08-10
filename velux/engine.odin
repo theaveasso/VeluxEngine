@@ -14,7 +14,6 @@ Config :: struct {
 	enable_validation:  bool,
 	enable_profiler:    bool,
 	enable_log:         bool,
-	// Debug builds turn the three above on unless the matching opt-out is set.
 	disable_validation: bool,
 	disable_profiler:   bool,
 	disable_log:        bool,
@@ -36,14 +35,9 @@ Engine :: struct {
 	last_time:          f64,
 }
 
-// The only mutable package-level variable in velux; everything shared lives in
-// Engine, reached through it. A second one would need its own line in attach.odin
-// and would silently diverge between the host and a hot reloaded DLL.
 @(private = "package")
 g_engine: ^Engine
 
-// Startup has no recoverable failures, so there is nothing to unwind and no
-// partially-built engine to leak.
 @(require_results)
 create :: proc(config: Config, allocator := context.allocator) -> ^Engine {
 	engine := new(Engine, allocator)
@@ -69,7 +63,6 @@ init :: proc(engine: ^Engine, config: Config) {
 	if config.shader_include_dir == "" do config.shader_include_dir = DEFAULT_SHADER_INCLUDE_DIR
 	engine.shader_include_dir, _ = strings.clone(config.shader_include_dir)
 
-	// Debug builds opt in unless the caller explicitly opts out.
 	when ODIN_DEBUG {
 		if !config.disable_validation do config.enable_validation = true
 		if !config.disable_log do config.enable_log = true
@@ -93,7 +86,6 @@ init :: proc(engine: ^Engine, config: Config) {
 
 	init_ui(engine)
 
-	// The only subsystem allowed to be absent.
 	if audio_err := init_audio(&engine.audio); audio_err != .None {
 		log.warnf("audio unavailable, continuing without sound: %v", audio_err)
 	}

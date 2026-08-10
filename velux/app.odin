@@ -11,9 +11,6 @@ App :: struct {
 	attach:      proc(engine: ^Engine),
 	state_size:  int,
 	state_align: int,
-	// Identifies the game's state layout so a hot reload can tell "the same
-	// struct, new code" (keep the state) from "a different struct" (reset it).
-	// This is the one place a type hash earns its keep.
 	state_hash:  u64,
 }
 
@@ -39,8 +36,6 @@ make_app :: proc(
 	}
 }
 
-// Entry point for a game compiled straight into the executable. For the
-// hot-reloading variant see run_hot_reload; both share host_run.
 run :: proc(app: App, allocator := context.allocator) -> Error {
 	owns_logger := needs_console_logger()
 	logger := owns_logger ? log.create_console_logger() : context.logger

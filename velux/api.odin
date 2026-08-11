@@ -2,6 +2,7 @@ package velux
 
 Velux_API :: struct {
 	bound:   bool,
+	gpu:     GPU_API,
 	ui:      UI_API,
 	audio:   Audio_API,
 	physics: Physics_API,
@@ -15,6 +16,7 @@ Velux_API :: struct {
 host_velux_api :: proc() -> Velux_API {
 	return {
 		bound = true,
+		gpu = host_gpu_api(),
 		ui = host_ui_api(),
 		audio = host_audio_api(),
 		physics = host_physics_api(),

@@ -43,7 +43,16 @@ destroy_profiler :: proc(device: ^GPU_Device) {
 	}
 }
 
-prof_zone_begin :: proc(frame: Frame, name: string, loc := #caller_location) -> (zone_index: u32) {
+prof_zone_begin :: proc(frame: Frame, name: string, loc := #caller_location) -> u32 {
+	return bound_api(loc).gpu.prof_zone_begin(frame, name, loc)
+}
+
+prof_zone_end :: proc(frame: Frame, loc := #caller_location) {
+	bound_api(loc).gpu.prof_zone_end(frame, loc)
+}
+
+@(private)
+host_prof_zone_begin :: proc(frame: Frame, name: string, loc := #caller_location) -> (zone_index: u32) {
 	device := &g_engine.gpu
 	if !device.enable_profiler do return 0
 
@@ -59,7 +68,8 @@ prof_zone_begin :: proc(frame: Frame, name: string, loc := #caller_location) -> 
 	return zone_index
 }
 
-prof_zone_end :: proc(frame: Frame, loc := #caller_location) {
+@(private)
+host_prof_zone_end :: proc(frame: Frame, loc := #caller_location) {
 	device := &g_engine.gpu
 	if !device.enable_profiler do return
 

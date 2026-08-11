@@ -149,7 +149,7 @@ host_is_cursor_captured :: proc() -> bool {
 }
 
 @(private)
-input_init :: proc(engine: ^Engine) {
+init_input :: proc(engine: ^Engine) {
 	input := &engine.input
 	input.window_handle = engine.window.handle
 	curr_mx, curr_my := glfw.GetCursorPos(input.window_handle)

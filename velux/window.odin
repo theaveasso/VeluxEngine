@@ -39,7 +39,7 @@ init_platform :: proc() {
 }
 
 @(private)
-create_window :: proc(window: ^Window, width, height: i32, title: cstring) {
+init_window :: proc(window: ^Window, width, height: i32, title: cstring) {
 	window.handle = glfw.CreateWindow(width, height, title, nil, nil)
 	if window.handle == nil {
 		description, code := glfw.GetError()

@@ -38,7 +38,7 @@ GPU_Sampler_Info :: struct {
 }
 
 @(private)
-create_image :: proc(create_info: GPU_Image_Info, loc := #caller_location) -> (image: GPU_Image) {
+host_create_image :: proc(create_info: GPU_Image_Info, loc := #caller_location) -> (image: GPU_Image) {
 	device := &g_engine.gpu
 	context.logger = device.logger
 

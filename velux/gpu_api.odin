@@ -39,7 +39,7 @@ host_gpu_api :: proc() -> GPU_API {
 	return {
 		swapchain_format = host_swapchain_format,
 		wait_for_idle = host_wait_for_idle,
-		create_image = create_image,
+		create_image = host_create_image,
 		destroy_image = host_destroy_gpu_image,
 		create_sampler = host_create_sampler,
 		create_pipeline = host_create_gpu_pipeline,

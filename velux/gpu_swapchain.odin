@@ -65,7 +65,7 @@ create_swapchain :: proc(device: ^GPU_Device) {
 
 @(private)
 create_depth_resources :: proc(device: ^GPU_Device) {
-	device.depth_image = create_image(
+	device.depth_image = host_create_image(
 		image_create_info(DEFAULT_DEPTH_FORMAT, {device.swapchain.extent.width, device.swapchain.extent.height, 1}, {.DEPTH_STENCIL_ATTACHMENT}),
 	)
 }

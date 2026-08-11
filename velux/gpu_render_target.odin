@@ -33,8 +33,8 @@ destroy_render_target :: proc(target: ^Render_Target, loc := #caller_location) {
 @(private)
 host_create_render_target :: proc(create_info: Render_Target_Info) -> (rt: Render_Target) {
 	extent := vk.Extent3D{create_info.width, create_info.height, 1}
-	rt.image = create_image(image_create_info(create_info.color_format, extent, {.SAMPLED, .COLOR_ATTACHMENT}))
-	rt.depth = create_image(image_create_info(create_info.depth_format, extent, {.DEPTH_STENCIL_ATTACHMENT}))
+	rt.image = host_create_image(image_create_info(create_info.color_format, extent, {.SAMPLED, .COLOR_ATTACHMENT}))
+	rt.depth = host_create_image(image_create_info(create_info.depth_format, extent, {.DEPTH_STENCIL_ATTACHMENT}))
 	rt.extent = {create_info.width, create_info.height}
 	rt.color_format = create_info.color_format
 	rt.depth_format = create_info.depth_format

@@ -8,8 +8,22 @@ Window :: struct {
 	height: i32,
 }
 
+Window_API :: struct {
+	now: proc() -> f64,
+}
+
+@(private, require_results)
+host_window_api :: proc() -> Window_API {
+	return {now = host_now}
+}
+
 @(require_results)
-now :: proc() -> f64 {
+now :: proc(loc := #caller_location) -> f64 {
+	return bound_api(loc).window.now()
+}
+
+@(private, require_results)
+host_now :: proc() -> f64 {
 	return glfw.GetTime()
 }
 

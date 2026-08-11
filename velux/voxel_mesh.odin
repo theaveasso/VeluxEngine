@@ -5,14 +5,29 @@ Voxel_Mesh :: struct {
 	indices:   []u32,
 }
 
-destroy_mesh :: proc(mesh: ^Voxel_Mesh) {
+destroy_mesh :: proc(mesh: ^Voxel_Mesh, loc := #caller_location) {
+	bound_api(loc).voxel.destroy_mesh(mesh)
+}
+
+@(require_results)
+mesh_grid_naive :: proc(
+	grid: ^Voxel_Grid,
+	voxel_size: f32,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> Voxel_Mesh {
+	return bound_api(loc).voxel.mesh_grid_naive(grid, voxel_size, allocator)
+}
+
+@(private)
+host_destroy_mesh :: proc(mesh: ^Voxel_Mesh) {
 	delete(mesh.positions)
 	delete(mesh.indices)
 	mesh^ = {}
 }
 
-@(require_results)
-mesh_grid_naive :: proc(
+@(private, require_results)
+host_mesh_grid_naive :: proc(
 	grid: ^Voxel_Grid,
 	voxel_size: f32,
 	allocator := context.allocator,

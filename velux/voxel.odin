@@ -1,5 +1,6 @@
 package velux
 
+import "base:runtime"
 import "core:log"
 
 import vox "_vox"
@@ -52,8 +53,92 @@ error_from_vox :: proc(err: vox.Error) -> Error {
 	return .Asset_Malformed
 }
 
+Voxel_API :: struct {
+	load_level_data:    proc(
+		file_name: string,
+		reserved_from: u8,
+		allocator: runtime.Allocator,
+	) -> (Level_Data, Error),
+	destroy_level_data: proc(data: ^Level_Data),
+	upload_level:       proc(data: ^Level_Data) -> Voxel_World,
+	load_level:         proc(file_name: string, reserved_from: u8) -> (Level, Error),
+	unload_level:       proc(level: ^Level),
+	create_grid:        proc(dimensions: [3]int, allocator: runtime.Allocator) -> Voxel_Grid,
+	destroy_grid:       proc(grid: ^Voxel_Grid),
+	get_voxel:          proc(grid: ^Voxel_Grid, x: int, y: int, z: int) -> Voxel,
+	set_voxel:          proc(grid: ^Voxel_Grid, x: int, y: int, z: int, value: Voxel),
+	destroy_mesh:       proc(mesh: ^Voxel_Mesh),
+	mesh_grid_naive:    proc(grid: ^Voxel_Grid, voxel_size: f32, allocator: runtime.Allocator) -> Voxel_Mesh,
+}
+
+@(private, require_results)
+host_voxel_api :: proc() -> Voxel_API {
+	return {
+		load_level_data = host_load_level_data,
+		destroy_level_data = host_destroy_level_data,
+		upload_level = host_upload_level,
+		load_level = host_load_level,
+		unload_level = host_unload_level,
+		create_grid = host_create_grid,
+		destroy_grid = host_destroy_grid,
+		get_voxel = host_get_voxel,
+		set_voxel = host_set_voxel,
+		destroy_mesh = host_destroy_mesh,
+		mesh_grid_naive = host_mesh_grid_naive,
+	}
+}
+
 @(require_results)
 load_level_data :: proc(
+	file_name: string,
+	reserved_from: u8,
+	allocator := context.allocator,
+	loc := #caller_location,
+) -> (
+	Level_Data,
+	Error,
+) {
+	return bound_api(loc).voxel.load_level_data(file_name, reserved_from, allocator)
+}
+
+destroy_level_data :: proc(data: ^Level_Data, loc := #caller_location) {
+	bound_api(loc).voxel.destroy_level_data(data)
+}
+
+@(require_results)
+upload_level :: proc(data: ^Level_Data, loc := #caller_location) -> Voxel_World {
+	return bound_api(loc).voxel.upload_level(data)
+}
+
+@(require_results)
+load_level :: proc(file_name: string, reserved_from: u8, loc := #caller_location) -> (Level, Error) {
+	return bound_api(loc).voxel.load_level(file_name, reserved_from)
+}
+
+unload_level :: proc(level: ^Level, loc := #caller_location) {
+	bound_api(loc).voxel.unload_level(level)
+}
+
+@(require_results)
+create_grid :: proc(dimensions: [3]int, allocator := context.allocator, loc := #caller_location) -> Voxel_Grid {
+	return bound_api(loc).voxel.create_grid(dimensions, allocator)
+}
+
+destroy_grid :: proc(grid: ^Voxel_Grid, loc := #caller_location) {
+	bound_api(loc).voxel.destroy_grid(grid)
+}
+
+@(require_results)
+get_voxel :: proc(grid: ^Voxel_Grid, x, y, z: int, loc := #caller_location) -> Voxel {
+	return bound_api(loc).voxel.get_voxel(grid, x, y, z)
+}
+
+set_voxel :: proc(grid: ^Voxel_Grid, x, y, z: int, value: Voxel, loc := #caller_location) {
+	bound_api(loc).voxel.set_voxel(grid, x, y, z, value)
+}
+
+@(private, require_results)
+host_load_level_data :: proc(
 	file_name: string,
 	reserved_from: u8,
 	allocator := context.allocator,
@@ -73,15 +158,16 @@ load_level_data :: proc(
 	return data, .None
 }
 
-destroy_level_data :: proc(data: ^Level_Data) {
+@(private)
+host_destroy_level_data :: proc(data: ^Level_Data) {
 	delete(data.markers)
-	destroy_grid(&data.grid)
+	host_destroy_grid(&data.grid)
 	data^ = {}
 }
 
 // Blocking, and meant to be: this is load-time work.
-@(require_results)
-upload_level :: proc(data: ^Level_Data) -> (world: Voxel_World) {
+@(private, require_results)
+host_upload_level :: proc(data: ^Level_Data) -> (world: Voxel_World) {
 	packed_words := (len(data.grid.voxels) + 3) / 4
 	world.buffer = create_gpu_buffer(u32, PALETTE_SLOTS + packed_words)
 	world.grid = data.grid
@@ -95,41 +181,44 @@ upload_level :: proc(data: ^Level_Data) -> (world: Voxel_World) {
 	return world
 }
 
-@(require_results)
-load_level :: proc(file_name: string, reserved_from: u8) -> (level: Level, err: Error) {
-	data := load_level_data(file_name, reserved_from) or_return
+@(private, require_results)
+host_load_level :: proc(file_name: string, reserved_from: u8) -> (level: Level, err: Error) {
+	data := host_load_level_data(file_name, reserved_from) or_return
 	// Ownership of grid and markers moves into the Level.
-	level.world = upload_level(&data)
+	level.world = host_upload_level(&data)
 	level.markers = data.markers
 	return level, .None
 }
 
-unload_level :: proc(level: ^Level) {
+@(private)
+host_unload_level :: proc(level: ^Level) {
 	delete(level.markers)
 	destroy_gpu_buffer(&level.world.buffer)
-	destroy_grid(&level.world.grid)
+	host_destroy_grid(&level.world.grid)
 	level^ = {}
 }
 
-@(require_results)
-create_grid :: proc(dimensions: [3]int, allocator := context.allocator) -> (grid: Voxel_Grid) {
+@(private, require_results)
+host_create_grid :: proc(dimensions: [3]int, allocator := context.allocator) -> (grid: Voxel_Grid) {
 	grid.voxels = make([]Voxel, dimensions.x * dimensions.y * dimensions.z, allocator)
 	grid.dimensions = dimensions
 	return
 }
 
-destroy_grid :: proc(grid: ^Voxel_Grid) {
+@(private)
+host_destroy_grid :: proc(grid: ^Voxel_Grid) {
 	delete(grid.voxels)
 	grid^ = {}
 }
 
-@(require_results)
-get_voxel :: proc(grid: ^Voxel_Grid, x, y, z: int) -> Voxel {
+@(private, require_results)
+host_get_voxel :: proc(grid: ^Voxel_Grid, x, y, z: int) -> Voxel {
 	if !voxel_in_bounds(grid, x, y, z) do return VOXEL_EMPTY
 	return grid.voxels[voxel_index(grid, x, y, z)]
 }
 
-set_voxel :: proc(grid: ^Voxel_Grid, x, y, z: int, value: Voxel) {
+@(private)
+host_set_voxel :: proc(grid: ^Voxel_Grid, x, y, z: int, value: Voxel) {
 	if !voxel_in_bounds(grid, x, y, z) do return
 	grid.voxels[voxel_index(grid, x, y, z)] = value
 }

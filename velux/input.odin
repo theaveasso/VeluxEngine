@@ -37,39 +37,104 @@ Input_State :: struct {
 	ignore_next_delta:   bool,
 }
 
-@(require_results)
-is_mouse_down :: proc(mouse_button: Mouse_Button) -> bool {
-	return g_engine.input.mouse_current[mouse_button]
+Input_API :: struct {
+	is_mouse_down:       proc(mouse_button: Mouse_Button) -> bool,
+	is_mouse_pressed:    proc(mouse_button: Mouse_Button) -> bool,
+	is_key_down:         proc(key: Key) -> bool,
+	is_key_pressed:      proc(key: Key) -> bool,
+	mouse_delta:         proc() -> [2]f32,
+	scroll_delta:        proc() -> [2]f32,
+	set_cursor_captured: proc(captured: bool),
+	is_cursor_captured:  proc() -> bool,
+}
+
+@(private, require_results)
+host_input_api :: proc() -> Input_API {
+	return {
+		is_mouse_down = host_is_mouse_down,
+		is_mouse_pressed = host_is_mouse_pressed,
+		is_key_down = host_is_key_down,
+		is_key_pressed = host_is_key_pressed,
+		mouse_delta = host_mouse_delta,
+		scroll_delta = host_scroll_delta,
+		set_cursor_captured = host_set_cursor_captured,
+		is_cursor_captured = host_is_cursor_captured,
+	}
 }
 
 @(require_results)
-is_mouse_pressed :: proc(mouse_button: Mouse_Button) -> bool {
+is_mouse_down :: proc(mouse_button: Mouse_Button, loc := #caller_location) -> bool {
+	return bound_api(loc).input.is_mouse_down(mouse_button)
+}
+
+@(require_results)
+is_mouse_pressed :: proc(mouse_button: Mouse_Button, loc := #caller_location) -> bool {
+	return bound_api(loc).input.is_mouse_pressed(mouse_button)
+}
+
+@(require_results)
+is_key_down :: proc(key: Key, loc := #caller_location) -> bool {
+	return bound_api(loc).input.is_key_down(key)
+}
+
+@(require_results)
+is_key_pressed :: proc(key: Key, loc := #caller_location) -> bool {
+	return bound_api(loc).input.is_key_pressed(key)
+}
+
+@(require_results)
+mouse_delta :: proc(loc := #caller_location) -> [2]f32 {
+	return bound_api(loc).input.mouse_delta()
+}
+
+@(require_results)
+scroll_delta :: proc(loc := #caller_location) -> [2]f32 {
+	return bound_api(loc).input.scroll_delta()
+}
+
+set_cursor_captured :: proc(captured: bool, loc := #caller_location) {
+	bound_api(loc).input.set_cursor_captured(captured)
+}
+
+@(require_results)
+is_cursor_captured :: proc(loc := #caller_location) -> bool {
+	return bound_api(loc).input.is_cursor_captured()
+}
+
+@(private, require_results)
+host_is_mouse_down :: proc(mouse_button: Mouse_Button) -> bool {
+	return g_engine.input.mouse_current[mouse_button]
+}
+
+@(private, require_results)
+host_is_mouse_pressed :: proc(mouse_button: Mouse_Button) -> bool {
 	input := &g_engine.input
 	return input.mouse_current[mouse_button] && !input.mouse_previous[mouse_button]
 }
 
-@(require_results)
-is_key_down :: proc(key: Key) -> bool {
+@(private, require_results)
+host_is_key_down :: proc(key: Key) -> bool {
 	return g_engine.input.keys_current[key]
 }
 
-@(require_results)
-is_key_pressed :: proc(key: Key) -> bool {
+@(private, require_results)
+host_is_key_pressed :: proc(key: Key) -> bool {
 	input := &g_engine.input
 	return input.keys_current[key] && !input.keys_previous[key]
 }
 
-@(require_results)
-mouse_delta :: proc() -> [2]f32 {
+@(private, require_results)
+host_mouse_delta :: proc() -> [2]f32 {
 	return g_engine.input.mouse_delta
 }
 
-@(require_results)
-scroll_delta :: proc() -> [2]f32 {
+@(private, require_results)
+host_scroll_delta :: proc() -> [2]f32 {
 	return g_engine.input.scroll_delta
 }
 
-set_cursor_captured :: proc(captured: bool) {
+@(private)
+host_set_cursor_captured :: proc(captured: bool) {
 	input := &g_engine.input
 	if input.cursor_captured == captured do return
 	input.cursor_captured = captured
@@ -78,8 +143,8 @@ set_cursor_captured :: proc(captured: bool) {
 	input.ignore_next_delta = true
 }
 
-@(require_results)
-is_cursor_captured :: proc() -> bool {
+@(private, require_results)
+host_is_cursor_captured :: proc() -> bool {
 	return g_engine.input.cursor_captured
 }
 

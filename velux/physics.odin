@@ -23,6 +23,11 @@ Physics_World :: struct {
 	steps:         i32,
 }
 
+Physics_API :: struct {
+	add_box:       proc(physics: ^Physics_World, type: Body_Type, center: [3]f32, half_extents: [3]f32) -> Body,
+	body_position: proc(body: Body) -> [3]f32,
+}
+
 @(private)
 physics_step :: proc(physics: ^Physics_World, dt: f32) {
 	if physics.fixed_dt <= 0 do return
@@ -40,7 +45,8 @@ physics_step :: proc(physics: ^Physics_World, dt: f32) {
 	physics.alpha = min(physics.accumulator / physics.fixed_dt, 1)
 }
 
-physics_add_box :: proc(physics: ^Physics_World, type: Body_Type, center: [3]f32, half_extents: [3]f32) -> (body: Body) {
+@(private)
+host_add_box :: proc(physics: ^Physics_World, type: Body_Type, center: [3]f32, half_extents: [3]f32) -> (body: Body) {
 	body_def := b3.DefaultBodyDef()
 	body_def.type = type
 	body_def.position = center
@@ -49,6 +55,32 @@ physics_add_box :: proc(physics: ^Physics_World, type: Body_Type, center: [3]f32
 	shape_def := b3.DefaultShapeDef()
 	b3.CreateHullShape(body, &shape_def, &hull.base)
 	return
+}
+
+@(private)
+host_body_position :: proc(body: Body) -> [3]f32 {return b3.Body_GetPosition(body)}
+
+@(private)
+host_physics_api :: proc() -> Physics_API {
+	return {add_box = host_add_box, body_position = host_body_position}
+}
+
+@(private, require_results)
+bound_physics_api :: proc(loc := #caller_location) -> Physics_API {
+	if g_engine == nil || g_engine.physics_api.add_box == nil {
+		fatal("physics api is unbound: the host must run velux create() before the game calls physics", loc = loc)
+	}
+	return g_engine.physics_api
+}
+
+physics_add_box :: proc(
+	physics: ^Physics_World,
+	type: Body_Type,
+	center: [3]f32,
+	half_extents: [3]f32,
+	loc := #caller_location,
+) -> Body {
+	return bound_physics_api(loc).add_box(physics, type, center, half_extents)
 }
 
 @(private)
@@ -75,4 +107,6 @@ destroy_physics :: proc(physics: ^Physics_World) {
 
 physics_world :: proc() -> ^Physics_World {return &g_engine.physics}
 
-physics_body_position :: proc(body: Body) -> [3]f32 {return b3.Body_GetPosition(body)}
+physics_body_position :: proc(body: Body, loc := #caller_location) -> [3]f32 {
+	return bound_physics_api(loc).body_position(body)
+}

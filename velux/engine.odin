@@ -27,6 +27,7 @@ Engine :: struct {
 	gpu:                GPU_Device,
 	audio:              Audio_Device,
 	physics:            Physics_World,
+	physics_api:        Physics_API,
 	watch_shaders:      [dynamic]Shader_Watch,
 	shader_reloads:     int,
 	ui_context:         ^UI_Context,
@@ -93,6 +94,7 @@ init :: proc(engine: ^Engine, config: Config) {
 	}
 
 	init_physics(&engine.physics, config.physics_config)
+	engine.physics_api = host_physics_api()
 
 	engine.last_time = now()
 }

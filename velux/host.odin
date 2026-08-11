@@ -87,6 +87,8 @@ should_quit :: proc(engine: ^Engine) -> bool {
 host_frame :: proc(host: ^Game_Host) {
 	ui_new_frame()
 
+	physics_step(&g_engine.physics, g_engine.dt)
+
 	replaying := host.reload != nil
 	if replaying {
 		replay_capture(&host.replay)

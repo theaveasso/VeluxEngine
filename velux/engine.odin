@@ -11,6 +11,7 @@ Config :: struct {
 	width:              i32,
 	height:             i32,
 	shader_include_dir: string,
+	physics_config:     Physics_Config,
 	enable_validation:  bool,
 	enable_profiler:    bool,
 	enable_log:         bool,
@@ -25,6 +26,7 @@ Engine :: struct {
 	input:              Input_State,
 	gpu:                GPU_Device,
 	audio:              Audio_Device,
+	physics:            Physics_World,
 	watch_shaders:      [dynamic]Shader_Watch,
 	shader_reloads:     int,
 	ui_context:         ^UI_Context,
@@ -90,6 +92,8 @@ init :: proc(engine: ^Engine, config: Config) {
 		log.warnf("audio unavailable, continuing without sound: %v", audio_err)
 	}
 
+	init_physics(&engine.physics, config.physics_config)
+
 	engine.last_time = now()
 }
 
@@ -117,6 +121,7 @@ shutdown :: proc(engine: ^Engine) {
 	wait_for_idle()
 	destroy_ui(engine)
 	destroy_gpu(&engine.gpu)
+	destroy_physics(&engine.physics)
 	destroy_audio(&engine.audio)
 	destroy_shader_watches(engine)
 	destroy_window(&engine.window)

@@ -12,6 +12,20 @@ create_render_target :: proc(
 	width, height: u32,
 	color_format: Format = .R8G8B8A8_UNORM,
 	depth_format: Format = DEFAULT_DEPTH_FORMAT,
+	loc := #caller_location,
+) -> Render_Target {
+	return bound_api(loc).gpu.create_render_target(width, height, color_format, depth_format)
+}
+
+destroy_render_target :: proc(target: ^Render_Target, loc := #caller_location) {
+	bound_api(loc).gpu.destroy_render_target(target)
+}
+
+@(private)
+host_create_render_target :: proc(
+	width, height: u32,
+	color_format: Format = .R8G8B8A8_UNORM,
+	depth_format: Format = DEFAULT_DEPTH_FORMAT,
 ) -> (
 	rt: Render_Target,
 ) {
@@ -23,7 +37,8 @@ create_render_target :: proc(
 	return
 }
 
-destroy_render_target :: proc(target: ^Render_Target) {
+@(private)
+host_destroy_render_target :: proc(target: ^Render_Target) {
 	wait_for_idle()
 	destroy_gpu_image(&target.image)
 	destroy_gpu_image(&target.depth)

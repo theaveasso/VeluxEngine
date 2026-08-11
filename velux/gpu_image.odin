@@ -91,7 +91,31 @@ create_image :: proc(create_info: GPU_Image_Info, loc := #caller_location) -> (i
 	return image
 }
 
-destroy_gpu_image :: proc(image: ^GPU_Image) {
+destroy_gpu_image :: proc(image: ^GPU_Image, loc := #caller_location) {
+	bound_api(loc).gpu.destroy_image(image)
+}
+
+create_sampler :: proc(
+	filter: vk.Filter,
+	address_mode: vk.SamplerAddressMode,
+	compare_op: vk.CompareOp = .NEVER,
+	border_color: vk.BorderColor = .FLOAT_TRANSPARENT_BLACK,
+	max_lod: f32 = 1.0,
+	max_anisotropy: f32 = 1.0,
+	loc := #caller_location,
+) -> vk.Sampler {
+	return bound_api(loc).gpu.create_sampler(
+		filter,
+		address_mode,
+		compare_op,
+		border_color,
+		max_lod,
+		max_anisotropy,
+	)
+}
+
+@(private)
+host_destroy_gpu_image :: proc(image: ^GPU_Image) {
 	device := &g_engine.gpu
 	if image.handle == 0 do return
 
@@ -102,7 +126,8 @@ destroy_gpu_image :: proc(image: ^GPU_Image) {
 }
 
 @(require_results)
-create_sampler :: proc(
+@(private)
+host_create_sampler :: proc(
 	filter: vk.Filter,
 	address_mode: vk.SamplerAddressMode,
 	compare_op: vk.CompareOp = .NEVER,

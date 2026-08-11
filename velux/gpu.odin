@@ -31,6 +31,37 @@ create_gpu_image :: proc(
 	usage: vma.MemoryUsage = .AUTO,
 	loc := #caller_location,
 ) -> GPU_Image {
+	return bound_api(loc).gpu.create_image(
+		format,
+		extent,
+		image_usage_flags,
+		mip_levels,
+		array_layers,
+		image_type,
+		msaa_samples,
+		tiling,
+		flags,
+		alloc_flags,
+		usage,
+		loc,
+	)
+}
+
+@(private)
+host_create_gpu_image :: proc(
+	format: vk.Format,
+	extent: vk.Extent3D,
+	image_usage_flags: vk.ImageUsageFlags,
+	mip_levels: u32 = 1,
+	array_layers: u32 = 1,
+	image_type: vk.ImageType = .D2,
+	msaa_samples: vk.SampleCountFlags = {._1},
+	tiling: vk.ImageTiling = .OPTIMAL,
+	flags: vk.ImageCreateFlags = {},
+	alloc_flags: vma.AllocationCreateFlags = {},
+	usage: vma.MemoryUsage = .AUTO,
+	loc := #caller_location,
+) -> GPU_Image {
 	info := image_create_info(
 		format,
 		extent,
@@ -49,6 +80,36 @@ create_gpu_image :: proc(
 
 @(require_results)
 create_gpu_pipeline :: proc(
+	pipeline: ^GPU_Pipeline,
+	slang_path: string,
+	push_constant_size: u32,
+	topology: vk.PrimitiveTopology = .TRIANGLE_LIST,
+	polygon_mode: vk.PolygonMode = .FILL,
+	front_face: vk.FrontFace = .COUNTER_CLOCKWISE,
+	depth: GPU_Depth_Config = {write_enabled = false, compare_op = .ALWAYS, format = DEFAULT_DEPTH_FORMAT},
+	cull_mode: vk.CullModeFlags = {},
+	color_format: Format = .UNDEFINED,
+	vertex_entry: cstring = DEFAULT_VERTEX_ENTRY,
+	fragment_entry: cstring = DEFAULT_FRAGMENT_ENTRY,
+	loc := #caller_location,
+) -> Error {
+	return bound_api(loc).gpu.create_pipeline(
+		pipeline,
+		slang_path,
+		push_constant_size,
+		topology,
+		polygon_mode,
+		front_face,
+		depth,
+		cull_mode,
+		color_format,
+		vertex_entry,
+		fragment_entry,
+	)
+}
+
+@(private)
+host_create_gpu_pipeline :: proc(
 	pipeline: ^GPU_Pipeline,
 	slang_path: string,
 	push_constant_size: u32,

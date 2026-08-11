@@ -40,7 +40,35 @@ GPU_Pipeline :: struct {
 // Returns an error rather than dying: a shader edited during hot reload can
 // produce a pipeline the driver rejects, and the caller keeps the last good one.
 @(require_results)
-rebuild_gpu_pipeline :: proc(shader: vk.ShaderModule, create_info: GPU_Pipeline_Info) -> (pipeline: GPU_Pipeline, err: Error) {
+rebuild_gpu_pipeline :: proc(
+	shader: vk.ShaderModule,
+	create_info: GPU_Pipeline_Info,
+	loc := #caller_location,
+) -> (GPU_Pipeline, Error) {
+	return bound_api(loc).gpu.rebuild_pipeline(shader, create_info)
+}
+
+destroy_gpu_pipeline :: proc(pipeline: ^GPU_Pipeline, loc := #caller_location) {
+	bound_api(loc).gpu.destroy_pipeline(pipeline)
+}
+
+create_gpu_shader :: proc(
+	file_name: string,
+	allocator: runtime.Allocator,
+	loc := #caller_location,
+) -> (vk.ShaderModule, Error) {
+	return bound_api(loc).gpu.create_shader(file_name, allocator, loc)
+}
+
+destroy_gpu_shader :: proc(module: vk.ShaderModule, loc := #caller_location) {
+	bound_api(loc).gpu.destroy_shader(module)
+}
+
+@(private)
+host_rebuild_gpu_pipeline :: proc(
+	shader: vk.ShaderModule,
+	create_info: GPU_Pipeline_Info,
+) -> (pipeline: GPU_Pipeline, err: Error) {
 	device := &g_engine.gpu
 	context.logger = device.logger
 
@@ -79,7 +107,8 @@ rebuild_gpu_pipeline :: proc(shader: vk.ShaderModule, create_info: GPU_Pipeline_
 	return {layout = layout, handle = handle, stage_flags = {.VERTEX, .FRAGMENT}, info = info}, .None
 }
 
-destroy_gpu_pipeline :: proc(pipeline: ^GPU_Pipeline) {
+@(private)
+host_destroy_gpu_pipeline :: proc(pipeline: ^GPU_Pipeline) {
 	device := &g_engine.gpu
 	if pipeline.handle == 0 do return
 
@@ -120,7 +149,8 @@ create_pipeline_layout :: proc(
 }
 
 @(require_results)
-create_gpu_shader :: proc(
+@(private)
+host_create_gpu_shader :: proc(
 	file_name: string,
 	allocator: runtime.Allocator,
 	loc := #caller_location,
@@ -157,7 +187,8 @@ create_gpu_shader :: proc(
 	return module, .None
 }
 
-destroy_gpu_shader :: proc(module: vk.ShaderModule) {
+@(private)
+host_destroy_gpu_shader :: proc(module: vk.ShaderModule) {
 	device := &g_engine.gpu
 	vk.DestroyShaderModule(device.device, module, nil)
 }

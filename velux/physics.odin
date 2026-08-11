@@ -37,7 +37,7 @@ physics_step :: proc(physics: ^Physics_World, dt: f32) {
 		physics.steps += 1
 		steps_this_call += 1
 	}
-	physics.alpha = physics.accumulator / physics.fixed_dt
+	physics.alpha = min(physics.accumulator / physics.fixed_dt, 1)
 }
 
 physics_add_box :: proc(physics: ^Physics_World, type: Body_Type, center: [3]f32, half_extents: [3]f32) -> (body: Body) {

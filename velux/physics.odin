@@ -24,6 +24,7 @@ Physics_World :: struct {
 }
 
 Physics_API :: struct {
+	world:         proc() -> ^Physics_World,
 	add_box:       proc(physics: ^Physics_World, type: Body_Type, center: [3]f32, half_extents: [3]f32) -> Body,
 	body_position: proc(body: Body) -> [3]f32,
 }
@@ -61,16 +62,11 @@ host_add_box :: proc(physics: ^Physics_World, type: Body_Type, center: [3]f32, h
 host_body_position :: proc(body: Body) -> [3]f32 {return b3.Body_GetPosition(body)}
 
 @(private)
-host_physics_api :: proc() -> Physics_API {
-	return {add_box = host_add_box, body_position = host_body_position}
-}
+host_physics_world :: proc() -> ^Physics_World {return &g_engine.physics}
 
 @(private, require_results)
-bound_physics_api :: proc(loc := #caller_location) -> Physics_API {
-	if g_engine == nil || g_engine.physics_api.add_box == nil {
-		fatal("physics api is unbound: the host must run velux create() before the game calls physics", loc = loc)
-	}
-	return g_engine.physics_api
+host_physics_api :: proc() -> Physics_API {
+	return {world = host_physics_world, add_box = host_add_box, body_position = host_body_position}
 }
 
 physics_add_box :: proc(
@@ -80,7 +76,7 @@ physics_add_box :: proc(
 	half_extents: [3]f32,
 	loc := #caller_location,
 ) -> Body {
-	return bound_physics_api(loc).add_box(physics, type, center, half_extents)
+	return bound_api(loc).physics.add_box(physics, type, center, half_extents)
 }
 
 @(private)
@@ -105,8 +101,10 @@ destroy_physics :: proc(physics: ^Physics_World) {
 	physics^ = {}
 }
 
-physics_world :: proc() -> ^Physics_World {return &g_engine.physics}
+physics_world :: proc(loc := #caller_location) -> ^Physics_World {
+	return bound_api(loc).physics.world()
+}
 
 physics_body_position :: proc(body: Body, loc := #caller_location) -> [3]f32 {
-	return bound_physics_api(loc).body_position(body)
+	return bound_api(loc).physics.body_position(body)
 }

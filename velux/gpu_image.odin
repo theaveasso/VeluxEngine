@@ -28,6 +28,15 @@ GPU_Image_Info :: struct {
 	usage:             vma.MemoryUsage,
 }
 
+GPU_Sampler_Info :: struct {
+	filter:         vk.Filter,
+	address_mode:   vk.SamplerAddressMode,
+	compare_op:     vk.CompareOp,
+	border_color:   vk.BorderColor,
+	max_lod:        f32,
+	max_anisotropy: f32,
+}
+
 @(private)
 create_image :: proc(create_info: GPU_Image_Info, loc := #caller_location) -> (image: GPU_Image) {
 	device := &g_engine.gpu
@@ -99,7 +108,8 @@ create_sampler :: proc(
 	max_anisotropy: f32 = 1.0,
 	loc := #caller_location,
 ) -> vk.Sampler {
-	return bound_api(loc).gpu.create_sampler(filter, address_mode, compare_op, border_color, max_lod, max_anisotropy)
+	info := sampler_create_info(filter, address_mode, compare_op, border_color, max_lod, max_anisotropy)
+	return bound_api(loc).gpu.create_sampler(info)
 }
 
 @(private)
@@ -115,34 +125,25 @@ host_destroy_gpu_image :: proc(image: ^GPU_Image) {
 
 @(require_results)
 @(private)
-host_create_sampler :: proc(
-	filter: vk.Filter,
-	address_mode: vk.SamplerAddressMode,
-	compare_op: vk.CompareOp = .NEVER,
-	border_color: vk.BorderColor = .FLOAT_TRANSPARENT_BLACK,
-	max_lod: f32 = 1.0,
-	max_anisotropy: f32 = 1.0,
-) -> (
-	sampler: vk.Sampler,
-) {
+host_create_sampler :: proc(create_info: GPU_Sampler_Info) -> (sampler: vk.Sampler) {
 	device := &g_engine.gpu
 
 	sampler_info: vk.SamplerCreateInfo = {
 		sType            = .SAMPLER_CREATE_INFO,
-		minFilter        = filter,
-		magFilter        = filter,
+		minFilter        = create_info.filter,
+		magFilter        = create_info.filter,
 		mipmapMode       = .LINEAR,
-		addressModeU     = address_mode,
-		addressModeV     = address_mode,
-		addressModeW     = address_mode,
+		addressModeU     = create_info.address_mode,
+		addressModeV     = create_info.address_mode,
+		addressModeW     = create_info.address_mode,
 		mipLodBias       = 0.0,
-		anisotropyEnable = b32(max_anisotropy > 1.0),
-		maxAnisotropy    = max_anisotropy,
+		anisotropyEnable = b32(create_info.max_anisotropy > 1.0),
+		maxAnisotropy    = create_info.max_anisotropy,
 		minLod           = 0.0,
-		maxLod           = max_lod,
-		borderColor      = border_color,
-		compareOp        = compare_op,
-		compareEnable    = b32(compare_op != .NEVER),
+		maxLod           = create_info.max_lod,
+		borderColor      = create_info.border_color,
+		compareOp        = create_info.compare_op,
+		compareEnable    = b32(create_info.compare_op != .NEVER),
 	}
 
 	vk_assert(vk.CreateSampler(device.device, &sampler_info, nil, &sampler), "vkCreateSampler")

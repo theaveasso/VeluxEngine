@@ -29,6 +29,35 @@ pipeline_create_info :: proc(
 }
 
 @(private)
+sampler_create_info :: proc(
+	filter: vk.Filter,
+	address_mode: vk.SamplerAddressMode,
+	compare_op: vk.CompareOp = .NEVER,
+	border_color: vk.BorderColor = .FLOAT_TRANSPARENT_BLACK,
+	max_lod: f32 = 1.0,
+	max_anisotropy: f32 = 1.0,
+) -> GPU_Sampler_Info {
+	return {
+		filter = filter,
+		address_mode = address_mode,
+		compare_op = compare_op,
+		border_color = border_color,
+		max_lod = max_lod,
+		max_anisotropy = max_anisotropy,
+	}
+}
+
+@(private)
+render_target_create_info :: proc(
+	width: u32,
+	height: u32,
+	color_format: Format = .R8G8B8A8_UNORM,
+	depth_format: Format = DEFAULT_DEPTH_FORMAT,
+) -> Render_Target_Info {
+	return {width = width, height = height, color_format = color_format, depth_format = depth_format}
+}
+
+@(private)
 image_create_info :: proc(
 	format: vk.Format,
 	extent: vk.Extent3D,

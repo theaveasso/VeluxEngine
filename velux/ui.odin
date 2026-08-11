@@ -1,5 +1,7 @@
 package velux
 
+import "base:runtime"
+
 import vk "vendor:vulkan"
 
 import imgui "third_party:odin-imgui"
@@ -7,6 +9,37 @@ import imgui_glfw "third_party:odin-imgui/imgui_impl_glfw"
 import imgui_vk "third_party:odin-imgui/imgui_impl_vulkan"
 
 UI_Context :: imgui.Context
+
+UI_API :: struct {
+	wants_mouse:    proc() -> bool,
+	wants_keyboard: proc() -> bool,
+	demo:           proc(),
+	begin_panel:    proc(name: string, allocator: runtime.Allocator) -> bool,
+	end_panel:      proc(),
+	slider_f32:     proc(label: string, v: ^f32, v_min: f32, v_max: f32, allocator: runtime.Allocator) -> bool,
+	slider_int:     proc(label: string, v: ^i32, v_min: i32, v_max: i32, allocator: runtime.Allocator) -> bool,
+	slider_float3:  proc(label: string, v: ^[3]f32, v_min: f32, v_max: f32, allocator: runtime.Allocator) -> bool,
+	checkbox:       proc(label: string, v: ^bool, allocator: runtime.Allocator) -> bool,
+	text:           proc(t: string, allocator: runtime.Allocator),
+	plot_lines:     proc(label: string, v: []f32, s_min: f32, s_max: f32, height: f32, allocator: runtime.Allocator),
+}
+
+@(private, require_results)
+host_ui_api :: proc() -> UI_API {
+	return {
+		wants_mouse = host_ui_wants_mouse,
+		wants_keyboard = host_ui_wants_keyboard,
+		demo = host_ui_demo,
+		begin_panel = host_ui_begin_panel,
+		end_panel = host_ui_end_panel,
+		slider_f32 = host_ui_slider_f32,
+		slider_int = host_ui_slider_int,
+		slider_float3 = host_ui_slider_float3,
+		checkbox = host_ui_checkbox,
+		text = host_ui_text,
+		plot_lines = host_ui_plot_lines,
+	}
+}
 
 @(private)
 ui_new_frame :: proc() {
@@ -31,13 +64,23 @@ ui_draw :: proc(frame: Frame) {
 }
 
 @(require_results)
-ui_wants_mouse :: proc() -> bool {
+ui_wants_mouse :: proc(loc := #caller_location) -> bool {
+	return bound_api(loc).ui.wants_mouse()
+}
+
+@(require_results)
+ui_wants_keyboard :: proc(loc := #caller_location) -> bool {
+	return bound_api(loc).ui.wants_keyboard()
+}
+
+@(private, require_results)
+host_ui_wants_mouse :: proc() -> bool {
 	if !ui_ready() do return false
 	return imgui.GetIO().WantCaptureMouse
 }
 
-@(require_results)
-ui_wants_keyboard :: proc() -> bool {
+@(private, require_results)
+host_ui_wants_keyboard :: proc() -> bool {
 	if !ui_ready() do return false
 	return imgui.GetIO().WantCaptureKeyboard
 }

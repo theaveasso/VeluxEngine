@@ -131,13 +131,6 @@ destroy_ui :: proc(engine: ^Engine) {
 	engine.ui_context = nil
 }
 
-@(private)
-bind_ui :: proc(engine: ^Engine) {
-	if engine.ui_context == nil do return
-	imgui.SetCurrentContext(engine.ui_context)
-	imgui_vk.LoadFunctions(vk.API_VERSION_1_4, imgui_loader, rawptr(engine.gpu.instance))
-}
-
 @(private, require_results)
 ui_ready :: proc() -> bool {
 	return g_engine != nil && g_engine.ui_context != nil

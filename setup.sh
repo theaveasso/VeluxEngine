@@ -78,4 +78,5 @@ fi
 
 echo
 echo "setup complete."
-echo "  build a sample:  ./build.sh 05_voxel_raycast"
+echo "  velux is a library - there is no executable to build here."
+echo "  build your game repo, or clone https://github.com/theaveasso/velux-starter"

@@ -52,8 +52,7 @@ create_image :: proc(create_info: GPU_Image_Info, loc := #caller_location) -> (i
 		flags         = create_info.alloc_flags,
 	}
 
-	if result := vma.CreateImage(device.vma_allocator, &image_info, &allocation_info, &image.handle, &image.allocation, nil);
-	   result != .SUCCESS {
+	if result := vma.CreateImage(device.vma_allocator, &image_info, &allocation_info, &image.handle, &image.allocation, nil); result != .SUCCESS {
 		fatal("vmaCreateImage failed: %v (%v %v)", result, create_info.format, create_info.extent, loc = loc)
 	}
 
@@ -70,11 +69,7 @@ create_image :: proc(create_info: GPU_Image_Info, loc := #caller_location) -> (i
 		image            = image.handle,
 		format           = create_info.format,
 		viewType         = view_type,
-		subresourceRange = init_image_subresource_range(
-			vk_aspect_of_format(create_info.format),
-			create_info.mip_levels,
-			create_info.array_layers,
-		),
+		subresourceRange = init_image_subresource_range(vk_aspect_of_format(create_info.format), create_info.mip_levels, create_info.array_layers),
 	}
 
 	vk_assert(vk.CreateImageView(device.device, &view_info, nil, &image.view), "vkCreateImageView")
@@ -104,14 +99,7 @@ create_sampler :: proc(
 	max_anisotropy: f32 = 1.0,
 	loc := #caller_location,
 ) -> vk.Sampler {
-	return bound_api(loc).gpu.create_sampler(
-		filter,
-		address_mode,
-		compare_op,
-		border_color,
-		max_lod,
-		max_anisotropy,
-	)
+	return bound_api(loc).gpu.create_sampler(filter, address_mode, compare_op, border_color, max_lod, max_anisotropy)
 }
 
 @(private)

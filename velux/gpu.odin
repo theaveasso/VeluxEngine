@@ -80,19 +80,7 @@ host_create_gpu_image :: proc(
 	usage: vma.MemoryUsage = .AUTO,
 	loc := #caller_location,
 ) -> GPU_Image {
-	info := image_create_info(
-		format,
-		extent,
-		image_usage_flags,
-		mip_levels,
-		array_layers,
-		image_type,
-		msaa_samples,
-		tiling,
-		flags,
-		alloc_flags,
-		usage,
-	)
+	info := image_create_info(format, extent, image_usage_flags, mip_levels, array_layers, image_type, msaa_samples, tiling, flags, alloc_flags, usage)
 	return create_image(info, loc)
 }
 

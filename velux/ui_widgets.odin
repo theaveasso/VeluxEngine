@@ -23,32 +23,13 @@ ui_slider :: proc {
 	ui_slider_float3,
 }
 
-ui_slider_f32 :: proc(
-	label: string,
-	v: ^f32,
-	v_min, v_max: f32,
-	allocator := context.temp_allocator,
-	loc := #caller_location,
-) -> bool {
+ui_slider_f32 :: proc(label: string, v: ^f32, v_min, v_max: f32, allocator := context.temp_allocator, loc := #caller_location) -> bool {
 	return bound_api(loc).ui.slider_f32(label, v, v_min, v_max, allocator)
 }
-ui_slider_int :: proc(
-	label: string,
-	v: ^i32,
-	v_min, v_max: i32,
-	allocator := context.temp_allocator,
-	loc := #caller_location,
-) -> bool {
+ui_slider_int :: proc(label: string, v: ^i32, v_min, v_max: i32, allocator := context.temp_allocator, loc := #caller_location) -> bool {
 	return bound_api(loc).ui.slider_int(label, v, v_min, v_max, allocator)
 }
-ui_slider_float3 :: proc(
-	label: string,
-	v: ^[3]f32,
-	v_min: f32,
-	v_max: f32,
-	allocator := context.temp_allocator,
-	loc := #caller_location,
-) -> bool {
+ui_slider_float3 :: proc(label: string, v: ^[3]f32, v_min: f32, v_max: f32, allocator := context.temp_allocator, loc := #caller_location) -> bool {
 	return bound_api(loc).ui.slider_float3(label, v, v_min, v_max, allocator)
 }
 
@@ -98,13 +79,7 @@ host_ui_slider_int :: proc(label: string, v: ^i32, v_min, v_max: i32, allocator:
 }
 
 @(private, require_results)
-host_ui_slider_float3 :: proc(
-	label: string,
-	v: ^[3]f32,
-	v_min: f32,
-	v_max: f32,
-	allocator: runtime.Allocator,
-) -> bool {
+host_ui_slider_float3 :: proc(label: string, v: ^[3]f32, v_min: f32, v_max: f32, allocator: runtime.Allocator) -> bool {
 	return ui_ready() ? imgui.SliderFloat3(strings.clone_to_cstring(label, allocator), v, v_min, v_max) : false
 }
 
@@ -120,23 +95,9 @@ host_ui_text :: proc(t: string, allocator: runtime.Allocator) {
 }
 
 @(private)
-host_ui_plot_lines :: proc(
-	label: string,
-	v: []f32,
-	s_min: f32,
-	s_max: f32,
-	height: f32,
-	allocator: runtime.Allocator,
-) {
+host_ui_plot_lines :: proc(label: string, v: []f32, s_min: f32, s_max: f32, height: f32, allocator: runtime.Allocator) {
 	if !ui_ready() do return
 	if len(v) == 0 do return
 
-	imgui.PlotLines(
-		strings.clone_to_cstring(label, allocator),
-		&v[0],
-		i32(len(v)),
-		scale_min = s_min,
-		scale_max = s_max,
-		graph_size = {0, height},
-	)
+	imgui.PlotLines(strings.clone_to_cstring(label, allocator), &v[0], i32(len(v)), scale_min = s_min, scale_max = s_max, graph_size = {0, height})
 }

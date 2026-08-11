@@ -13,12 +13,7 @@ logger_from_prefix :: proc(state: ^Prefix_Logger, prefix: string, backing := con
 	state.backing = backing
 	state.prefix = prefix
 
-	return log.Logger {
-		procedure = prefix_logger_proc,
-		data = cast(rawptr)state,
-		lowest_level = backing.lowest_level,
-		options = backing.options,
-	}
+	return log.Logger{procedure = prefix_logger_proc, data = cast(rawptr)state, lowest_level = backing.lowest_level, options = backing.options}
 }
 
 @(private)

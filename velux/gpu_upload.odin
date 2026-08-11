@@ -64,14 +64,7 @@ frame_upload :: proc(frame: Frame, dst: ^GPU_Buffer($T), in_data: ^$U, dst_offse
 }
 
 @(private)
-suballocate_upload :: proc(
-	device: ^GPU_Device,
-	slot: u32,
-	size: vk.DeviceSize,
-	loc := #caller_location,
-) -> (
-	offset: vk.DeviceSize,
-) {
+suballocate_upload :: proc(device: ^GPU_Device, slot: u32, size: vk.DeviceSize, loc := #caller_location) -> (offset: vk.DeviceSize) {
 	offset = cast(vk.DeviceSize)mem.align_forward_uint(uint(device.upload.used[slot]), UPLOAD_ALIGNMENT)
 	if offset + size > device.upload.capacity {
 		fatal(

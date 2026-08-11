@@ -24,14 +24,7 @@ GPU_Buffer_Kind :: enum {
 }
 
 @(require_results)
-create_gpu_buffer :: proc(
-	$T: typeid,
-	#any_int size: vk.DeviceSize = 1,
-	kind: GPU_Buffer_Kind = .Storage,
-	loc := #caller_location,
-) -> (
-	buffer: GPU_Buffer(T),
-) {
+create_gpu_buffer :: proc($T: typeid, #any_int size: vk.DeviceSize = 1, kind: GPU_Buffer_Kind = .Storage, loc := #caller_location) -> (buffer: GPU_Buffer(T)) {
 	device := &g_engine.gpu
 	context.logger = device.logger
 
@@ -49,14 +42,7 @@ create_gpu_buffer :: proc(
 		flags = vma_create_flags,
 	}
 
-	if result := vma.CreateBuffer(
-		device.vma_allocator,
-		&buffer_info,
-		&allocation_info,
-		&buffer.handle,
-		&buffer.allocation,
-		&buffer.info,
-	); result != .SUCCESS {
+	if result := vma.CreateBuffer(device.vma_allocator, &buffer_info, &allocation_info, &buffer.handle, &buffer.allocation, &buffer.info); result != .SUCCESS {
 		fatal("vmaCreateBuffer failed: %v (%v bytes, %v)", result, alloc_size, kind, loc = loc)
 	}
 
@@ -131,13 +117,7 @@ write_buffer_slice :: proc(buffer: ^GPU_Buffer($T), in_data: []$U, offset: vk.De
 
 // Load-time only: allocates a throwaway staging buffer for
 // immediate_transfer_end to reap. Per frame, use frame_upload_slice.
-write_staging_buffer :: proc(
-	cmd: vk.CommandBuffer,
-	buffer: ^GPU_Buffer($T),
-	in_data: ^$U,
-	offset: vk.DeviceSize = 0,
-	loc := #caller_location,
-) {
+write_staging_buffer :: proc(cmd: vk.CommandBuffer, buffer: ^GPU_Buffer($T), in_data: ^$U, offset: vk.DeviceSize = 0, loc := #caller_location) {
 	device := &g_engine.gpu
 	context.logger = device.logger
 
@@ -152,13 +132,7 @@ write_staging_buffer :: proc(
 	cmd_copy_buffer2(cmd, staging.handle, buffer.handle, &region)
 }
 
-write_staging_buffer_slice :: proc(
-	cmd: vk.CommandBuffer,
-	buffer: ^GPU_Buffer($T),
-	in_data: []$U,
-	offset: vk.DeviceSize = 0,
-	loc := #caller_location,
-) {
+write_staging_buffer_slice :: proc(cmd: vk.CommandBuffer, buffer: ^GPU_Buffer($T), in_data: []$U, offset: vk.DeviceSize = 0, loc := #caller_location) {
 	device := &g_engine.gpu
 	context.logger = device.logger
 

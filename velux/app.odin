@@ -50,4 +50,3 @@ run :: proc(app: App, allocator := context.allocator) -> Error {
 	}
 	return host_run(&host, allocator)
 }
-

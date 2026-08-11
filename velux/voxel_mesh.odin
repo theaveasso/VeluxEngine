@@ -10,12 +10,7 @@ destroy_mesh :: proc(mesh: ^Voxel_Mesh, loc := #caller_location) {
 }
 
 @(require_results)
-mesh_grid_naive :: proc(
-	grid: ^Voxel_Grid,
-	voxel_size: f32,
-	allocator := context.allocator,
-	loc := #caller_location,
-) -> Voxel_Mesh {
+mesh_grid_naive :: proc(grid: ^Voxel_Grid, voxel_size: f32, allocator := context.allocator, loc := #caller_location) -> Voxel_Mesh {
 	return bound_api(loc).voxel.mesh_grid_naive(grid, voxel_size, allocator)
 }
 
@@ -27,11 +22,7 @@ host_destroy_mesh :: proc(mesh: ^Voxel_Mesh) {
 }
 
 @(private, require_results)
-host_mesh_grid_naive :: proc(
-	grid: ^Voxel_Grid,
-	voxel_size: f32,
-	allocator := context.allocator,
-) -> (mesh: Voxel_Mesh) {
+host_mesh_grid_naive :: proc(grid: ^Voxel_Grid, voxel_size: f32, allocator := context.allocator) -> (mesh: Voxel_Mesh) {
 	positions := make([dynamic][3]f32, 0, 0, allocator)
 	indices := make([dynamic]u32, 0, 0, allocator)
 

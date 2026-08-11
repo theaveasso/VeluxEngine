@@ -34,19 +34,7 @@ compile_slang :: proc(slang_path, spv_path: string, allocator: runtime.Allocator
 	if g_engine != nil && g_engine.shader_include_dir != "" do engine_shader_dir = g_engine.shader_include_dir
 
 	slang_dir := filepath.dir(slang_path)
-	cmd := []string {
-		slangc,
-		slang_path,
-		"-I",
-		slang_dir,
-		"-I",
-		engine_shader_dir,
-		"-target",
-		"spirv",
-		"-fvk-use-entrypoint-name",
-		"-o",
-		spv_path,
-	}
+	cmd := []string{slangc, slang_path, "-I", slang_dir, "-I", engine_shader_dir, "-target", "spirv", "-fvk-use-entrypoint-name", "-o", spv_path}
 	state, stdout, stderr, exec_err := os.process_exec({command = cmd}, allocator)
 	defer delete(stdout, allocator)
 	defer delete(stderr, allocator)

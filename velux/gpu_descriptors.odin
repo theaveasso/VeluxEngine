@@ -52,13 +52,7 @@ create_bindless_placeholder :: proc(device: ^GPU_Device) {
 	range := init_image_subresource_range({.COLOR}, 1, 1)
 	vk.CmdClearColorImage(cmd, device.bindless.placeholder.handle, .TRANSFER_DST_OPTIMAL, &magenta, 1, &range)
 
-	cmd_transition_image(
-		cmd,
-		device.bindless.placeholder.handle,
-		{.COLOR},
-		.TRANSFER_DST_OPTIMAL,
-		.SHADER_READ_ONLY_OPTIMAL,
-	)
+	cmd_transition_image(cmd, device.bindless.placeholder.handle, {.COLOR}, .TRANSFER_DST_OPTIMAL, .SHADER_READ_ONLY_OPTIMAL)
 	immediate_transfer_end()
 }
 
@@ -69,12 +63,7 @@ register_bindless :: proc(device: ^GPU_Device, view: vk.ImageView, loc := #calle
 		index = pop(&device.bindless.free)
 	} else {
 		if device.bindless.next_index >= MAX_TEXTURES {
-			fatal(
-				"bindless table full: %d live textures and none freed, MAX_TEXTURES is %d",
-				device.bindless.next_index,
-				MAX_TEXTURES,
-				loc = loc,
-			)
+			fatal("bindless table full: %d live textures and none freed, MAX_TEXTURES is %d", device.bindless.next_index, MAX_TEXTURES, loc = loc)
 		}
 		index = device.bindless.next_index
 		device.bindless.next_index += 1

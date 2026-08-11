@@ -54,11 +54,7 @@ error_from_vox :: proc(err: vox.Error) -> Error {
 }
 
 Voxel_API :: struct {
-	load_level_data:    proc(
-		file_name: string,
-		reserved_from: u8,
-		allocator: runtime.Allocator,
-	) -> (Level_Data, Error),
+	load_level_data:    proc(file_name: string, reserved_from: u8, allocator: runtime.Allocator) -> (Level_Data, Error),
 	destroy_level_data: proc(data: ^Level_Data),
 	upload_level:       proc(data: ^Level_Data) -> Voxel_World,
 	load_level:         proc(file_name: string, reserved_from: u8) -> (Level, Error),
@@ -89,15 +85,7 @@ host_voxel_api :: proc() -> Voxel_API {
 }
 
 @(require_results)
-load_level_data :: proc(
-	file_name: string,
-	reserved_from: u8,
-	allocator := context.allocator,
-	loc := #caller_location,
-) -> (
-	Level_Data,
-	Error,
-) {
+load_level_data :: proc(file_name: string, reserved_from: u8, allocator := context.allocator, loc := #caller_location) -> (Level_Data, Error) {
 	return bound_api(loc).voxel.load_level_data(file_name, reserved_from, allocator)
 }
 
@@ -138,14 +126,7 @@ set_voxel :: proc(grid: ^Voxel_Grid, x, y, z: int, value: Voxel, loc := #caller_
 }
 
 @(private, require_results)
-host_load_level_data :: proc(
-	file_name: string,
-	reserved_from: u8,
-	allocator := context.allocator,
-) -> (
-	data: Level_Data,
-	err: Error,
-) {
+host_load_level_data :: proc(file_name: string, reserved_from: u8, allocator := context.allocator) -> (data: Level_Data, err: Error) {
 	model, vox_err := vox.load(file_name, allocator)
 	if vox_err != .None {
 		log.errorf("cannot load '%v': %v", file_name, vox_err)
@@ -246,14 +227,7 @@ pack_voxels :: proc(grid: ^Voxel_Grid, allocator := context.allocator) -> (packe
 }
 
 @(private, require_results)
-grid_from_vox :: proc(
-	model: vox.Model,
-	reserved_from: u8,
-	allocator := context.allocator,
-) -> (
-	grid: Voxel_Grid,
-	markers: []Marker,
-) {
+grid_from_vox :: proc(model: vox.Model, reserved_from: u8, allocator := context.allocator) -> (grid: Voxel_Grid, markers: []Marker) {
 	if len(model.tiles) == 0 do return
 
 	minimum := [3]int{max(int), max(int), max(int)}

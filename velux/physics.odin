@@ -69,13 +69,7 @@ host_physics_api :: proc() -> Physics_API {
 	return {world = host_physics_world, add_box = host_add_box, body_position = host_body_position}
 }
 
-physics_add_box :: proc(
-	physics: ^Physics_World,
-	type: Body_Type,
-	center: [3]f32,
-	half_extents: [3]f32,
-	loc := #caller_location,
-) -> Body {
+physics_add_box :: proc(physics: ^Physics_World, type: Body_Type, center: [3]f32, half_extents: [3]f32, loc := #caller_location) -> Body {
 	return bound_api(loc).physics.add_box(physics, type, center, half_extents)
 }
 

@@ -208,22 +208,19 @@ create_instance :: proc(device: ^GPU_Device, config: GPU_Config) {
 // `features` is written through and must outlive the returned struct: it is
 // reached by pNext, not copied.
 @(private)
-debug_messenger_create_info :: proc(
-	device: ^GPU_Device,
-	features: ^vk.ValidationFeaturesEXT,
-) -> vk.DebugUtilsMessengerCreateInfoEXT {
+debug_messenger_create_info :: proc(device: ^GPU_Device, features: ^vk.ValidationFeaturesEXT) -> vk.DebugUtilsMessengerCreateInfoEXT {
 	features^ = {
 		sType                         = .VALIDATION_FEATURES_EXT,
 		enabledValidationFeatureCount = cast(u32)len(VALIDATION_FEATURES),
 		pEnabledValidationFeatures    = raw_data(VALIDATION_FEATURES),
 	}
 	return {
-		sType           = .DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-		pNext           = features,
+		sType = .DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+		pNext = features,
 		messageSeverity = {.WARNING, .ERROR, .INFO},
-		messageType     = {.GENERAL, .VALIDATION, .PERFORMANCE},
+		messageType = {.GENERAL, .VALIDATION, .PERFORMANCE},
 		pfnUserCallback = debug_callback,
-		pUserData       = &device.logger,
+		pUserData = &device.logger,
 	}
 }
 
@@ -234,10 +231,7 @@ setup_debug_utils_messenger :: proc(device: ^GPU_Device, config: GPU_Config) {
 	validation_features: vk.ValidationFeaturesEXT
 	debug_create_info := debug_messenger_create_info(device, &validation_features)
 
-	vk_assert(
-		vk.CreateDebugUtilsMessengerEXT(device.instance, &debug_create_info, nil, &device.debug_messenger),
-		"vkCreateDebugUtilsMessengerEXT",
-	)
+	vk_assert(vk.CreateDebugUtilsMessengerEXT(device.instance, &debug_create_info, nil, &device.debug_messenger), "vkCreateDebugUtilsMessengerEXT")
 }
 
 @(private)

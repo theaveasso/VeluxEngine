@@ -6,7 +6,6 @@ import vma "third_party:odin-vma"
 import vk "vendor:vulkan"
 
 
-
 FRAME_HISTORY :: 120
 
 Hud :: struct {

@@ -25,14 +25,7 @@ begin_frame :: proc() -> (frame: Frame, err: Error) {
 	vk_assert(vk.WaitForFences(device.device, 1, &frame_data.in_flight_fence, true, max(u64)), "vkWaitForFences")
 
 	image_index: u32 = max(u32)
-	acquire_result := vk.AcquireNextImageKHR(
-		device.device,
-		device.swapchain.handle,
-		max(u64),
-		frame_data.present_complete,
-		0,
-		&image_index,
-	)
+	acquire_result := vk.AcquireNextImageKHR(device.device, device.swapchain.handle, max(u64), frame_data.present_complete, 0, &image_index)
 
 	#partial switch acquire_result {
 	case .SUCCESS, .SUBOPTIMAL_KHR:

@@ -40,11 +40,7 @@ GPU_Pipeline :: struct {
 // Returns an error rather than dying: a shader edited during hot reload can
 // produce a pipeline the driver rejects, and the caller keeps the last good one.
 @(require_results)
-rebuild_gpu_pipeline :: proc(
-	shader: vk.ShaderModule,
-	create_info: GPU_Pipeline_Info,
-	loc := #caller_location,
-) -> (GPU_Pipeline, Error) {
+rebuild_gpu_pipeline :: proc(shader: vk.ShaderModule, create_info: GPU_Pipeline_Info, loc := #caller_location) -> (GPU_Pipeline, Error) {
 	return bound_api(loc).gpu.rebuild_pipeline(shader, create_info)
 }
 
@@ -52,11 +48,7 @@ destroy_gpu_pipeline :: proc(pipeline: ^GPU_Pipeline, loc := #caller_location) {
 	bound_api(loc).gpu.destroy_pipeline(pipeline)
 }
 
-create_gpu_shader :: proc(
-	file_name: string,
-	allocator: runtime.Allocator,
-	loc := #caller_location,
-) -> (vk.ShaderModule, Error) {
+create_gpu_shader :: proc(file_name: string, allocator: runtime.Allocator, loc := #caller_location) -> (vk.ShaderModule, Error) {
 	return bound_api(loc).gpu.create_shader(file_name, allocator, loc)
 }
 
@@ -65,10 +57,7 @@ destroy_gpu_shader :: proc(module: vk.ShaderModule, loc := #caller_location) {
 }
 
 @(private)
-host_rebuild_gpu_pipeline :: proc(
-	shader: vk.ShaderModule,
-	create_info: GPU_Pipeline_Info,
-) -> (pipeline: GPU_Pipeline, err: Error) {
+host_rebuild_gpu_pipeline :: proc(shader: vk.ShaderModule, create_info: GPU_Pipeline_Info) -> (pipeline: GPU_Pipeline, err: Error) {
 	device := &g_engine.gpu
 	context.logger = device.logger
 
@@ -150,14 +139,7 @@ create_pipeline_layout :: proc(
 
 @(require_results)
 @(private)
-host_create_gpu_shader :: proc(
-	file_name: string,
-	allocator: runtime.Allocator,
-	loc := #caller_location,
-) -> (
-	module: vk.ShaderModule,
-	err: Error,
-) {
+host_create_gpu_shader :: proc(file_name: string, allocator: runtime.Allocator, loc := #caller_location) -> (module: vk.ShaderModule, err: Error) {
 	device := &g_engine.gpu
 	context.logger = device.logger
 

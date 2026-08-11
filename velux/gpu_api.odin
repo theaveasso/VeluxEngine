@@ -6,9 +6,9 @@ import vma "third_party:odin-vma"
 import vk "vendor:vulkan"
 
 GPU_API :: struct {
-	swapchain_format:         proc() -> Format,
-	wait_for_idle:            proc(),
-	create_image:             proc(
+	swapchain_format:          proc() -> Format,
+	wait_for_idle:             proc(),
+	create_image:              proc(
 		format: vk.Format,
 		extent: vk.Extent3D,
 		image_usage_flags: vk.ImageUsageFlags,
@@ -22,8 +22,8 @@ GPU_API :: struct {
 		usage: vma.MemoryUsage,
 		loc: runtime.Source_Code_Location,
 	) -> GPU_Image,
-	destroy_image:            proc(image: ^GPU_Image),
-	create_sampler:           proc(
+	destroy_image:             proc(image: ^GPU_Image),
+	create_sampler:            proc(
 		filter: vk.Filter,
 		address_mode: vk.SamplerAddressMode,
 		compare_op: vk.CompareOp,
@@ -31,7 +31,7 @@ GPU_API :: struct {
 		max_lod: f32,
 		max_anisotropy: f32,
 	) -> vk.Sampler,
-	create_pipeline:          proc(
+	create_pipeline:           proc(
 		pipeline: ^GPU_Pipeline,
 		slang_path: string,
 		push_constant_size: u32,
@@ -44,25 +44,40 @@ GPU_API :: struct {
 		vertex_entry: cstring,
 		fragment_entry: cstring,
 	) -> Error,
-	rebuild_pipeline:         proc(shader: vk.ShaderModule, create_info: GPU_Pipeline_Info) -> (GPU_Pipeline, Error),
-	destroy_pipeline:         proc(pipeline: ^GPU_Pipeline),
-	create_shader:            proc(
+	rebuild_pipeline:          proc(shader: vk.ShaderModule, create_info: GPU_Pipeline_Info) -> (GPU_Pipeline, Error),
+	destroy_pipeline:          proc(pipeline: ^GPU_Pipeline),
+	create_shader:             proc(
 		file_name: string,
 		allocator: runtime.Allocator,
 		loc: runtime.Source_Code_Location,
-	) -> (vk.ShaderModule, Error),
-	destroy_shader:           proc(module: vk.ShaderModule),
-	create_render_target:     proc(
-		width: u32,
-		height: u32,
-		color_format: Format,
-		depth_format: Format,
-	) -> Render_Target,
-	destroy_render_target:    proc(target: ^Render_Target),
-	immediate_transfer_begin: proc() -> vk.CommandBuffer,
-	immediate_transfer_end:   proc(),
-	prof_zone_begin:          proc(frame: Frame, name: string, loc: runtime.Source_Code_Location) -> u32,
-	prof_zone_end:            proc(frame: Frame, loc: runtime.Source_Code_Location),
+	) -> (
+		vk.ShaderModule,
+		Error,
+	),
+	destroy_shader:            proc(module: vk.ShaderModule),
+	create_render_target:      proc(width: u32, height: u32, color_format: Format, depth_format: Format) -> Render_Target,
+	destroy_render_target:     proc(target: ^Render_Target),
+	begin_rendering_swapchain: proc(frame: Frame, clear_color: Maybe([4]f32)),
+	end_rendering_swapchain:   proc(frame: Frame),
+	begin_rendering_target:    proc(frame: Frame, target: Render_Target, clear_color: [4]f32),
+	end_rendering_target:      proc(frame: Frame, target: Render_Target),
+	bind_graphics_pipeline:    proc(frame: Frame, pipeline: GPU_Pipeline),
+	push_constants:            proc(frame: Frame, pipeline: GPU_Pipeline, data: rawptr, size: int, loc: runtime.Source_Code_Location),
+	bind_index_buffer:         proc(frame: Frame, buffer: vk.Buffer, offset: vk.DeviceSize, index_type: vk.IndexType),
+	set_viewport:              proc(frame: Frame, offset: [2]f32, size: [2]f32),
+	draw:                      proc(frame: Frame, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32),
+	draw_indexed:              proc(
+		frame: Frame,
+		index_count: u32,
+		instance_count: u32,
+		first_index: u32,
+		vertex_offset: i32,
+		first_instance: u32,
+	),
+	immediate_transfer_begin:  proc() -> vk.CommandBuffer,
+	immediate_transfer_end:    proc(),
+	prof_zone_begin:           proc(frame: Frame, name: string, loc: runtime.Source_Code_Location) -> u32,
+	prof_zone_end:             proc(frame: Frame, loc: runtime.Source_Code_Location),
 }
 
 @(private, require_results)
@@ -80,6 +95,16 @@ host_gpu_api :: proc() -> GPU_API {
 		destroy_shader = host_destroy_gpu_shader,
 		create_render_target = host_create_render_target,
 		destroy_render_target = host_destroy_render_target,
+		begin_rendering_swapchain = host_cmd_begin_rendering_swapchain,
+		end_rendering_swapchain = host_cmd_end_rendering_swapchain,
+		begin_rendering_target = host_cmd_begin_rendering_target,
+		end_rendering_target = host_cmd_end_rendering_target,
+		bind_graphics_pipeline = host_cmd_bind_graphics_pipeline,
+		push_constants = host_cmd_push_constants,
+		bind_index_buffer = host_cmd_bind_index_buffer,
+		set_viewport = host_cmd_set_viewport,
+		draw = host_cmd_draw,
+		draw_indexed = host_cmd_draw_indexed,
 		immediate_transfer_begin = host_immediate_transfer_begin,
 		immediate_transfer_end = host_immediate_transfer_end,
 		prof_zone_begin = host_prof_zone_begin,

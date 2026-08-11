@@ -117,15 +117,39 @@ cmd_begin_rendering_views :: proc(
 	vk.CmdSetScissor(frame.cmd, 0, 1, &scissor)
 }
 
-cmd_begin_rendering_swapchain :: proc(frame: Frame, clear_color: Maybe([4]f32) = nil) {
+cmd_begin_rendering_swapchain :: proc(frame: Frame, clear_color: Maybe([4]f32) = nil, loc := #caller_location) {
+	bound_api(loc).gpu.begin_rendering_swapchain(frame, clear_color)
+}
+
+cmd_end_rendering_swapchain :: proc(frame: Frame, loc := #caller_location) {
+	bound_api(loc).gpu.end_rendering_swapchain(frame)
+}
+
+cmd_begin_rendering_target :: proc(
+	frame: Frame,
+	target: Render_Target,
+	clear_color: [4]f32 = {0, 0, 0, 1},
+	loc := #caller_location,
+) {
+	bound_api(loc).gpu.begin_rendering_target(frame, target, clear_color)
+}
+
+cmd_end_rendering_target :: proc(frame: Frame, target: Render_Target, loc := #caller_location) {
+	bound_api(loc).gpu.end_rendering_target(frame, target)
+}
+
+@(private)
+host_cmd_begin_rendering_swapchain :: proc(frame: Frame, clear_color: Maybe([4]f32) = nil) {
 	cmd_begin_rendering_views(frame, frame.view, frame.extent, clear_color, frame.depth_view)
 }
 
-cmd_end_rendering_swapchain :: proc(frame: Frame) {
+@(private)
+host_cmd_end_rendering_swapchain :: proc(frame: Frame) {
 	vk.CmdEndRendering(frame.cmd)
 }
 
-cmd_begin_rendering_target :: proc(frame: Frame, target: Render_Target, clear_color: [4]f32 = {0, 0, 0, 1}) {
+@(private)
+host_cmd_begin_rendering_target :: proc(frame: Frame, target: Render_Target, clear_color: [4]f32 = {0, 0, 0, 1}) {
 	cmd_transition_images(
 		frame.cmd,
 		{
@@ -136,7 +160,8 @@ cmd_begin_rendering_target :: proc(frame: Frame, target: Render_Target, clear_co
 	cmd_begin_rendering_views(frame, target.image.view, {target.extent[0], target.extent[1]}, clear_color, target.depth.view)
 }
 
-cmd_end_rendering_target :: proc(frame: Frame, target: Render_Target) {
+@(private)
+host_cmd_end_rendering_target :: proc(frame: Frame, target: Render_Target) {
 	vk.CmdEndRendering(frame.cmd)
 	cmd_transition_image(frame.cmd, target.image.handle, {.COLOR}, .COLOR_ATTACHMENT_OPTIMAL, .SHADER_READ_ONLY_OPTIMAL)
 }
@@ -145,24 +170,84 @@ cmd_bind_pipeline :: proc {
 	cmd_bind_graphics_pipeline,
 }
 
-cmd_bind_graphics_pipeline :: proc(frame: Frame, pipeline: GPU_Pipeline) {
+cmd_bind_graphics_pipeline :: proc(frame: Frame, pipeline: GPU_Pipeline, loc := #caller_location) {
+	bound_api(loc).gpu.bind_graphics_pipeline(frame, pipeline)
+}
+
+cmd_push_constants :: proc(frame: Frame, pipeline: GPU_Pipeline, data: ^$T, loc := #caller_location) {
+	bound_api(loc).gpu.push_constants(frame, pipeline, data, size_of(T), loc)
+}
+
+cmd_bind_index_buffer :: proc(
+	frame: Frame,
+	buffer: vk.Buffer,
+	offset: vk.DeviceSize = 0,
+	index_type: vk.IndexType = .UINT32,
+	loc := #caller_location,
+) {
+	bound_api(loc).gpu.bind_index_buffer(frame, buffer, offset, index_type)
+}
+
+cmd_set_viewport :: proc(frame: Frame, offset, size: [2]f32, loc := #caller_location) {
+	bound_api(loc).gpu.set_viewport(frame, offset, size)
+}
+
+cmd_draw :: proc(
+	frame: Frame,
+	vertex_count: u32,
+	instance_count: u32 = 1,
+	first_vertex: u32 = 0,
+	first_instance: u32 = 0,
+	loc := #caller_location,
+) {
+	bound_api(loc).gpu.draw(frame, vertex_count, instance_count, first_vertex, first_instance)
+}
+
+cmd_draw_indexed :: proc(
+	frame: Frame,
+	index_count: u32,
+	instance_count: u32 = 1,
+	first_index: u32 = 0,
+	vertex_offset: i32 = 0,
+	first_instance: u32 = 0,
+	loc := #caller_location,
+) {
+	bound_api(loc).gpu.draw_indexed(frame, index_count, instance_count, first_index, vertex_offset, first_instance)
+}
+
+@(private)
+host_cmd_bind_graphics_pipeline :: proc(frame: Frame, pipeline: GPU_Pipeline) {
 	vk.CmdBindPipeline(frame.cmd, .GRAPHICS, pipeline.handle)
 	bindless_set := frame.bindless_set
 	vk.CmdBindDescriptorSets(frame.cmd, .GRAPHICS, pipeline.layout, 0, 1, &bindless_set, 0, nil)
 }
 
-cmd_push_constants :: proc(frame: Frame, pipeline: GPU_Pipeline, data: ^$T, loc := #caller_location) {
-	if size_of(T) != int(pipeline.info.push_constant_size) {
-		fatal("push constant is %d bytes but the pipeline was built for %d", size_of(T), pipeline.info.push_constant_size, loc = loc)
+@(private)
+host_cmd_push_constants :: proc(
+	frame: Frame,
+	pipeline: GPU_Pipeline,
+	data: rawptr,
+	size: int,
+	loc := #caller_location,
+) {
+	if size != int(pipeline.info.push_constant_size) {
+		fatal("push constant is %d bytes but the pipeline was built for %d", size, pipeline.info.push_constant_size, loc = loc)
 	}
 	vk.CmdPushConstants(frame.cmd, pipeline.layout, pipeline.stage_flags, 0, pipeline.info.push_constant_size, data)
 }
 
-cmd_bind_index_buffer :: proc(frame: Frame, buffer: vk.Buffer, offset: vk.DeviceSize = 0, index_type: vk.IndexType = .UINT32) {
+@(private)
+host_cmd_bind_index_buffer :: proc(
+	frame: Frame,
+	buffer: vk.Buffer,
+	offset: vk.DeviceSize = 0,
+	index_type: vk.IndexType = .UINT32,
+) {
 	vk.CmdBindIndexBuffer(frame.cmd, buffer, offset, index_type)
 }
 
-cmd_set_viewport :: proc(frame: Frame, offset, size: [2]f32) {
+@(private)
+host_cmd_set_viewport :: proc(frame: Frame, offset, size: [2]f32) {
 	viewport: vk.Viewport = {
 		x        = offset[0],
 		y        = offset[1],
@@ -174,11 +259,19 @@ cmd_set_viewport :: proc(frame: Frame, offset, size: [2]f32) {
 	vk.CmdSetViewport(frame.cmd, 0, 1, &viewport)
 }
 
-cmd_draw :: proc(frame: Frame, vertex_count: u32, instance_count: u32 = 1, first_vertex: u32 = 0, first_instance: u32 = 0) {
+@(private)
+host_cmd_draw :: proc(
+	frame: Frame,
+	vertex_count: u32,
+	instance_count: u32 = 1,
+	first_vertex: u32 = 0,
+	first_instance: u32 = 0,
+) {
 	vk.CmdDraw(frame.cmd, vertex_count, instance_count, first_vertex, first_instance)
 }
 
-cmd_draw_indexed :: proc(
+@(private)
+host_cmd_draw_indexed :: proc(
 	frame: Frame,
 	index_count: u32,
 	instance_count: u32 = 1,

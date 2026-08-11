@@ -72,6 +72,12 @@ init :: proc(engine: ^Engine, config: Config) {
 		if !config.disable_profiler do config.enable_profiler = true
 	}
 
+	engine.api = host_velux_api()
+
+	init_platform()
+	init_window(&engine.window, config.width, config.height, config.app_name)
+	init_input(engine)
+
 	gpu_config: GPU_Config = {
 		app_name          = config.app_name,
 		window            = engine.window.handle,
@@ -79,10 +85,6 @@ init :: proc(engine: ^Engine, config: Config) {
 		enable_log        = config.enable_log,
 		enable_profiler   = config.enable_profiler,
 	}
-
-	init_platform()
-	init_window(&engine.window, config.width, config.height, config.app_name)
-	init_input(engine)
 	init_gpu(&engine.gpu, gpu_config)
 	init_ui(engine)
 	init_physics(&engine.physics, config.physics_config)
@@ -90,8 +92,6 @@ init :: proc(engine: ^Engine, config: Config) {
 	if audio_err := init_audio(&engine.audio); audio_err != .None {
 		log.warnf("audio unavailable, continuing without sound: %v", audio_err)
 	}
-
-	engine.api = host_velux_api()
 
 	engine.last_time = now()
 }

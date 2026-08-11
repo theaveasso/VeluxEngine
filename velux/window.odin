@@ -9,12 +9,13 @@ Window :: struct {
 }
 
 Window_API :: struct {
-	now: proc() -> f64,
+	now:    proc() -> f64,
+	extent: proc() -> [2]f32,
 }
 
 @(private, require_results)
 host_window_api :: proc() -> Window_API {
-	return {now = host_now}
+	return {now = host_now, extent = host_window_extent}
 }
 
 @(require_results)

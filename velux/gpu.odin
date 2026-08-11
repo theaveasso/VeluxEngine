@@ -17,6 +17,24 @@ Vertex :: struct {
 }
 
 @(require_results)
+swapchain_format :: proc(loc := #caller_location) -> Format {
+	return bound_api(loc).gpu.swapchain_format()
+}
+
+wait_for_idle :: proc(loc := #caller_location) {
+	bound_api(loc).gpu.wait_for_idle()
+}
+
+@(private, require_results)
+host_swapchain_format :: proc() -> Format {
+	return g_engine.gpu.swapchain.surface_format.format
+}
+
+@(private)
+host_wait_for_idle :: proc() {
+	wait_idle(&g_engine.gpu)
+}
+
 create_gpu_image :: proc(
 	format: vk.Format,
 	extent: vk.Extent3D,

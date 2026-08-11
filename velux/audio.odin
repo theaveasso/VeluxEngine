@@ -26,12 +26,7 @@ Audio_API :: struct {
 
 @(private, require_results)
 host_audio_api :: proc() -> Audio_API {
-	return {
-		load_sound = host_load_sound,
-		play_sound = host_play_sound,
-		stop_sound = host_stop_sound,
-		play_oneshot = host_play_oneshot,
-	}
+	return {load_sound = host_load_sound, play_sound = host_play_sound, stop_sound = host_stop_sound, play_oneshot = host_play_oneshot}
 }
 
 @(require_results)
@@ -54,14 +49,7 @@ play_oneshot :: proc(file_name: string, loc := #caller_location) {
 // A machine with no sound card is a machine velux still runs on, so audio is
 // the one subsystem whose absence is not fatal.
 @(private, require_results)
-host_load_sound :: proc(
-	file_name: string,
-	spatial: bool,
-	loc := #caller_location,
-) -> (
-	handle: Sound_Handle,
-	err: Error,
-) {
+host_load_sound :: proc(file_name: string, spatial: bool, loc := #caller_location) -> (handle: Sound_Handle, err: Error) {
 	audio := &g_engine.audio
 	if !audio.enabled do return INVALID_SOUND, .Audio_Unavailable
 	if audio.sound_count >= MAX_SOUNDS {

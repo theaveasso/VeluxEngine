@@ -96,25 +96,6 @@ init :: proc(engine: ^Engine, config: Config) {
 	engine.last_time = now()
 }
 
-@(require_results)
-swapchain_format :: proc(loc := #caller_location) -> Format {
-	return bound_api(loc).gpu.swapchain_format()
-}
-
-@(require_results)
-window_extent :: proc(loc := #caller_location) -> [2]f32 {
-	return bound_api(loc).window.extent()
-}
-
-@(require_results)
-delta_time :: proc(loc := #caller_location) -> f32 {
-	return bound_api(loc).engine.delta_time()
-}
-
-wait_for_idle :: proc(loc := #caller_location) {
-	bound_api(loc).gpu.wait_for_idle()
-}
-
 Engine_API :: struct {
 	delta_time: proc() -> f32,
 	quit:       proc(),
@@ -125,14 +106,13 @@ host_engine_api :: proc() -> Engine_API {
 	return {delta_time = host_delta_time, quit = host_quit}
 }
 
-@(private, require_results)
-host_swapchain_format :: proc() -> Format {
-	return g_engine.gpu.swapchain.surface_format.format
+@(require_results)
+delta_time :: proc(loc := #caller_location) -> f32 {
+	return bound_api(loc).engine.delta_time()
 }
 
-@(private, require_results)
-host_window_extent :: proc() -> [2]f32 {
-	return framebuffer_extent(&g_engine.window)
+quit :: proc(loc := #caller_location) {
+	bound_api(loc).engine.quit()
 }
 
 @(private, require_results)
@@ -141,8 +121,8 @@ host_delta_time :: proc() -> f32 {
 }
 
 @(private)
-host_wait_for_idle :: proc() {
-	wait_idle(&g_engine.gpu)
+host_quit :: proc() {
+	g_engine.quit_requested = true
 }
 
 @(private)

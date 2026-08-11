@@ -51,11 +51,3 @@ run :: proc(app: App, allocator := context.allocator) -> Error {
 	return host_run(&host, allocator)
 }
 
-quit :: proc(loc := #caller_location) {
-	bound_api(loc).engine.quit()
-}
-
-@(private)
-host_quit :: proc() {
-	g_engine.quit_requested = true
-}

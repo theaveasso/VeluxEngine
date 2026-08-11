@@ -23,9 +23,19 @@ now :: proc(loc := #caller_location) -> f64 {
 	return bound_api(loc).window.now()
 }
 
+@(require_results)
+window_extent :: proc(loc := #caller_location) -> [2]f32 {
+	return bound_api(loc).window.extent()
+}
+
 @(private, require_results)
 host_now :: proc() -> f64 {
 	return glfw.GetTime()
+}
+
+@(private, require_results)
+host_window_extent :: proc() -> [2]f32 {
+	return framebuffer_extent(&g_engine.window)
 }
 
 @(private)

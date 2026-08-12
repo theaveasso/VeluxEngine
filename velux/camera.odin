@@ -241,9 +241,8 @@ host_camera_projection :: proc(camera: Camera, aspect: f32) -> matrix[4, 4]f32 {
 
 @(private, require_results)
 host_projection_perspective :: proc(p: Perspective, aspect: f32) -> matrix[4, 4]f32 {
-	m := linalg.matrix4_perspective(p.fov_y, aspect, p.near, p.far)
-	m[1, 1] *= -1
-	return m
+	f := 1 / math.tan(p.fov_y * 0.5)
+	return {f / aspect, 0, 0, 0, 0, -f, 0, 0, 0, 0, 0, p.near, 0, 0, -1, 0}
 }
 
 @(private, require_results)

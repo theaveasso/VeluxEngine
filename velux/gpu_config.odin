@@ -3,6 +3,7 @@ package velux
 import vk "vendor:vulkan"
 
 DEFAULT_DEPTH_FORMAT :: vk.Format.D32_SFLOAT
+DEFAULT_CLEAR_DEPTH :: 0.0
 
 DEFAULT_VERTEX_ENTRY: cstring : "vertex_main"
 DEFAULT_FRAGMENT_ENTRY: cstring : "fragment_main"

@@ -91,7 +91,7 @@ cmd_begin_rendering_views :: proc(frame: Frame, view: vk.ImageView, extent: vk.E
 			imageLayout = .DEPTH_ATTACHMENT_OPTIMAL,
 			loadOp = clear_color != nil ? .CLEAR : .LOAD,
 			storeOp = .STORE,
-			clearValue = {depthStencil = {depth = 1.0}},
+			clearValue = {depthStencil = {depth = DEFAULT_CLEAR_DEPTH}},
 		}
 		rendering_info.pDepthAttachment = &depth_attachment
 	}

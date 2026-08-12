@@ -61,14 +61,26 @@ create_gpu_pipeline :: proc(
 	topology: vk.PrimitiveTopology = .TRIANGLE_LIST,
 	polygon_mode: vk.PolygonMode = .FILL,
 	front_face: vk.FrontFace = .COUNTER_CLOCKWISE,
-	depth: GPU_Depth_Config = {write_enabled = false, compare_op = .ALWAYS, format = DEFAULT_DEPTH_FORMAT},
+	depth: GPU_Depth_Config = {},
 	cull_mode: vk.CullModeFlags = {},
 	color_format: Format = .UNDEFINED,
+	depth_format: Format = .UNDEFINED,
 	vertex_entry: cstring = DEFAULT_VERTEX_ENTRY,
 	fragment_entry: cstring = DEFAULT_FRAGMENT_ENTRY,
 	loc := #caller_location,
 ) -> Error {
-	info := pipeline_create_info(push_constant_size, topology, polygon_mode, front_face, depth, cull_mode, color_format, vertex_entry, fragment_entry)
+	info := pipeline_create_info(
+		push_constant_size,
+		topology,
+		polygon_mode,
+		front_face,
+		depth,
+		cull_mode,
+		color_format,
+		depth_format,
+		vertex_entry,
+		fragment_entry,
+	)
 	return bound_api(loc).gpu.create_pipeline(pipeline, slang_path, info)
 }
 
@@ -88,6 +100,7 @@ host_create_gpu_pipeline :: proc(pipeline: ^GPU_Pipeline, slang_path: string, cr
 
 	resolved := create_info
 	if resolved.color_format == .UNDEFINED do resolved.color_format = swapchain_format()
+	if resolved.depth_format == .UNDEFINED do resolved.depth_format = DEFAULT_DEPTH_FORMAT
 	pipeline^ = rebuild_gpu_pipeline(shader, resolved) or_return
 
 	when ODIN_DEBUG do watch_shader(pipeline, slang_path, spv_path) or_return

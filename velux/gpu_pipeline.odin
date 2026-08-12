@@ -17,7 +17,6 @@ Pipeline :: struct {
 GPU_Depth_Config :: struct {
 	write_enabled: b32,
 	compare_op:    vk.CompareOp,
-	format:        vk.Format,
 }
 
 GPU_Pipeline_Info :: struct {
@@ -27,6 +26,7 @@ GPU_Pipeline_Info :: struct {
 	front_face:         vk.FrontFace,
 	depth_config:       GPU_Depth_Config,
 	color_format:       vk.Format,
+	depth_format:       vk.Format,
 	cull_mode:          vk.CullModeFlags,
 	vertex_entry:       cstring,
 	fragment_entry:     cstring,
@@ -79,12 +79,13 @@ host_rebuild_gpu_pipeline :: proc(shader: vk.ShaderModule, create_info: GPU_Pipe
 	pipeline_builder_disable_blending(&pipeline_builder) // TODO: support blending
 	pipeline_builder_set_attachment_format(&pipeline_builder, create_info.color_format)
 
+	pipeline_builder_set_depth_format(&pipeline_builder, create_info.depth_format)
+
 	depth_config := create_info.depth_config
-	if depth_config.format == .UNDEFINED {
+	if depth_config.compare_op == .NEVER {
 		pipeline_builder_disabled_depth_test(&pipeline_builder)
 	} else {
 		pipeline_builder_enable_depth_test(&pipeline_builder, depth_config.write_enabled, depth_config.compare_op)
-		pipeline_builder_set_depth_format(&pipeline_builder, depth_config.format)
 	}
 
 	handle := pipeline_builder_build_pipeline(device.device, &pipeline_builder) or_return

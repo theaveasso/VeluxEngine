@@ -15,7 +15,6 @@ clone and rename.
 | Vulkan | [LunarG SDK](https://vulkan.lunarg.com) | `brew install vulkan-headers vulkan-loader molten-vk vulkan-tools` |
 | Slang | ships with the LunarG SDK | `brew install shader-slang` |
 | Python 3 | required (builds imgui) | ships with macOS |
-| CMake | required (builds box3d) | `brew install cmake` |
 | C++ compiler | MSVC | Xcode command line tools (`xcode-select --install`) |
 
 `VULKAN_SDK` must be set. The LunarG installer sets it on Windows. On macOS `setup.sh`
@@ -32,13 +31,13 @@ cd VeluxEngine
 setup.bat       # Windows
 ```
 
-Setup initialises the nested submodules and builds the three native libraries velux links
-against: [VulkanMemoryAllocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator),
-[Dear ImGui](https://github.com/ocornut/imgui) and [box3d](https://github.com/erincatto/box3d).
-Windows uses the prebuilt `.lib` files that ship with the vma and imgui submodules; box3d is
-compiled with CMake on every platform, and macOS and Linux build all three from source. The
-imgui build clones dear imgui, glfw, SDL2, SDL3 and Vulkan-Headers, so the first run takes a
-few minutes. Re-running setup is cheap — it skips anything already built.
+Setup initialises the nested submodules and builds the two native libraries velux links
+against: [VulkanMemoryAllocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator)
+and [Dear ImGui](https://github.com/ocornut/imgui). Physics comes from `vendor:box3d`, which
+ships prebuilt with Odin — nothing to build. Windows uses the prebuilt `.lib` files that ship
+with the vma and imgui submodules; macOS and Linux build both from source. The imgui build
+clones dear imgui, glfw, SDL2, SDL3 and Vulkan-Headers, so the first run takes a few minutes.
+Re-running setup is cheap — it skips anything already built.
 
 ## Running something
 
@@ -115,7 +114,7 @@ velux/            the engine package  -> import vlx "vlx:velux"
 velux/shaders/    shared Slang modules
 hot_reload/       the hot reload host, built by build_hot_reload
 tests/            odin test suite
-third_party/      odin-vma, odin-imgui, box3d, box3d-odin
+third_party/      odin-vma, odin-imgui
 ```
 
 ## Per-frame data

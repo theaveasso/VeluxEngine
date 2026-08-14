@@ -12,5 +12,3 @@ build
 
 *.vox
 *.log
-
-third_party/box3d-odin/external/

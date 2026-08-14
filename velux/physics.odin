@@ -1,6 +1,6 @@
 package velux
 
-import b3 "third_party:box3d-odin"
+import b3 "vendor:box3d"
 
 DEFAULT_GRAVITY :: [3]f32{0, -9.81, 0}
 MAX_STEPS :: 8
@@ -51,10 +51,10 @@ host_add_box :: proc(physics: ^Physics_World, type: Body_Type, center: [3]f32, h
 	body_def := b3.DefaultBodyDef()
 	body_def.type = type
 	body_def.position = center
-	body = b3.CreateBody(physics.world, &body_def)
+	body = b3.CreateBody(physics.world, body_def)
 	hull := b3.MakeBoxHull(half_extents.x, half_extents.y, half_extents.z)
 	shape_def := b3.DefaultShapeDef()
-	b3.CreateHullShape(body, &shape_def, &hull.base)
+	_ = b3.CreateHullShape(body, shape_def, &hull.base)
 	return
 }
 
@@ -82,7 +82,7 @@ init_physics :: proc(physics: ^Physics_World, config: Physics_Config = {}) {
 
 	world_def := b3.DefaultWorldDef()
 	world_def.gravity = config.gravity
-	physics.world = b3.CreateWorld(&world_def)
+	physics.world = b3.CreateWorld(world_def)
 	if !b3.World_IsValid(physics.world) do fatal("b3CreateWorld failed (max worlds: %d)", b3.GetMaxWorldCount())
 	physics.fixed_dt = config.fixed_dt
 	physics.substep_count = config.substep_count

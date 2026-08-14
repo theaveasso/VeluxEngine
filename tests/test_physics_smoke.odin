@@ -2,12 +2,12 @@ package tests
 
 import "core:testing"
 
-import b3 "third_party:box3d-odin"
+import b3 "vendor:box3d"
 
 @(test)
 world_creates_and_destroys :: proc(t: ^testing.T) {
 	def := b3.DefaultWorldDef()
-	world := b3.CreateWorld(&def)
+	world := b3.CreateWorld(def)
 	testing.expect(t, b3.World_IsValid(world))
 	b3.DestroyWorld(world)
 	testing.expect(t, !b3.World_IsValid(world))
@@ -16,7 +16,7 @@ world_creates_and_destroys :: proc(t: ^testing.T) {
 @(test)
 world_steps_without_bodies :: proc(t: ^testing.T) {
 	def := b3.DefaultWorldDef()
-	world := b3.CreateWorld(&def)
+	world := b3.CreateWorld(def)
 	defer b3.DestroyWorld(world)
 
 	for _ in 0 ..< 10 {

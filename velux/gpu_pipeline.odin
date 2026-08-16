@@ -19,6 +19,56 @@ GPU_Depth_Config :: struct {
 	compare_op:    vk.CompareOp,
 }
 
+// Velux commits to reverse-z, so GREATER_OR_EQUAL is the only correct compare
+// op and is not a per-pipeline choice. These three are the answers that exist.
+GPU_Depth :: enum {
+	Off,
+	Read,
+	Read_Write,
+}
+
+GPU_Winding :: enum {
+	CCW,
+	CW,
+}
+
+GPU_Cull :: enum {
+	None,
+	Back,
+	Front,
+}
+
+@(private, require_results)
+depth_config_from :: proc(depth: GPU_Depth) -> GPU_Depth_Config {
+	switch depth {
+	case .Off:
+		return {}
+	case .Read:
+		return {write_enabled = false, compare_op = .GREATER_OR_EQUAL}
+	case .Read_Write:
+		return {write_enabled = true, compare_op = .GREATER_OR_EQUAL}
+	}
+	return {}
+}
+
+@(private, require_results)
+front_face_from :: proc(winding: GPU_Winding) -> vk.FrontFace {
+	return winding == .CW ? .CLOCKWISE : .COUNTER_CLOCKWISE
+}
+
+@(private, require_results)
+cull_mode_from :: proc(cull: GPU_Cull) -> vk.CullModeFlags {
+	switch cull {
+	case .None:
+		return {}
+	case .Back:
+		return {.BACK}
+	case .Front:
+		return {.FRONT}
+	}
+	return {}
+}
+
 GPU_Pipeline_Info :: struct {
 	push_constant_size: u32,
 	input_topology:     vk.PrimitiveTopology,
@@ -41,12 +91,12 @@ GPU_Pipeline :: struct {
 create_gpu_pipeline :: proc(
 	pipeline: ^GPU_Pipeline,
 	slang_path: string,
-	push_constant_size: u32,
+	push_constant_size: u32 = 0,
 	topology: vk.PrimitiveTopology = .TRIANGLE_LIST,
 	polygon_mode: vk.PolygonMode = .FILL,
-	front_face: vk.FrontFace = .COUNTER_CLOCKWISE,
-	depth: GPU_Depth_Config = {},
-	cull_mode: vk.CullModeFlags = {},
+	winding: GPU_Winding = .CCW,
+	depth: GPU_Depth = .Off,
+	cull: GPU_Cull = .None,
 	color_format: Format = .UNDEFINED,
 	depth_format: Format = .UNDEFINED,
 	vertex_entry: cstring = DEFAULT_VERTEX_ENTRY,
@@ -57,9 +107,9 @@ create_gpu_pipeline :: proc(
 		push_constant_size,
 		topology,
 		polygon_mode,
-		front_face,
-		depth,
-		cull_mode,
+		front_face_from(winding),
+		depth_config_from(depth),
+		cull_mode_from(cull),
 		color_format,
 		depth_format,
 		vertex_entry,

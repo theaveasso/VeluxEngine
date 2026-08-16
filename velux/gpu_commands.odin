@@ -149,8 +149,15 @@ push_constants :: proc(frame: Frame, pipeline: GPU_Pipeline, data: ^$T, loc := #
 	vk.CmdPushConstants(frame.cmd, pipeline.layout, pipeline.stage_flags, 0, pipeline.info.push_constant_size, data)
 }
 
-bind_indices :: proc(frame: Frame, buffer: vk.Buffer, offset: vk.DeviceSize = 0, index_type: vk.IndexType = .UINT32) {
-	vk.CmdBindIndexBuffer(frame.cmd, buffer, offset, index_type)
+bind_indices :: proc(frame: Frame, buffer: GPU_Buffer($T), offset: vk.DeviceSize = 0) {
+	when T == u16 {
+		index_type := vk.IndexType.UINT16
+	} else when T == u32 {
+		index_type := vk.IndexType.UINT32
+	} else {
+		#panic("an index buffer must be GPU_Buffer(u16) or GPU_Buffer(u32)")
+	}
+	vk.CmdBindIndexBuffer(frame.cmd, buffer.handle, offset, index_type)
 }
 
 set_viewport :: proc(frame: Frame, offset, size: [2]f32) {

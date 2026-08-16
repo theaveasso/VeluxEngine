@@ -51,8 +51,9 @@ ui_wants_keyboard :: proc() -> bool {
 
 @(private)
 init_ui :: proc(engine: ^Engine) {
-	engine.ui_context = imgui.CreateContext()
-	imgui.GetAllocatorFunctions(&engine.imgui_alloc, &engine.imgui_free, &engine.imgui_user_data)
+	ui := &engine.ui_context
+	ui.ctx = imgui.CreateContext()
+	imgui.GetAllocatorFunctions(&ui.imgui_alloc, &ui.imgui_free, &ui.imgui_user_data)
 	if !imgui_glfw.InitForVulkan(engine.window.handle, true) do fatal("ImGui_ImplGlfw_InitForVulkan failed")
 
 	device := &engine.gpu
@@ -89,16 +90,16 @@ init_ui :: proc(engine: ^Engine) {
 
 @(private)
 destroy_ui :: proc(engine: ^Engine) {
-	if engine.ui_context == nil do return
+	if engine.ui_context.ctx == nil do return
 	imgui_vk.Shutdown()
 	imgui_glfw.Shutdown()
 	imgui.DestroyContext()
-	engine.ui_context = nil
+	engine.ui_context = {}
 }
 
 @(private, require_results)
 ui_ready :: proc() -> bool {
-	return g_engine != nil && g_engine.ui_context != nil
+	return g_engine != nil && g_engine.ui_context.ctx != nil
 }
 
 @(private)

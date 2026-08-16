@@ -27,8 +27,8 @@ attach :: proc(engine: ^Engine) {
 	vk.load_proc_addresses_instance(engine.gpu.instance)
 	vk.load_proc_addresses_device(engine.gpu.device)
 
-	if engine.ui_context != nil {
-		imgui.SetAllocatorFunctions(engine.imgui_alloc, engine.imgui_free, engine.imgui_user_data)
-		imgui.SetCurrentContext(engine.ui_context)
+	if ui := &engine.ui_context; ui.ctx != nil {
+		imgui.SetAllocatorFunctions(ui.imgui_alloc, ui.imgui_free, ui.imgui_user_data)
+		imgui.SetCurrentContext(ui.ctx)
 	}
 }

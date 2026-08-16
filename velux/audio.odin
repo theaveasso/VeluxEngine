@@ -1,6 +1,5 @@
 package velux
 
-import "base:runtime"
 import "core:strings"
 
 import ma "vendor:miniaudio"
@@ -17,39 +16,10 @@ Audio_Device :: struct {
 	enabled:     bool,
 }
 
-Audio_API :: struct {
-	load_sound:   proc(file_name: string, spatial: bool, loc: runtime.Source_Code_Location) -> (Sound_Handle, Error),
-	play_sound:   proc(handle: Sound_Handle),
-	stop_sound:   proc(handle: Sound_Handle),
-	play_oneshot: proc(file_name: string),
-}
-
-@(private, require_results)
-host_audio_api :: proc() -> Audio_API {
-	return {load_sound = host_load_sound, play_sound = host_play_sound, stop_sound = host_stop_sound, play_oneshot = host_play_oneshot}
-}
-
-@(require_results)
-load_sound :: proc(file_name: string, spatial: bool, loc := #caller_location) -> (Sound_Handle, Error) {
-	return bound_api(loc).audio.load_sound(file_name, spatial, loc)
-}
-
-play_sound :: proc(handle: Sound_Handle, loc := #caller_location) {
-	bound_api(loc).audio.play_sound(handle)
-}
-
-stop_sound :: proc(handle: Sound_Handle, loc := #caller_location) {
-	bound_api(loc).audio.stop_sound(handle)
-}
-
-play_oneshot :: proc(file_name: string, loc := #caller_location) {
-	bound_api(loc).audio.play_oneshot(file_name)
-}
-
 // A machine with no sound card is a machine velux still runs on, so audio is
 // the one subsystem whose absence is not fatal.
-@(private, require_results)
-host_load_sound :: proc(file_name: string, spatial: bool, loc := #caller_location) -> (handle: Sound_Handle, err: Error) {
+@(require_results)
+load_sound :: proc(file_name: string, spatial: bool, loc := #caller_location) -> (handle: Sound_Handle, err: Error) {
 	audio := &g_engine.audio
 	if !audio.enabled do return INVALID_SOUND, .Audio_Unavailable
 	if audio.sound_count >= MAX_SOUNDS {
@@ -73,8 +43,7 @@ host_load_sound :: proc(file_name: string, spatial: bool, loc := #caller_locatio
 	return Sound_Handle(index + 1), .None
 }
 
-@(private)
-host_play_sound :: proc(handle: Sound_Handle) {
+play_sound :: proc(handle: Sound_Handle) {
 	audio := &g_engine.audio
 	if !audio.enabled do return
 	sound := sound_from_handle(audio, handle)
@@ -82,8 +51,7 @@ host_play_sound :: proc(handle: Sound_Handle) {
 	ma.sound_start(sound)
 }
 
-@(private)
-host_stop_sound :: proc(handle: Sound_Handle) {
+stop_sound :: proc(handle: Sound_Handle) {
 	audio := &g_engine.audio
 	if !audio.enabled do return
 	sound := sound_from_handle(audio, handle)
@@ -91,8 +59,7 @@ host_stop_sound :: proc(handle: Sound_Handle) {
 	ma.sound_stop(sound)
 }
 
-@(private)
-host_play_oneshot :: proc(file_name: string) {
+play_oneshot :: proc(file_name: string) {
 	audio := &g_engine.audio
 	if !audio.enabled do return
 	ma.engine_play_sound(&audio.engine, strings.clone_to_cstring(file_name, context.temp_allocator), nil)

@@ -41,6 +41,14 @@ Engine :: struct {
 @(private = "package")
 g_engine: ^Engine
 
+@(private, require_results)
+engine_bound :: proc(loc := #caller_location) -> ^Engine {
+	if g_engine == nil {
+		fatal("velux is unbound: the host must run create() before the game calls in", loc = loc)
+	}
+	return g_engine
+}
+
 @(require_results)
 create :: proc(config: Config, allocator := context.allocator) -> ^Engine {
 	engine := new(Engine, allocator)

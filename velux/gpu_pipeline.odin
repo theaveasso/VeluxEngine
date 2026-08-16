@@ -37,28 +37,136 @@ GPU_Pipeline :: struct {
 	info:         GPU_Pipeline_Info,
 }
 
-// Returns an error rather than dying: a shader edited during hot reload can
-// produce a pipeline the driver rejects, and the caller keeps the last good one.
 @(require_results)
-rebuild_gpu_pipeline :: proc(shader: vk.ShaderModule, create_info: GPU_Pipeline_Info, loc := #caller_location) -> (GPU_Pipeline, Error) {
-	return bound_api(loc).gpu.rebuild_pipeline(shader, create_info)
+create_gpu_pipeline :: proc(
+	pipeline: ^GPU_Pipeline,
+	slang_path: string,
+	push_constant_size: u32,
+	topology: vk.PrimitiveTopology = .TRIANGLE_LIST,
+	polygon_mode: vk.PolygonMode = .FILL,
+	front_face: vk.FrontFace = .COUNTER_CLOCKWISE,
+	depth: GPU_Depth_Config = {},
+	cull_mode: vk.CullModeFlags = {},
+	color_format: Format = .UNDEFINED,
+	depth_format: Format = .UNDEFINED,
+	vertex_entry: cstring = DEFAULT_VERTEX_ENTRY,
+	fragment_entry: cstring = DEFAULT_FRAGMENT_ENTRY,
+	loc := #caller_location,
+) -> Error {
+	info := pipeline_create_info(
+		push_constant_size,
+		topology,
+		polygon_mode,
+		front_face,
+		depth,
+		cull_mode,
+		color_format,
+		depth_format,
+		vertex_entry,
+		fragment_entry,
+	)
+
+	spv_path := strings.concatenate({strings.trim_suffix(slang_path, ".slang"), ".spv"}, context.temp_allocator)
+
+	output, compile_err := compile_slang(slang_path, spv_path, context.temp_allocator)
+	if compile_err != .None {
+		if output != "" do log.error(output)
+		return compile_err
+	}
+	if output != "" do log.warn(output)
+
+	shader := create_gpu_shader(spv_path, context.temp_allocator, loc) or_return
+	defer destroy_gpu_shader(shader, loc)
+
+	if info.color_format == .UNDEFINED do info.color_format = swapchain_format(loc)
+	if info.depth_format == .UNDEFINED do info.depth_format = DEFAULT_DEPTH_FORMAT
+	pipeline^ = rebuild_gpu_pipeline(shader, info, loc) or_return
+
+	when ODIN_DEBUG do watch_shader(pipeline, slang_path, spv_path) or_return
+	return .None
 }
 
 destroy_gpu_pipeline :: proc(pipeline: ^GPU_Pipeline, loc := #caller_location) {
-	bound_api(loc).gpu.destroy_pipeline(pipeline)
+	device := &engine_bound(loc).gpu
+	if pipeline.handle == 0 do return
+
+	delete(pipeline.info.vertex_entry)
+	delete(pipeline.info.fragment_entry)
+	vk.DestroyPipelineLayout(device.device, pipeline.layout, nil)
+	vk.DestroyPipeline(device.device, pipeline.handle, nil)
+	pipeline^ = {}
 }
 
-create_gpu_shader :: proc(file_name: string, allocator: runtime.Allocator, loc := #caller_location) -> (vk.ShaderModule, Error) {
-	return bound_api(loc).gpu.create_shader(file_name, allocator, loc)
+@(require_results)
+create_gpu_shader :: proc(file_name: string, allocator: runtime.Allocator, loc := #caller_location) -> (module: vk.ShaderModule, err: Error) {
+	device := &engine_bound(loc).gpu
+	context.logger = device.logger
+
+	buffer, read_err := os.read_entire_file(file_name, allocator)
+	if read_err != nil {
+		log.errorf("cannot read '%v': %v", file_name, read_err)
+		return 0, .Asset_Not_Found
+	}
+	defer delete(buffer, allocator)
+
+	if len(buffer) % 4 != 0 {
+		log.errorf("'%v' is %v bytes, not a multiple of 4, so it is not SPIR-V", file_name, len(buffer))
+		return 0, .Shader_Invalid
+	}
+
+	shader_info: vk.ShaderModuleCreateInfo = {
+		sType    = .SHADER_MODULE_CREATE_INFO,
+		codeSize = len(buffer),
+		pCode    = raw_data(slice.reinterpret([]u32, buffer)),
+	}
+
+	if result := vk.CreateShaderModule(device.device, &shader_info, nil, &module); result != .SUCCESS {
+		log.errorf("vkCreateShaderModule rejected '%v': %v", file_name, result)
+		return 0, .Shader_Invalid
+	}
+
+	return module, .None
 }
 
 destroy_gpu_shader :: proc(module: vk.ShaderModule, loc := #caller_location) {
-	bound_api(loc).gpu.destroy_shader(module)
+	device := &engine_bound(loc).gpu
+	vk.DestroyShaderModule(device.device, module, nil)
 }
 
 @(private)
-host_rebuild_gpu_pipeline :: proc(shader: vk.ShaderModule, create_info: GPU_Pipeline_Info) -> (pipeline: GPU_Pipeline, err: Error) {
-	device := &g_engine.gpu
+create_pipeline_layout :: proc(
+	device: ^GPU_Device,
+	push_constant_size: u32,
+	stage_flags: vk.ShaderStageFlags = {.VERTEX, .FRAGMENT},
+) -> (
+	layout: vk.PipelineLayout,
+) {
+	layout_info: vk.PipelineLayoutCreateInfo = {
+		sType          = .PIPELINE_LAYOUT_CREATE_INFO,
+		setLayoutCount = 1,
+		pSetLayouts    = &device.bindless.layout,
+	}
+
+	range: vk.PushConstantRange
+	if push_constant_size != 0 {
+		range = {
+			offset     = 0,
+			size       = push_constant_size,
+			stageFlags = stage_flags,
+		}
+		layout_info.pushConstantRangeCount = 1
+		layout_info.pPushConstantRanges = &range
+	}
+
+	vk_assert(vk.CreatePipelineLayout(device.device, &layout_info, nil, &layout), "vkCreatePipelineLayout")
+	return layout
+}
+
+// Returns an error rather than dying: a shader edited during hot reload can
+// produce a pipeline the driver rejects, and the caller keeps the last good one.
+@(require_results)
+rebuild_gpu_pipeline :: proc(shader: vk.ShaderModule, create_info: GPU_Pipeline_Info, loc := #caller_location) -> (pipeline: GPU_Pipeline, err: Error) {
+	device := &engine_bound(loc).gpu
 	context.logger = device.logger
 
 	layout := create_pipeline_layout(device, create_info.push_constant_size)
@@ -95,83 +203,4 @@ host_rebuild_gpu_pipeline :: proc(shader: vk.ShaderModule, create_info: GPU_Pipe
 	info.fragment_entry = strings.clone_to_cstring(string(fragment_entry))
 
 	return {layout = layout, handle = handle, stage_flags = {.VERTEX, .FRAGMENT}, info = info}, .None
-}
-
-@(private)
-host_destroy_gpu_pipeline :: proc(pipeline: ^GPU_Pipeline) {
-	device := &g_engine.gpu
-	if pipeline.handle == 0 do return
-
-	delete(pipeline.info.vertex_entry)
-	delete(pipeline.info.fragment_entry)
-	vk.DestroyPipelineLayout(device.device, pipeline.layout, nil)
-	vk.DestroyPipeline(device.device, pipeline.handle, nil)
-	pipeline^ = {}
-}
-
-@(private)
-create_pipeline_layout :: proc(
-	device: ^GPU_Device,
-	push_constant_size: u32,
-	stage_flags: vk.ShaderStageFlags = {.VERTEX, .FRAGMENT},
-) -> (
-	layout: vk.PipelineLayout,
-) {
-	layout_info: vk.PipelineLayoutCreateInfo = {
-		sType          = .PIPELINE_LAYOUT_CREATE_INFO,
-		setLayoutCount = 1,
-		pSetLayouts    = &device.bindless.layout,
-	}
-
-	range: vk.PushConstantRange
-	if push_constant_size != 0 {
-		range = {
-			offset     = 0,
-			size       = push_constant_size,
-			stageFlags = stage_flags,
-		}
-		layout_info.pushConstantRangeCount = 1
-		layout_info.pPushConstantRanges = &range
-	}
-
-	vk_assert(vk.CreatePipelineLayout(device.device, &layout_info, nil, &layout), "vkCreatePipelineLayout")
-	return layout
-}
-
-@(require_results)
-@(private)
-host_create_gpu_shader :: proc(file_name: string, allocator: runtime.Allocator, loc := #caller_location) -> (module: vk.ShaderModule, err: Error) {
-	device := &g_engine.gpu
-	context.logger = device.logger
-
-	buffer, read_err := os.read_entire_file(file_name, allocator)
-	if read_err != nil {
-		log.errorf("cannot read '%v': %v", file_name, read_err)
-		return 0, .Asset_Not_Found
-	}
-	defer delete(buffer, allocator)
-
-	if len(buffer) % 4 != 0 {
-		log.errorf("'%v' is %v bytes, not a multiple of 4, so it is not SPIR-V", file_name, len(buffer))
-		return 0, .Shader_Invalid
-	}
-
-	shader_info: vk.ShaderModuleCreateInfo = {
-		sType    = .SHADER_MODULE_CREATE_INFO,
-		codeSize = len(buffer),
-		pCode    = raw_data(slice.reinterpret([]u32, buffer)),
-	}
-
-	if result := vk.CreateShaderModule(device.device, &shader_info, nil, &module); result != .SUCCESS {
-		log.errorf("vkCreateShaderModule rejected '%v': %v", file_name, result)
-		return 0, .Shader_Invalid
-	}
-
-	return module, .None
-}
-
-@(private)
-host_destroy_gpu_shader :: proc(module: vk.ShaderModule) {
-	device := &g_engine.gpu
-	vk.DestroyShaderModule(device.device, module, nil)
 }

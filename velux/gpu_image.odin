@@ -37,9 +37,27 @@ GPU_Sampler_Info :: struct {
 	max_anisotropy: f32,
 }
 
+create_gpu_image :: proc(
+	format: vk.Format,
+	extent: vk.Extent3D,
+	image_usage_flags: vk.ImageUsageFlags,
+	mip_levels: u32 = 1,
+	array_layers: u32 = 1,
+	image_type: vk.ImageType = .D2,
+	msaa_samples: vk.SampleCountFlags = {._1},
+	tiling: vk.ImageTiling = .OPTIMAL,
+	flags: vk.ImageCreateFlags = {},
+	alloc_flags: vma.AllocationCreateFlags = {},
+	usage: vma.MemoryUsage = .AUTO,
+	loc := #caller_location,
+) -> GPU_Image {
+	info := image_create_info(format, extent, image_usage_flags, mip_levels, array_layers, image_type, msaa_samples, tiling, flags, alloc_flags, usage)
+	return create_image(info, loc)
+}
+
 @(private)
-host_create_image :: proc(create_info: GPU_Image_Info, loc := #caller_location) -> (image: GPU_Image) {
-	device := &g_engine.gpu
+create_image :: proc(create_info: GPU_Image_Info, loc := #caller_location) -> (image: GPU_Image) {
+	device := &engine_bound(loc).gpu
 	context.logger = device.logger
 
 	image_info: vk.ImageCreateInfo = {
@@ -95,10 +113,6 @@ host_create_image :: proc(create_info: GPU_Image_Info, loc := #caller_location) 
 	return image
 }
 
-destroy_gpu_image :: proc(image: ^GPU_Image, loc := #caller_location) {
-	bound_api(loc).gpu.destroy_image(image)
-}
-
 create_sampler :: proc(
 	filter: vk.Filter,
 	address_mode: vk.SamplerAddressMode,
@@ -107,26 +121,11 @@ create_sampler :: proc(
 	max_lod: f32 = 1.0,
 	max_anisotropy: f32 = 1.0,
 	loc := #caller_location,
-) -> vk.Sampler {
-	info := sampler_create_info(filter, address_mode, compare_op, border_color, max_lod, max_anisotropy)
-	return bound_api(loc).gpu.create_sampler(info)
-}
-
-@(private)
-host_destroy_gpu_image :: proc(image: ^GPU_Image) {
-	device := &g_engine.gpu
-	if image.handle == 0 do return
-
-	release_bindless(device, image.bindless_index)
-	vk.DestroyImageView(device.device, image.view, nil)
-	vma.DestroyImage(device.vma_allocator, image.handle, image.allocation)
-	image^ = {}
-}
-
-@(require_results)
-@(private)
-host_create_sampler :: proc(create_info: GPU_Sampler_Info) -> (sampler: vk.Sampler) {
-	device := &g_engine.gpu
+) -> (
+	sampler: vk.Sampler,
+) {
+	device := &engine_bound(loc).gpu
+	create_info := sampler_create_info(filter, address_mode, compare_op, border_color, max_lod, max_anisotropy)
 
 	sampler_info: vk.SamplerCreateInfo = {
 		sType            = .SAMPLER_CREATE_INFO,
@@ -148,6 +147,44 @@ host_create_sampler :: proc(create_info: GPU_Sampler_Info) -> (sampler: vk.Sampl
 
 	vk_assert(vk.CreateSampler(device.device, &sampler_info, nil, &sampler), "vkCreateSampler")
 	return sampler
+}
+
+destroy_gpu_image :: proc(image: ^GPU_Image, loc := #caller_location) {
+	device := &engine_bound(loc).gpu
+	if image.handle == 0 do return
+
+	release_bindless(device, image.bindless_index)
+	vk.DestroyImageView(device.device, image.view, nil)
+	vma.DestroyImage(device.vma_allocator, image.handle, image.allocation)
+	image^ = {}
+}
+
+write_image :: proc(cmd: Command_Buffer, image: ^GPU_Image, pixels: []u8, loc := #caller_location) {
+	device := &engine_bound(loc).gpu
+	context.logger = device.logger
+
+	expected := int(image.extent.width * image.extent.height * image.extent.depth) * bytes_per_pixel(image.format, loc)
+	if len(pixels) != expected {
+		fatal(
+			"image write of %v bytes does not match a %vx%vx%v %v image, which needs %v bytes",
+			len(pixels),
+			image.extent.width,
+			image.extent.height,
+			image.extent.depth,
+			image.format,
+			expected,
+			loc = loc,
+		)
+	}
+
+	staging := create_gpu_buffer(u8, len(pixels), .Staging, loc)
+	write_buffer_slice(&staging, pixels, 0, loc)
+	append(&device.transfer.staging_buffers, staging)
+
+	cmd_transition_image(cmd, image.handle, {.COLOR}, .UNDEFINED, .TRANSFER_DST_OPTIMAL)
+	region := init_buffer_image_copy2(image.extent, init_image_subresource_layers({.COLOR}))
+	cmd_copy_buffer_to_image2(cmd, staging.handle, image.handle, .TRANSFER_DST_OPTIMAL, &region)
+	cmd_transition_image(cmd, image.handle, {.COLOR}, .TRANSFER_DST_OPTIMAL, .SHADER_READ_ONLY_OPTIMAL)
 }
 
 @(private)
@@ -175,4 +212,13 @@ vk_aspect_of_format :: proc(format: vk.Format) -> (flags: vk.ImageAspectFlags) {
 	if is_depth_format(format) do flags |= {.DEPTH}
 	if is_stencil_format(format) do flags |= {.STENCIL}
 	return flags
+}
+
+@(private)
+bytes_per_pixel :: proc(format: vk.Format, loc := #caller_location) -> int {
+	#partial switch format {
+	case .R8G8B8A8_UNORM, .R8G8B8A8_SRGB:
+		return 4
+	}
+	fatal("no byte size known for %v; add it to bytes_per_pixel before uploading to that format", format, loc = loc)
 }

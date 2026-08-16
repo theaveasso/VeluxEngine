@@ -23,6 +23,11 @@ Physics_World :: struct {
 	steps:         i32,
 }
 
+// The one proc table velux keeps. b3.WorldId and b3.BodyId are indices into
+// static arrays inside box3d's object code, and box3d is linked statically, so
+// the game DLL's arrays are a different, empty set. Unlike vulkan (loader DLL),
+// glfw (GLFW_SHARED) and imgui (SetCurrentContext), box3d exposes no way to
+// share them -- the handle is a lookup key, not the state.
 Physics_API :: struct {
 	world:         proc() -> ^Physics_World,
 	add_box:       proc(physics: ^Physics_World, type: Body_Type, center: [3]f32, half_extents: [3]f32) -> Body,
@@ -70,7 +75,7 @@ host_physics_api :: proc() -> Physics_API {
 }
 
 physics_add_box :: proc(physics: ^Physics_World, type: Body_Type, center: [3]f32, half_extents: [3]f32, loc := #caller_location) -> Body {
-	return bound_api(loc).physics.add_box(physics, type, center, half_extents)
+	return engine_bound(loc).physics_api.add_box(physics, type, center, half_extents)
 }
 
 @(private)
@@ -96,9 +101,9 @@ destroy_physics :: proc(physics: ^Physics_World) {
 }
 
 physics_world :: proc(loc := #caller_location) -> ^Physics_World {
-	return bound_api(loc).physics.world()
+	return engine_bound(loc).physics_api.world()
 }
 
 physics_body_position :: proc(body: Body, loc := #caller_location) -> [3]f32 {
-	return bound_api(loc).physics.body_position(body)
+	return engine_bound(loc).physics_api.body_position(body)
 }

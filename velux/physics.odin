@@ -1,6 +1,6 @@
 package velux
 
-import b3 "vendor:box3d"
+import b3 "third_party:box3d"
 
 DEFAULT_GRAVITY :: [3]f32{0, -9.81, 0}
 MAX_STEPS :: 8
@@ -23,17 +23,6 @@ Physics_World :: struct {
 	steps:         i32,
 }
 
-// The one proc table velux keeps. b3.WorldId and b3.BodyId are indices into
-// static arrays inside box3d's object code, and box3d is linked statically, so
-// the game DLL's arrays are a different, empty set. Unlike vulkan (loader DLL),
-// glfw (GLFW_SHARED) and imgui (SetCurrentContext), box3d exposes no way to
-// share them -- the handle is a lookup key, not the state.
-Physics_API :: struct {
-	world:         proc() -> ^Physics_World,
-	add_box:       proc(physics: ^Physics_World, type: Body_Type, center: [3]f32, half_extents: [3]f32) -> Body,
-	body_position: proc(body: Body) -> [3]f32,
-}
-
 @(private)
 physics_step :: proc(physics: ^Physics_World, dt: f32) {
 	if physics.fixed_dt <= 0 do return
@@ -51,8 +40,7 @@ physics_step :: proc(physics: ^Physics_World, dt: f32) {
 	physics.alpha = min(physics.accumulator / physics.fixed_dt, 1)
 }
 
-@(private)
-host_add_box :: proc(physics: ^Physics_World, type: Body_Type, center: [3]f32, half_extents: [3]f32) -> (body: Body) {
+physics_add_box :: proc(physics: ^Physics_World, type: Body_Type, center: [3]f32, half_extents: [3]f32, loc := #caller_location) -> (body: Body) {
 	body_def := b3.DefaultBodyDef()
 	body_def.type = type
 	body_def.position = center
@@ -61,21 +49,6 @@ host_add_box :: proc(physics: ^Physics_World, type: Body_Type, center: [3]f32, h
 	shape_def := b3.DefaultShapeDef()
 	_ = b3.CreateHullShape(body, shape_def, &hull.base)
 	return
-}
-
-@(private)
-host_body_position :: proc(body: Body) -> [3]f32 {return b3.Body_GetPosition(body)}
-
-@(private)
-host_physics_world :: proc() -> ^Physics_World {return &g_engine.physics}
-
-@(private, require_results)
-host_physics_api :: proc() -> Physics_API {
-	return {world = host_physics_world, add_box = host_add_box, body_position = host_body_position}
-}
-
-physics_add_box :: proc(physics: ^Physics_World, type: Body_Type, center: [3]f32, half_extents: [3]f32, loc := #caller_location) -> Body {
-	return engine_bound(loc).physics_api.add_box(physics, type, center, half_extents)
 }
 
 @(private)
@@ -101,9 +74,9 @@ destroy_physics :: proc(physics: ^Physics_World) {
 }
 
 physics_world :: proc(loc := #caller_location) -> ^Physics_World {
-	return engine_bound(loc).physics_api.world()
+	return &g_engine.physics
 }
 
 physics_body_position :: proc(body: Body, loc := #caller_location) -> [3]f32 {
-	return engine_bound(loc).physics_api.body_position(body)
+	return b3.Body_GetPosition(body)
 }

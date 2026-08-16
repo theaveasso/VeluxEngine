@@ -2,7 +2,7 @@ package tests
 
 import "core:testing"
 
-import b3 "vendor:box3d"
+import b3 "third_party:box3d"
 
 @(test)
 world_creates_and_destroys :: proc(t: ^testing.T) {

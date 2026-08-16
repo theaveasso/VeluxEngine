@@ -279,6 +279,7 @@ build_game_dll :: proc(reload: ^Reloader, out_path: string, allocator := context
 	append(&cmd, fmt.tprintf("-collection:third_party=%s/third_party", engine_root()))
 	append(&cmd, fmt.tprintf("-out:%s", out_path))
 	when ODIN_OS == .Windows {
+		append(&cmd, "-define:BOX3D_SHARED=true")
 		append(&cmd, fmt.tprintf("-pdb-name:%s.pdb", strings.trim_suffix(out_path, SHARED_LIB_EXT)))
 	}
 

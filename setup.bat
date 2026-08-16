@@ -36,6 +36,14 @@ if exist "%IMGUI_LIB%" (
   popd
 )
 
+set "BOX3D_DLL=%ROOT%\third_party\box3d\lib\shared\box3d.dll"
+if exist "%BOX3D_DLL%" (
+  echo ==^> box3d already built
+) else (
+  echo ==^> building box3d -^> box3d.lib + box3d.dll
+  call "%ROOT%\third_party\box3d\build_dll.bat" || goto :err
+)
+
 echo.
 echo setup complete.
 echo   velux is a library - there is no executable to build here.

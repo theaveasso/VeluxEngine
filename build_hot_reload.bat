@@ -19,13 +19,21 @@ if not exist "%GLFW_DLL%" (
   exit /b 1
 )
 
+set "BOX3D_DLL=%ROOT%\third_party\box3d\lib\shared\box3d.dll"
+if not exist "%BOX3D_DLL%" (
+  echo Cannot find %BOX3D_DLL% - run setup.bat
+  exit /b 1
+)
+
 if not exist "%ROOT%\build" mkdir "%ROOT%\build"
 if not exist "%ROOT%\build\glfw3.dll" (
   copy /y "%GLFW_DLL%" "%ROOT%\build\glfw3.dll" >nul || goto :err
 )
+copy /y "%BOX3D_DLL%" "%ROOT%\build\box3d.dll" >nul || goto :err
 
 "%ODIN%" build "%ROOT%\hot_reload" -debug -o:none ^
   -define:GLFW_SHARED=true ^
+  -define:BOX3D_SHARED=true ^
   -collection:vlx="%ROOT%" ^
   -collection:third_party="%ROOT%\third_party" ^
   -out:"%ROOT%\build\velux_hot_reload.exe" || goto :err

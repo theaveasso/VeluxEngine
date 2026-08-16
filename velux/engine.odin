@@ -104,34 +104,10 @@ init :: proc(engine: ^Engine, config: Config) {
 	engine.last_time = now()
 }
 
-Engine_API :: struct {
-	delta_time: proc() -> f32,
-	quit:       proc(),
-}
-
-@(private, require_results)
-host_engine_api :: proc() -> Engine_API {
-	return {delta_time = host_delta_time, quit = host_quit}
-}
-
 @(require_results)
-delta_time :: proc(loc := #caller_location) -> f32 {
-	return bound_api(loc).engine.delta_time()
-}
+delta_time :: proc(loc := #caller_location) -> f32 {return g_engine.dt}
 
-quit :: proc(loc := #caller_location) {
-	bound_api(loc).engine.quit()
-}
-
-@(private, require_results)
-host_delta_time :: proc() -> f32 {
-	return g_engine.dt
-}
-
-@(private)
-host_quit :: proc() {
-	g_engine.quit_requested = true
-}
+quit :: proc(loc := #caller_location) {g_engine.quit_requested = true}
 
 @(private)
 shutdown :: proc(engine: ^Engine) {

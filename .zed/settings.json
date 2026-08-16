@@ -4,7 +4,7 @@
     "Odin": {
       "tab_size": 2,
       "hard_tabs": true,
-      "format_on_save": "off"
+      "format_on_save": "on"
     }
   }
 }

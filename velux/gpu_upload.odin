@@ -40,7 +40,7 @@ reset_upload_slot :: proc(device: ^GPU_Device, slot: u32) {
 }
 
 // Must be called with no render pass open -- from `draw`, before
-// cmd_begin_rendering -- because it records a copy. `in_data` is memcpy'd here
+// begin_pass -- because it records a copy. `in_data` is memcpy'd here
 // and need not outlive the call.
 frame_upload_slice :: proc(frame: Frame, dst: ^GPU_Buffer($T), in_data: []$U, dst_offset: vk.DeviceSize = 0, loc := #caller_location) {
 	device := &g_engine.gpu

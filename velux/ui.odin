@@ -74,7 +74,7 @@ init_ui :: proc(engine: ^Engine) {
 		ImageCount = u32(len(device.swapchain.images)),
 		UseDynamicRendering = true,
 		PipelineInfoMain = {
-			// cmd_begin_rendering always binds depth, so this must match even
+			// begin_pass always binds depth, so this must match even
 			// though imgui never writes it. UNDEFINED here is a validation
 			// error on every UI draw.
 			PipelineRenderingCreateInfo = {

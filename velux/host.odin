@@ -110,11 +110,11 @@ run_frame :: proc(host: ^Game_Host) {
 
 	if host.app.draw != nil do host.app.draw(host.memory, frame)
 
-	cmd_begin_rendering(frame)
+	begin_pass(frame)
 	prof_zone_begin(frame, "ui")
 	ui_draw(frame)
 	prof_zone_end(frame)
-	cmd_end_rendering(frame)
+	end_pass(frame)
 
 	end_frame(frame)
 }

@@ -115,9 +115,14 @@ write_buffer_slice :: proc(buffer: ^GPU_Buffer($T), in_data: []$U, offset: vk.De
 	mem.copy(data[offset:], raw_data(in_data), int(size))
 }
 
+upload :: proc {
+	upload_ptr,
+	upload_slice,
+}
+
 // Load-time only: allocates a throwaway staging buffer for
-// immediate_transfer_end to reap. Per frame, use frame_upload_slice.
-write_staging_buffer :: proc(cmd: vk.CommandBuffer, buffer: ^GPU_Buffer($T), in_data: ^$U, offset: vk.DeviceSize = 0, loc := #caller_location) {
+// upload_end to reap. Per frame, use frame_upload_slice.
+upload_ptr :: proc(cmd: vk.CommandBuffer, buffer: ^GPU_Buffer($T), in_data: ^$U, offset: vk.DeviceSize = 0, loc := #caller_location) {
 	device := &g_engine.gpu
 	context.logger = device.logger
 
@@ -132,7 +137,7 @@ write_staging_buffer :: proc(cmd: vk.CommandBuffer, buffer: ^GPU_Buffer($T), in_
 	cmd_copy_buffer2(cmd, staging.handle, buffer.handle, &region)
 }
 
-write_staging_buffer_slice :: proc(cmd: vk.CommandBuffer, buffer: ^GPU_Buffer($T), in_data: []$U, offset: vk.DeviceSize = 0, loc := #caller_location) {
+upload_slice :: proc(cmd: vk.CommandBuffer, buffer: ^GPU_Buffer($T), in_data: []$U, offset: vk.DeviceSize = 0, loc := #caller_location) {
 	device := &g_engine.gpu
 	context.logger = device.logger
 

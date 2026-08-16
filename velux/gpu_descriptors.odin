@@ -43,7 +43,7 @@ create_bindless_placeholder :: proc(device: ^GPU_Device) {
 	device.bindless.placeholder = create_gpu_image(.R8G8B8A8_UNORM, {1, 1, 1}, {.SAMPLED, .TRANSFER_DST})
 	device.bindless.placeholder_view = device.bindless.placeholder.view
 
-	cmd := immediate_transfer_begin()
+	cmd := upload_begin()
 	cmd_transition_image(cmd, device.bindless.placeholder.handle, {.COLOR}, .UNDEFINED, .TRANSFER_DST_OPTIMAL)
 
 	magenta: vk.ClearColorValue = {
@@ -53,7 +53,7 @@ create_bindless_placeholder :: proc(device: ^GPU_Device) {
 	vk.CmdClearColorImage(cmd, device.bindless.placeholder.handle, .TRANSFER_DST_OPTIMAL, &magenta, 1, &range)
 
 	cmd_transition_image(cmd, device.bindless.placeholder.handle, {.COLOR}, .TRANSFER_DST_OPTIMAL, .SHADER_READ_ONLY_OPTIMAL)
-	immediate_transfer_end()
+	upload_end()
 }
 
 @(private)

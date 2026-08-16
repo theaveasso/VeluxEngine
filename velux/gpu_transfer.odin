@@ -41,7 +41,7 @@ destroy_transfer_context :: proc(device: ^GPU_Device) {
 }
 
 // Blocking: correct at load time, ruinous per frame. See gpu_upload.odin.
-immediate_transfer_begin :: proc(loc := #caller_location) -> vk.CommandBuffer {
+upload_begin :: proc(loc := #caller_location) -> vk.CommandBuffer {
 	device := &engine_bound(loc).gpu
 	context.logger = device.logger
 
@@ -54,7 +54,7 @@ immediate_transfer_begin :: proc(loc := #caller_location) -> vk.CommandBuffer {
 	return device.transfer.command_buffer
 }
 
-immediate_transfer_end :: proc(loc := #caller_location) {
+upload_end :: proc(loc := #caller_location) {
 	device := &engine_bound(loc).gpu
 	context.logger = device.logger
 	defer {

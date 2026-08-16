@@ -82,10 +82,10 @@ upload_level :: proc(data: ^Level_Data) -> (world: Voxel_World) {
 
 	voxels := pack_voxels(&data.grid, context.temp_allocator)
 
-	cmd := immediate_transfer_begin()
-	write_staging_buffer_slice(cmd, &world.buffer, data.palette[:])
-	write_staging_buffer_slice(cmd, &world.buffer, voxels, PALETTE_BYTES)
-	immediate_transfer_end()
+	cmd := upload_begin()
+	upload(cmd, &world.buffer, data.palette[:])
+	upload(cmd, &world.buffer, voxels, PALETTE_BYTES)
+	upload_end()
 	return world
 }
 

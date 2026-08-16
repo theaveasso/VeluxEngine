@@ -5,12 +5,11 @@ Velux_API :: struct {
 	ui:      UI_API,
 	audio:   Audio_API,
 	physics: Physics_API,
-	voxel:   Voxel_API,
 }
 
 @(private, require_results)
 host_velux_api :: proc() -> Velux_API {
-	return {bound = true, ui = host_ui_api(), audio = host_audio_api(), physics = host_physics_api(), voxel = host_voxel_api()}
+	return {bound = true, ui = host_ui_api(), audio = host_audio_api(), physics = host_physics_api()}
 }
 
 @(private, require_results)

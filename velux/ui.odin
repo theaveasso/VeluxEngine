@@ -88,6 +88,7 @@ host_ui_wants_keyboard :: proc() -> bool {
 @(private)
 init_ui :: proc(engine: ^Engine) {
 	engine.ui_context = imgui.CreateContext()
+	imgui.GetAllocatorFunctions(&engine.imgui_alloc, &engine.imgui_free, &engine.imgui_user_data)
 	if !imgui_glfw.InitForVulkan(engine.window.handle, true) do fatal("ImGui_ImplGlfw_InitForVulkan failed")
 
 	device := &engine.gpu

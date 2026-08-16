@@ -4,6 +4,8 @@ import "core:log"
 import "core:strings"
 import "core:time"
 
+import imgui "third_party:odin-imgui"
+
 MAX_DELTA :: 0.1
 
 Config :: struct {
@@ -31,6 +33,9 @@ Engine :: struct {
 	watch_shaders:      [dynamic]Shader_Watch,
 	shader_reloads:     int,
 	ui_context:         ^UI_Context,
+	imgui_alloc:        imgui.MemAllocFunc,
+	imgui_free:         imgui.MemFreeFunc,
+	imgui_user_data:    rawptr,
 	hud:                Hud,
 	last_shader_check:  time.Time,
 	quit_requested:     bool,

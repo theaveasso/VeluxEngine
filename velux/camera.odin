@@ -62,69 +62,7 @@ Camera :: struct {
 	controller: Camera_Controller,
 }
 
-Camera_API :: struct {
-	update:              proc(camera: ^Camera, input: Camera_Input, dt: f32),
-	set_controller:      proc(camera: ^Camera, controller: Camera_Controller),
-	input_from_platform: proc() -> Camera_Input,
-	view:                proc(camera: Camera) -> matrix[4, 4]f32,
-	projection:          proc(camera: Camera, aspect: f32) -> matrix[4, 4]f32,
-	perspective:         proc(p: Perspective, aspect: f32) -> matrix[4, 4]f32,
-	orthographic:        proc(o: Orthographic, aspect: f32) -> matrix[4, 4]f32,
-}
-
-@(private, require_results)
-host_camera_api :: proc() -> Camera_API {
-	return {
-		update = host_camera_update,
-		set_controller = host_camera_set_controller,
-		input_from_platform = host_camera_input_from_platform,
-		view = host_camera_view,
-		projection = host_camera_projection,
-		perspective = host_projection_perspective,
-		orthographic = host_projection_orthographic,
-	}
-}
-
 camera_update :: proc(camera: ^Camera, input: Camera_Input, dt: f32, loc := #caller_location) {
-	bound_api(loc).camera.update(camera, input, dt)
-}
-
-camera_set_controller :: proc(camera: ^Camera, controller: Camera_Controller, loc := #caller_location) {
-	bound_api(loc).camera.set_controller(camera, controller)
-}
-
-@(require_results)
-camera_input_from_platform :: proc(loc := #caller_location) -> Camera_Input {
-	return bound_api(loc).camera.input_from_platform()
-}
-
-@(require_results)
-camera_view :: proc(camera: Camera, loc := #caller_location) -> matrix[4, 4]f32 {
-	return bound_api(loc).camera.view(camera)
-}
-
-@(require_results)
-camera_projection :: proc(camera: Camera, aspect: f32, loc := #caller_location) -> matrix[4, 4]f32 {
-	return bound_api(loc).camera.projection(camera, aspect)
-}
-
-projection :: proc {
-	projection_perspective,
-	projection_orthographic,
-}
-
-@(require_results)
-projection_perspective :: proc(p: Perspective, aspect: f32, loc := #caller_location) -> matrix[4, 4]f32 {
-	return bound_api(loc).camera.perspective(p, aspect)
-}
-
-@(require_results)
-projection_orthographic :: proc(o: Orthographic, aspect: f32 = 0, loc := #caller_location) -> matrix[4, 4]f32 {
-	return bound_api(loc).camera.orthographic(o, aspect)
-}
-
-@(private)
-host_camera_update :: proc(camera: ^Camera, input: Camera_Input, dt: f32) {
 	switch &control in camera.controller {
 	case Orbit_Camera:
 		ix: f32 = control.invert_x ? -1 : 1
@@ -168,8 +106,7 @@ host_camera_update :: proc(camera: ^Camera, input: Camera_Input, dt: f32) {
 	}
 }
 
-@(private)
-host_camera_set_controller :: proc(camera: ^Camera, controller: Camera_Controller) {
+camera_set_controller :: proc(camera: ^Camera, controller: Camera_Controller, loc := #caller_location) {
 	switch incoming in controller {
 	case Orbit_Camera:
 		control := incoming
@@ -203,8 +140,8 @@ host_camera_set_controller :: proc(camera: ^Camera, controller: Camera_Controlle
 	}
 }
 
-@(private, require_results)
-host_camera_input_from_platform :: proc() -> (input: Camera_Input) {
+@(require_results)
+camera_input_from_platform :: proc(loc := #caller_location) -> (input: Camera_Input) {
 	if !ui_wants_keyboard() {
 		if is_key_down(.D) do input.move.x += 1
 		if is_key_down(.A) do input.move.x -= 1
@@ -222,31 +159,30 @@ host_camera_input_from_platform :: proc() -> (input: Camera_Input) {
 	return
 }
 
-@(private, require_results)
-host_camera_view :: proc(camera: Camera) -> matrix[4, 4]f32 {
+@(require_results)
+camera_view :: proc(camera: Camera, loc := #caller_location) -> matrix[4, 4]f32 {
 	return linalg.matrix4_look_at(camera.position, camera.target, [3]f32{0.0, 1.0, 0.0})
 }
 
-@(private, require_results)
-host_camera_projection :: proc(camera: Camera, aspect: f32) -> matrix[4, 4]f32 {
+@(require_results)
+camera_projection :: proc(camera: Camera, aspect: f32, loc := #caller_location) -> matrix[4, 4]f32 {
 	switch proj in camera.projection {
 	case Perspective:
-		return host_projection_perspective(proj, aspect)
+		return projection_perspective(proj, aspect, loc)
 	case Orthographic:
-		return host_projection_orthographic(proj, aspect)
-	case:
-		return host_projection_perspective(Perspective{linalg.to_radians(cast(f32)70), 0.1, 1000}, aspect)
+		return projection_orthographic(proj, aspect, loc)
 	}
+	fatal("camera has no projection set", loc = loc)
 }
 
 @(private, require_results)
-host_projection_perspective :: proc(p: Perspective, aspect: f32) -> matrix[4, 4]f32 {
+projection_perspective :: proc(p: Perspective, aspect: f32, loc := #caller_location) -> matrix[4, 4]f32 {
 	f := 1 / math.tan(p.fov_y * 0.5)
 	return {f / aspect, 0, 0, 0, 0, -f, 0, 0, 0, 0, 0, p.near, 0, 0, -1, 0}
 }
 
 @(private, require_results)
-host_projection_orthographic :: proc(o: Orthographic, aspect: f32 = 0) -> matrix[4, 4]f32 {
+projection_orthographic :: proc(o: Orthographic, aspect: f32 = 0, loc := #caller_location) -> matrix[4, 4]f32 {
 	m := linalg.matrix_ortho3d(o.left, o.right, o.bottom, o.top, o.near, o.far)
 	return m
 }

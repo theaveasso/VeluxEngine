@@ -3,11 +3,9 @@ package velux
 Velux_API :: struct {
 	bound:   bool,
 	engine:  Engine_API,
-	gpu:     GPU_API,
 	ui:      UI_API,
 	audio:   Audio_API,
 	physics: Physics_API,
-	camera:  Camera_API,
 	input:   Input_API,
 	voxel:   Voxel_API,
 	window:  Window_API,
@@ -18,11 +16,9 @@ host_velux_api :: proc() -> Velux_API {
 	return {
 		bound = true,
 		engine = host_engine_api(),
-		gpu = host_gpu_api(),
 		ui = host_ui_api(),
 		audio = host_audio_api(),
 		physics = host_physics_api(),
-		camera = host_camera_api(),
 		input = host_input_api(),
 		voxel = host_voxel_api(),
 		window = host_window_api(),

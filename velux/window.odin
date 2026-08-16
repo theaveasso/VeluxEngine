@@ -7,7 +7,7 @@ Window :: struct {
 }
 
 Window_API :: struct {
-	now:             proc() -> f64,
+	now:              proc() -> f64,
 	framebuffer_size: proc() -> [2]f32,
 }
 

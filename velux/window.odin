@@ -6,36 +6,16 @@ Window :: struct {
 	handle: glfw.WindowHandle,
 }
 
-Window_API :: struct {
-	now:              proc() -> f64,
-	framebuffer_size: proc() -> [2]f32,
-}
-
-@(private, require_results)
-host_window_api :: proc() -> Window_API {
-	return {now = host_now, framebuffer_size = host_framebuffer_size}
-}
-
 @(require_results)
-now :: proc(loc := #caller_location) -> f64 {
-	return bound_api(loc).window.now()
+now :: proc() -> f64 {
+	return glfw.GetTime()
 }
 
 // Framebuffer pixels, not window units: on a HiDPI display these differ, and
 // swapchains, viewports and render targets are all sized in pixels.
 @(require_results)
 framebuffer_size :: proc(loc := #caller_location) -> [2]f32 {
-	return bound_api(loc).window.framebuffer_size()
-}
-
-@(private, require_results)
-host_now :: proc() -> f64 {
-	return glfw.GetTime()
-}
-
-@(private, require_results)
-host_framebuffer_size :: proc() -> [2]f32 {
-	width, height := glfw.GetFramebufferSize(g_engine.window.handle)
+	width, height := glfw.GetFramebufferSize(engine_bound(loc).window.handle)
 	return {cast(f32)width, cast(f32)height}
 }
 

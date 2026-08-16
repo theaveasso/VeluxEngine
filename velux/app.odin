@@ -2,16 +2,20 @@ package velux
 
 import "core:log"
 
-App :: struct {
-	config:      Config,
-	init:        proc(game: rawptr) -> Error,
-	update:      proc(game: rawptr) -> Error,
-	draw:        proc(game: rawptr, frame: Frame),
-	shutdown:    proc(game: rawptr),
+Reload_Info :: struct {
 	attach:      proc(engine: ^Engine),
 	state_size:  int,
 	state_align: int,
 	state_hash:  u64,
+}
+
+App :: struct {
+	config:   Config,
+	init:     proc(game: rawptr) -> Error,
+	update:   proc(game: rawptr) -> Error,
+	draw:     proc(game: rawptr, frame: Frame),
+	shutdown: proc(game: rawptr),
+	reload:   Reload_Info,
 }
 
 @(require_results)
@@ -29,10 +33,7 @@ make_app :: proc(
 		update = transmute(proc(game: rawptr) -> Error)(update),
 		draw = transmute(proc(game: rawptr, frame: Frame))(draw),
 		shutdown = transmute(proc(game: rawptr))(shutdown),
-		attach = attach,
-		state_size = size_of(T),
-		state_align = align_of(T),
-		state_hash = type_signature(T),
+		reload = {attach = attach, state_size = size_of(T), state_align = align_of(T), state_hash = type_signature(T)},
 	}
 }
 

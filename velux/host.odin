@@ -28,8 +28,8 @@ needs_console_logger :: proc() -> bool {
 @(private)
 host_run :: proc(host: ^Game_Host, allocator: runtime.Allocator) -> (err: Error) {
 	alloc_err: mem.Allocator_Error
-	host.memory, alloc_err = mem.alloc(host.app.state_size, host.app.state_align, allocator)
-	if alloc_err != nil do fatal("cannot allocate %v bytes of game state: %v", host.app.state_size, alloc_err)
+	host.memory, alloc_err = mem.alloc(host.app.reload.state_size, host.app.reload.state_align, allocator)
+	if alloc_err != nil do fatal("cannot allocate %v bytes of game state: %v", host.app.reload.state_size, alloc_err)
 	defer free(host.memory, allocator)
 	defer replay_destroy(&host.replay, allocator)
 
@@ -55,7 +55,7 @@ host_run :: proc(host: ^Game_Host, allocator: runtime.Allocator) -> (err: Error)
 			}
 		}
 
-		host_frame(host)
+		run_frame(host)
 	}
 	return .None
 }
@@ -84,7 +84,7 @@ should_quit :: proc(engine: ^Engine) -> bool {
 }
 
 @(private)
-host_frame :: proc(host: ^Game_Host) {
+run_frame :: proc(host: ^Game_Host) {
 	ui_new_frame()
 
 	physics_step(&g_engine.physics, g_engine.dt)
@@ -92,7 +92,7 @@ host_frame :: proc(host: ^Game_Host) {
 	replaying := host.reload != nil
 	if replaying {
 		replay_capture(&host.replay)
-		replay_apply(&host.replay, host.memory, host.app.state_size)
+		replay_apply(&host.replay, host.memory, host.app.reload.state_size)
 	}
 	if host.app.update != nil {
 		if update_err := host.app.update(host.memory); update_err != .None {

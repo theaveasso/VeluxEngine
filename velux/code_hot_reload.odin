@@ -100,7 +100,7 @@ run_hot_reload :: proc(game_dir: string, work_dir := "", allocator := context.al
 		fatal("cannot enter %s: %v", reload.work_dir, wd_err)
 	}
 
-	host.app.attach(engine)
+	host.app.reload.attach(engine)
 
 	reload.newest_source = newest_odin_write(reload.source_dir)
 
@@ -141,7 +141,7 @@ poll_replay :: proc(host: ^Game_Host, allocator := context.allocator) {
 		replay_discard(&host.replay, "shader reloaded", allocator)
 	}
 	if is_key_pressed(.F6) {
-		replay_toggle(&host.replay, host.memory, host.app.state_size, host.app.state_hash, allocator)
+		replay_toggle(&host.replay, host.memory, host.app.reload.state_size, host.app.reload.state_hash, allocator)
 	}
 }
 
@@ -210,11 +210,11 @@ reload_game_code :: proc(host: ^Game_Host, allocator := context.allocator) {
 	}
 
 	wait_for_idle()
-	new_app.attach(g_engine)
+	new_app.reload.attach(g_engine)
 
 	// Same struct, new code: keep the state. Different struct: the old bytes
 	// mean something else now.
-	hard := new_app.state_hash != host.app.state_hash
+	hard := new_app.reload.state_hash != host.app.reload.state_hash
 	if hard {
 		replay_discard(&host.replay, "game layout changed", allocator)
 		reset_shader_watches(g_engine)
@@ -233,8 +233,8 @@ reload_game_code :: proc(host: ^Game_Host, allocator := context.allocator) {
 	}
 
 	alloc_err: mem.Allocator_Error
-	host.memory, alloc_err = mem.alloc(host.app.state_size, host.app.state_align, allocator)
-	if alloc_err != nil do fatal("cannot allocate %v bytes of game state: %v", host.app.state_size, alloc_err)
+	host.memory, alloc_err = mem.alloc(host.app.reload.state_size, host.app.reload.state_align, allocator)
+	if alloc_err != nil do fatal("cannot allocate %v bytes of game state: %v", host.app.reload.state_size, alloc_err)
 
 	if host.app.init != nil {
 		if init_err := host.app.init(host.memory); init_err != .None {

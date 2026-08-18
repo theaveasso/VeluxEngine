@@ -1,6 +1,10 @@
 package velux
 
+import "core:math"
 import "core:path/filepath"
+
+import stbtt "vendor:stb/truetype"
+
 MAX_GLYPHS :: 16384
 
 TEXT_SHADER :: "text.slang"
@@ -26,6 +30,28 @@ Text_Renderer :: struct {
 	pipeline: GPU_Pipeline,
 	buffers:  [MAX_FRAMES_IN_FLIGHT]GPU_Buffer(Glyph_Instance),
 	counts:   [MAX_FRAMES_IN_FLIGHT]u32,
+}
+
+text :: proc(renderer: ^Text_Renderer, frame: Frame, font: ^Font, str: string, pos: [2]f32, color: [4]u8) {
+	origin_x := math.round(pos.x)
+	x := origin_x
+	y := math.round(pos.y) + math.round(font.atlas.ascent)
+
+	for ch in str {
+		if ch == '\n' {
+			x = origin_x
+			y += font.atlas.line_height
+			continue
+		}
+
+		i := glyph_index(ch)
+		if i < 0 do continue
+
+		q: stbtt.aligned_quad
+		stbtt.GetPackedQuad(raw_data(font.atlas.chars[:]), FONT_ATLAS_W, FONT_ATLAS_H + 1, i32(i), &x, &y, &q, true)
+
+		push_glyph(renderer, frame, {rect = {q.x0, q.y0, q.x1, q.y1}, uv = {q.s0, q.t0, q.s1, q.t1}, color = color})
+	}
 }
 
 @(require_results)

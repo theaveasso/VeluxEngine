@@ -21,6 +21,7 @@ GPU_Buffer_Kind :: enum {
 	Storage,
 	Index,
 	Staging,
+	Dynamic,
 }
 
 @(require_results)
@@ -77,6 +78,9 @@ vk_vma_buffer_flags :: proc(kind: GPU_Buffer_Kind) -> (vk.BufferUsageFlags, vma.
 		return {.TRANSFER_DST, .INDEX_BUFFER, .SHADER_DEVICE_ADDRESS}, {}
 	case .Staging:
 		return {.TRANSFER_SRC}, {.MAPPED, .HOST_ACCESS_SEQUENTIAL_WRITE}
+
+	case .Dynamic:
+		return {.STORAGE_BUFFER, .SHADER_DEVICE_ADDRESS}, {.MAPPED, .HOST_ACCESS_SEQUENTIAL_WRITE}
 	}
 	unreachable()
 }

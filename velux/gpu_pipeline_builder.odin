@@ -95,9 +95,28 @@ pipeline_builder_multisampling_none :: proc(builder: ^Pipeline_Builder) {
 }
 
 @(private)
-pipeline_builder_disable_blending :: proc(builder: ^Pipeline_Builder) {
+pipeline_builder_set_blending :: proc(builder: ^Pipeline_Builder, blend: GPU_Blend) {
 	builder.color_blend_attachment.colorWriteMask = {.R, .G, .B, .A}
-	builder.color_blend_attachment.blendEnable = false
+	switch blend {
+	case .Off:
+		builder.color_blend_attachment.blendEnable = false
+	case .Alpha:
+		builder.color_blend_attachment.blendEnable = true
+		builder.color_blend_attachment.srcColorBlendFactor = .ONE
+		builder.color_blend_attachment.dstColorBlendFactor = .ONE_MINUS_SRC_ALPHA
+		builder.color_blend_attachment.colorBlendOp = .ADD
+		builder.color_blend_attachment.srcAlphaBlendFactor = .ONE
+		builder.color_blend_attachment.dstAlphaBlendFactor = .ONE_MINUS_SRC_ALPHA
+		builder.color_blend_attachment.alphaBlendOp = .ADD
+	case .Additive:
+		builder.color_blend_attachment.blendEnable = true
+		builder.color_blend_attachment.srcColorBlendFactor = .ONE
+		builder.color_blend_attachment.dstColorBlendFactor = .ONE
+		builder.color_blend_attachment.colorBlendOp = .ADD
+		builder.color_blend_attachment.srcAlphaBlendFactor = .ONE
+		builder.color_blend_attachment.dstAlphaBlendFactor = .ONE
+		builder.color_blend_attachment.alphaBlendOp = .ADD
+	}
 }
 
 @(private)

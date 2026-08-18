@@ -11,6 +11,7 @@ pipeline_create_info :: proc(
 	front_face: vk.FrontFace,
 	depth_config: GPU_Depth_Config,
 	cull_mode: vk.CullModeFlags = {},
+	blend: GPU_Blend = .Off,
 	color_format: vk.Format = .UNDEFINED,
 	depth_format: vk.Format = .UNDEFINED,
 	vertex_entry: cstring = DEFAULT_VERTEX_ENTRY,
@@ -25,6 +26,7 @@ pipeline_create_info :: proc(
 		color_format = color_format,
 		depth_format = depth_format,
 		cull_mode = cull_mode,
+		blend = blend,
 		vertex_entry = vertex_entry,
 		fragment_entry = fragment_entry,
 	}

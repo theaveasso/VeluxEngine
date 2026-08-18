@@ -19,8 +19,6 @@ GPU_Depth_Config :: struct {
 	compare_op:    vk.CompareOp,
 }
 
-// Velux commits to reverse-z, so GREATER_OR_EQUAL is the only correct compare
-// op and is not a per-pipeline choice. These three are the answers that exist.
 GPU_Depth :: enum {
 	Off,
 	Read,
@@ -36,6 +34,12 @@ GPU_Cull :: enum {
 	None,
 	Back,
 	Front,
+}
+
+GPU_Blend :: enum {
+	Off,
+	Alpha,
+	Additive,
 }
 
 @(private, require_results)
@@ -78,6 +82,7 @@ GPU_Pipeline_Info :: struct {
 	color_format:       vk.Format,
 	depth_format:       vk.Format,
 	cull_mode:          vk.CullModeFlags,
+	blend:              GPU_Blend,
 	vertex_entry:       cstring,
 	fragment_entry:     cstring,
 }
@@ -97,6 +102,7 @@ create_gpu_pipeline :: proc(
 	winding: GPU_Winding = .CCW,
 	depth: GPU_Depth = .Off,
 	cull: GPU_Cull = .None,
+	blend: GPU_Blend = .Off,
 	color_format: Format = .UNDEFINED,
 	depth_format: Format = .UNDEFINED,
 	vertex_entry: cstring = DEFAULT_VERTEX_ENTRY,
@@ -110,6 +116,7 @@ create_gpu_pipeline :: proc(
 		front_face_from(winding),
 		depth_config_from(depth),
 		cull_mode_from(cull),
+		blend,
 		color_format,
 		depth_format,
 		vertex_entry,
@@ -212,8 +219,6 @@ create_pipeline_layout :: proc(
 	return layout
 }
 
-// Returns an error rather than dying: a shader edited during hot reload can
-// produce a pipeline the driver rejects, and the caller keeps the last good one.
 @(require_results)
 rebuild_gpu_pipeline :: proc(shader: vk.ShaderModule, create_info: GPU_Pipeline_Info, loc := #caller_location) -> (pipeline: GPU_Pipeline, err: Error) {
 	device := &engine_bound(loc).gpu
@@ -234,7 +239,7 @@ rebuild_gpu_pipeline :: proc(shader: vk.ShaderModule, create_info: GPU_Pipeline_
 	pipeline_builder_set_polygon_mode(&pipeline_builder, create_info.polygon_mode)
 	pipeline_builder_set_cull_mode(&pipeline_builder, create_info.cull_mode, create_info.front_face)
 	pipeline_builder_multisampling_none(&pipeline_builder) // TODO: support multisampling
-	pipeline_builder_disable_blending(&pipeline_builder) // TODO: support blending
+	pipeline_builder_set_blending(&pipeline_builder, create_info.blend)
 	pipeline_builder_set_attachment_format(&pipeline_builder, create_info.color_format)
 
 	pipeline_builder_set_depth_format(&pipeline_builder, create_info.depth_format)

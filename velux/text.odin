@@ -54,6 +54,15 @@ text :: proc(renderer: ^Text_Renderer, frame: Frame, font: ^Font, str: string, p
 	}
 }
 
+rect :: proc(renderer: ^Text_Renderer, frame: Frame, min, max: [2]f32, color: [4]u8) {
+	uv := WHITE_TEXEL_UV
+	push_glyph(
+		renderer,
+		frame,
+		{rect = {math.round(min.x), math.round(min.y), math.round(max.x), math.round(max.y)}, uv = {uv.x, uv.y, uv.x, uv.y}, color = color},
+	)
+}
+
 @(require_results)
 create_text_renderer :: proc(loc := #caller_location) -> (renderer: Text_Renderer, err: Error) {
 	engine := engine_bound(loc)

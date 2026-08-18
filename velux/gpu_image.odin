@@ -217,6 +217,8 @@ vk_aspect_of_format :: proc(format: vk.Format) -> (flags: vk.ImageAspectFlags) {
 @(private)
 bytes_per_pixel :: proc(format: vk.Format, loc := #caller_location) -> int {
 	#partial switch format {
+	case .R8_UNORM:
+		return 1
 	case .R8G8B8A8_UNORM, .R8G8B8A8_SRGB:
 		return 4
 	}

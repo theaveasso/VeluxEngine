@@ -1,6 +1,7 @@
 package velux
 
 import "core:math"
+import "core:os"
 import stbtt "vendor:stb/truetype"
 
 FONT_ATLAS_W :: 512
@@ -17,6 +18,13 @@ Font_Atlas :: struct {
 	line_height:  f32,
 	pixel_height: f32,
 }
+
+Font :: struct {
+	atlas: Font_Atlas,
+	image: GPU_Image,
+}
+
+WHITE_TEXEL_UV :: [2]f32{0.5 / f32(FONT_ATLAS_W), (f32(FONT_ATLAS_H) + 0.5) / f32(FONT_ATLAS_H + 1)}
 
 @(require_results)
 glyph_index :: proc(r: rune) -> int {
@@ -78,3 +86,29 @@ font_measure :: proc(atlas: Font_Atlas, text: string) -> [2]f32 {
 
 	return {max(max_width, line_width), lines * atlas.line_height}
 }
+
+@(require_results)
+font_load :: proc(path: string, pixel_height: f32, loc := #caller_location) -> (font: Font, err: Error) {
+	ttf, read_err := os.read_entire_file(path, context.temp_allocator)
+	if read_err != nil do return {}, .Asset_Not_Found
+
+	atlas, baked := bake_font_atlas(ttf, pixel_height)
+	if !baked do return {}, .Asset_Malformed
+
+	font.atlas = atlas
+	font.image = create_gpu_image(.R8_UNORM, {FONT_ATLAS_W, FONT_ATLAS_H + 1, 1}, {.SAMPLED, .TRANSFER_DST}, loc = loc)
+
+	cmd := upload_begin()
+	write_image(cmd, &font.image, font.atlas.pixels, loc)
+	upload_end()
+
+	return font, .None
+}
+
+destroy_font :: proc(font: ^Font) {
+	destroy_gpu_image(&font.image)
+	destroy_font_atlas(&font.atlas)
+}
+
+@(require_results)
+font_atlas_index :: proc(font: Font) -> u32 {return font.image.bindless_index}
